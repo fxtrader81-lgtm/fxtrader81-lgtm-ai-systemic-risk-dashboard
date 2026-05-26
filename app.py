@@ -2,46 +2,56 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 
-# ======================================================
+# =========================================================
 # PAGE CONFIG
-# ======================================================
+# =========================================================
 
 st.set_page_config(
     page_title="AI Risk Terminal",
     layout="wide"
 )
 
-# ======================================================
+# =========================================================
 # API CONFIG
-# ======================================================
+# =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
-# ======================================================
-# GLOBAL STYLE
-# ======================================================
+# =========================================================
+# GLOBAL CSS
+# =========================================================
 
 st.markdown("""
 <style>
 
-html, body, [class*="css"] {
+/* =========================================================
+BACKGROUND
+========================================================= */
+
+html, body, [class*="css"]  {
     background-color: #050816;
     color: white;
-    font-family: "Inter", sans-serif;
+    font-family: Inter, sans-serif;
 }
 
-/* Main Layout */
+.main {
+    background-color: #050816;
+}
+
 .block-container {
-    padding-top: 1.5rem;
+    padding-top: 2rem;
     padding-left: 2rem;
     padding-right: 2rem;
     max-width: 1600px;
 }
 
-/* Header */
+/* =========================================================
+HEADER
+========================================================= */
+
 .main-title {
-    font-size: 48px;
+    font-size: 44px;
     font-weight: 800;
     color: white;
     margin-bottom: 8px;
@@ -51,10 +61,30 @@ html, body, [class*="css"] {
 .sub-title {
     color: #94a3b8;
     font-size: 18px;
-    margin-bottom: 35px;
+    margin-bottom: 36px;
 }
 
-/* Metric Cards */
+/* =========================================================
+INPUT
+========================================================= */
+
+.stTextInput input {
+
+    background-color: #111827 !important;
+
+    color: white !important;
+
+    border-radius: 12px !important;
+
+    border: 1px solid rgba(255,255,255,0.08) !important;
+
+    padding: 10px !important;
+}
+
+/* =========================================================
+CARD
+========================================================= */
+
 .metric-card {
 
     background:
@@ -75,33 +105,32 @@ html, body, [class*="css"] {
     box-shadow:
         0 0 40px rgba(0,0,0,0.35);
 
-    transition: all 0.3s ease;
-}
-
-.metric-card:hover {
-    transform: translateY(-2px);
+    margin-bottom: 18px;
 }
 
 .metric-label {
     color: #94a3b8;
     font-size: 15px;
-    margin-bottom: 22px;
+    margin-bottom: 18px;
 }
 
 .metric-number {
-    font-size: 52px;
+    font-size: 50px;
     font-weight: 800;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
     line-height: 1;
 }
 
 .metric-desc {
-    color: #cbd5e1;
+    color: #d1d5db;
     font-size: 15px;
     line-height: 1.9;
 }
 
-/* Colors */
+/* =========================================================
+COLORS
+========================================================= */
+
 .green {
     color: #22c55e;
 }
@@ -114,45 +143,58 @@ html, body, [class*="css"] {
     color: #fbbf24;
 }
 
-/* Alert Box */
-.alert-box {
+/* =========================================================
+ALERT BOX
+========================================================= */
 
-    margin-top: 30px;
+.alert-box {
 
     background:
         linear-gradient(
             90deg,
-            rgba(70,50,0,0.95),
-            rgba(20,15,5,0.98)
+            rgba(70,50,0,0.96),
+            rgba(25,18,5,0.98)
         );
 
     border: 1px solid rgba(251,191,36,0.25);
 
-    border-radius: 26px;
+    border-radius: 24px;
 
-    padding: 36px;
+    padding: 34px;
+
+    margin-top: 10px;
+
+    margin-bottom: 32px;
 
     box-shadow:
         0 0 50px rgba(251,191,36,0.08);
 }
 
 .alert-title {
-    color: #fbbf24;
-    font-size: 38px;
+
+    font-size: 34px;
+
     font-weight: 800;
+
+    color: #fbbf24;
+
     margin-bottom: 18px;
 }
 
 .alert-text {
-    color: white;
-    font-size: 20px;
+
+    font-size: 19px;
+
     line-height: 2;
+
+    color: white;
 }
 
-/* Section Card */
-.section-card {
+/* =========================================================
+SECTION CARD
+========================================================= */
 
-    margin-top: 32px;
+.section-card {
 
     background:
         linear-gradient(
@@ -167,49 +209,55 @@ html, body, [class*="css"] {
 
     padding: 28px;
 
-    min-height: 560px;
+    min-height: 620px;
 
     box-shadow:
         0 0 40px rgba(0,0,0,0.35);
 }
 
 .section-title {
+
     font-size: 30px;
+
     font-weight: 700;
+
     margin-bottom: 28px;
 }
 
 .logic-item {
+
     font-size: 17px;
+
     line-height: 2;
+
     color: #e2e8f0;
-    margin-bottom: 16px;
+
+    margin-bottom: 18px;
 }
 
-/* Footer */
+/* =========================================================
+FOOTER
+========================================================= */
+
 .footer {
-    margin-top: 24px;
-    color: #64748b;
-    font-size: 14px;
-}
 
-.stTextInput input {
-    background-color: #111827 !important;
-    color: white !important;
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
+    margin-top: 28px;
+
+    color: #64748b;
+
+    font-size: 14px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ======================================================
+# =========================================================
 # HEADER
-# ======================================================
+# =========================================================
 
-left, right = st.columns([5, 1])
+left_header, right_header = st.columns([5, 1])
 
-with left:
+with left_header:
 
     st.markdown("""
     <div class="main-title">
@@ -221,16 +269,16 @@ with left:
     </div>
     """, unsafe_allow_html=True)
 
-with right:
+with right_header:
 
     symbol = st.text_input(
         "股票代码",
         "NVDA"
     )
 
-# ======================================================
-# FETCH
-# ======================================================
+# =========================================================
+# FETCH FUNCTION
+# =========================================================
 
 @st.cache_data(ttl=300)
 def fetch(url):
@@ -250,9 +298,9 @@ def fetch(url):
     except:
         return []
 
-# ======================================================
-# SAFE
-# ======================================================
+# =========================================================
+# SAFE GET
+# =========================================================
 
 def safe(x, key):
 
@@ -261,9 +309,9 @@ def safe(x, key):
     except:
         return 0
 
-# ======================================================
+# =========================================================
 # API DATA
-# ======================================================
+# =========================================================
 
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
@@ -273,20 +321,27 @@ cash = fetch(
     f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
 
-# ======================================================
-# MAIN
-# ======================================================
+# =========================================================
+# VALIDATION
+# =========================================================
 
-if isinstance(income, list) and len(income) > 1:
+if (
+    isinstance(income, list)
+    and isinstance(cash, list)
+    and len(income) > 1
+    and len(cash) > 1
+):
 
     years = []
     revenue = []
     capex = []
 
-    for i in range(min(len(income), len(cash))):
+    n = min(len(income), len(cash))
+
+    for i in range(n):
 
         years.append(
-            income[i]["date"][:4]
+            income[i].get("date", "")[:4]
         )
 
         revenue.append(
@@ -294,16 +349,18 @@ if isinstance(income, list) and len(income) > 1:
         )
 
         capex.append(
-            abs(safe(cash[i], "capitalExpenditure"))
+            abs(
+                safe(cash[i], "capitalExpenditure")
+            )
         )
 
     years = years[::-1]
     revenue = revenue[::-1]
     capex = capex[::-1]
 
-    # ======================================================
-    # CORE METRICS
-    # ======================================================
+    # =========================================================
+    # METRICS
+    # =========================================================
 
     rev_growth = (
         (revenue[-1] - revenue[-2])
@@ -319,24 +376,27 @@ if isinstance(income, list) and len(income) > 1:
 
     status = "🟢 健康"
     status_color = "green"
+    status_desc = "当前收入增长仍能覆盖资本扩张。"
 
     if diff > 0:
         status = "🟡 偏热"
         status_color = "yellow"
+        status_desc = "资本扩张已经开始领先收入增长。"
 
-    if diff > 0.2:
+    if diff >= 0.2:
         status = "🟡 过热预警"
         status_color = "yellow"
+        status_desc = "当前AI资本扩张已经进入高波动风险阶段。"
 
-    # ======================================================
+    # =========================================================
     # KPI CARDS
-    # ======================================================
+    # =========================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
 
-        st.markdown(f"""
+        card1 = f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -353,11 +413,16 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
         </div>
-        """, unsafe_allow_html=True)
+        """
+
+        st.markdown(
+            card1,
+            unsafe_allow_html=True
+        )
 
     with c2:
 
-        st.markdown(f"""
+        card2 = f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -374,11 +439,16 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
         </div>
-        """, unsafe_allow_html=True)
+        """
+
+        st.markdown(
+            card2,
+            unsafe_allow_html=True
+        )
 
     with c3:
 
-        st.markdown(f"""
+        card3 = f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -395,11 +465,16 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
         </div>
-        """, unsafe_allow_html=True)
+        """
+
+        st.markdown(
+            card3,
+            unsafe_allow_html=True
+        )
 
     with c4:
 
-        st.markdown(f"""
+        card4 = f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -411,18 +486,22 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="metric-desc">
-            当前AI资本扩张已经进入<br>
-            高波动风险阶段。
+            {status_desc}
             </div>
 
         </div>
-        """, unsafe_allow_html=True)
+        """
 
-    # ======================================================
+        st.markdown(
+            card4,
+            unsafe_allow_html=True
+        )
+
+    # =========================================================
     # ALERT BOX
-    # ======================================================
+    # =========================================================
 
-    st.markdown(f"""
+    alert_html = f"""
     <div class="alert-box">
 
         <div class="alert-title">
@@ -447,21 +526,26 @@ if isinstance(income, list) and len(income) > 1:
         </div>
 
     </div>
-    """, unsafe_allow_html=True)
+    """
 
-    # ======================================================
-    # LOWER PANELS
-    # ======================================================
+    st.markdown(
+        alert_html,
+        unsafe_allow_html=True
+    )
 
-    left_panel, right_panel = st.columns([1, 1])
+    # =========================================================
+    # LOWER LAYOUT
+    # =========================================================
 
-    # ======================================================
+    left_panel, right_panel = st.columns(2)
+
+    # =========================================================
     # LOGIC PANEL
-    # ======================================================
+    # =========================================================
 
     with left_panel:
 
-        st.markdown("""
+        logic_html = """
         <div class="section-card">
 
             <div class="section-title">
@@ -481,13 +565,13 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="logic-item">
-            ④ 计算增速差：
-            <br>
+            ④ 计算增速差：<br>
             CapEx Growth - Revenue Growth
             </div>
 
             <div class="logic-item">
             ⑤ 风险阈值：
+
             <br><br>
 
             增速差 ≥ 20%
@@ -502,26 +586,34 @@ if isinstance(income, list) and len(income) > 1:
 
             小于 0%
             → 健康
+
             </div>
 
         </div>
-        """, unsafe_allow_html=True)
+        """
 
-    # ======================================================
+        st.markdown(
+            logic_html,
+            unsafe_allow_html=True
+        )
+
+    # =========================================================
     # CHART PANEL
-    # ======================================================
+    # =========================================================
 
     with right_panel:
 
-        st.markdown("""
+        chart_card_open = """
         <div class="section-card">
-        """, unsafe_allow_html=True)
+            <div class="section-title">
+            📈 趋势对比（最近5年）
+            </div>
+        """
 
-        st.markdown("""
-        <div class="section-title">
-        📈 趋势对比（最近5年）
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            chart_card_open,
+            unsafe_allow_html=True
+        )
 
         rev_growths = []
         capex_growths = []
@@ -601,9 +693,10 @@ if isinstance(income, list) and len(income) > 1:
 
         fig.update_layout(
 
-            height=500,
+            height=520,
 
             paper_bgcolor="#111827",
+
             plot_bgcolor="#111827",
 
             hovermode="x unified",
@@ -659,21 +752,31 @@ if isinstance(income, list) and len(income) > 1:
             use_container_width=True
         )
 
-        st.markdown("""
+        chart_card_close = """
         </div>
-        """, unsafe_allow_html=True)
+        """
 
-    # ======================================================
+        st.markdown(
+            chart_card_close,
+            unsafe_allow_html=True
+        )
+
+    # =========================================================
     # FOOTER
-    # ======================================================
+    # =========================================================
 
-    st.markdown("""
+    footer_html = """
     <div class="footer">
     数据来源：Financial Modeling Prep（FMP）
     ｜ 单位：USD
     ｜ 更新频率：实时
     </div>
-    """, unsafe_allow_html=True)
+    """
+
+    st.markdown(
+        footer_html,
+        unsafe_allow_html=True
+    )
 
 else:
 
