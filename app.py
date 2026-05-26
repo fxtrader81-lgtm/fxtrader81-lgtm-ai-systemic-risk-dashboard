@@ -8,234 +8,174 @@ import plotly.graph_objects as go
 # =========================
 st.set_page_config(layout="wide")
 
-API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+API_KEY = "YOUR_API_KEY_HERE"
 BASE = "https://financialmodelingprep.com/stable"
 
 symbol = st.text_input("Symbol", "NVDA")
 
+
 # =========================
-# DATA FETCH
+# CACHE (防止限流)
 # =========================
+@st.cache_data(ttl=3600)
 def fetch(url):
     try:
-        return requests.get(url, timeout=10).json()
-    except:
-        return []
+        r = requests.get(url, timeout=10)
 
+        # HTTP error
+        if r.status_code != 200:
+            return {"error": f"HTTP {r.status_code}"}
+
+        data = r.json()
+
+        # API error message
+        if isinstance(data, dict) and "Error Message" in data:
+            return {"error": data["Error Message"]}
+
+        return data
+
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# =========================
+# SAFE FIELD PARSER
+# =========================
+def get_value(x, keys):
+    """Try multiple possible keys"""
+    for k in keys:
+        if isinstance(x, dict) and k in x and x[k] is not None:
+            try:
+                return float(x[k])
+            except:
+                pass
+    return 0.0
+
+
+# =========================
+# FETCH DATA
+# =========================
 income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
 cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
 
-# =========================
-# SAFE
-# =========================
-def safe(x, k):
-    try:
-        return float(x.get(k, 0))
-    except:
-        return 0.0
-
 
 # =========================
-# CSS (关键：看板风格)
+# ERROR HANDLING
 # =========================
-st.markdown("""
-<style>
+if isinstance(income, dict) and "error" in income:
+    st.error(f"Income API Error: {income['error']}")
+    st.stop()
 
-body {
-    background-color: #0b1220;
-}
+if isinstance(cash, dict) and "error" in cash:
+    st.error(f"Cashflow API Error: {cash['error']}")
+    st.stop()
 
-.main {
-    background-color: #0b1220;
-}
+if not isinstance(income, list) or not isinstance(cash, list):
+    st.error("API返回结构异常（非list）")
+    st.stop()
 
-.block-container {
-    padding-top: 2rem;
-}
-
-.card {
-    background: #111827;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid #243244;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-
-.metric-title {
-    font-size: 13px;
-    color: #9ca3af;
-}
-
-.metric-value {
-    font-size: 26px;
-    font-weight: 700;
-}
-
-.red { color: #ef4444; }
-.green { color: #22c55e; }
-.yellow { color: #fbbf24; }
-
-.big-alert {
-    padding: 18px;
-    border-radius: 12px;
-    background: linear-gradient(90deg, #1f2937, #111827);
-    border: 1px solid #374151;
-    margin-top: 10px;
-}
-
-.alert-title {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-.small {
-    font-size: 12px;
-    color: #9ca3af;
-}
-
-</style>
-""", unsafe_allow_html=True)
+if len(income) < 2 or len(cash) < 2:
+    st.error("数据不足（至少需要2期数据）")
+    st.stop()
 
 
 # =========================
-# VALIDATION
+# BUILD DATA
 # =========================
-if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
+rev, capex, dates = [], [], []
 
-    inc0, inc1 = income[0], income[1]
-    cf0, cf1 = cash[0], cash[1]
+for i in range(min(len(income), len(cash))):
+    inc = income[i]
+    cf = cash[i]
 
-    revenue = safe(inc0, "revenue")
-    revenue_prev = safe(inc1, "revenue")
+    revenue = get_value(inc, ["revenue", "revenueUSD", "totalRevenue"])
+    capex_v = abs(get_value(cf, ["capitalExpenditure", "capex"]))
+    date = inc.get("date", str(i))
 
-    capex = abs(safe(cf0, "capitalExpenditure"))
-    capex_prev = abs(safe(cf1, "capitalExpenditure"))
+    rev.append(revenue)
+    capex.append(capex_v)
+    dates.append(date)
 
-    # =========================
-    # METRICS
-    # =========================
-    rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
-    capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
 
-    threshold = rev_growth * 1.2
-    overheat = capex_growth > threshold
+df = pd.DataFrame({
+    "date": dates,
+    "revenue": rev,
+    "capex": capex
+})
 
-    # =========================
-    # HEADER
-    # =========================
-    st.title(f"📊 AI Compute-Dollar Risk Terminal — {symbol}")
+df = df.iloc[::-1]  # chronological
 
-    # =========================
-    # KPI ROW (像你图里的卡片)
-    # =========================
-    col1, col2, col3, col4 = st.columns(4)
 
-    with col1:
-        st.markdown(f"""
-        <div class="card">
-            <div class="metric-title">收入增长率 (YoY)</div>
-            <div class="metric-value green">{rev_growth*100:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+# =========================
+# METRICS
+# =========================
+df["rev_growth"] = df["revenue"].pct_change()
+df["capex_growth"] = df["capex"].pct_change()
 
-    with col2:
-        st.markdown(f"""
-        <div class="card">
-            <div class="metric-title">资本开支增长率</div>
-            <div class="metric-value red">{capex_growth*100:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+latest_rev_growth = df["rev_growth"].iloc[-1] if len(df) > 1 else 0
+latest_capex_growth = df["capex_growth"].iloc[-1] if len(df) > 1 else 0
 
-    with col3:
-        diff = (capex_growth - rev_growth) * 100
-        st.markdown(f"""
-        <div class="card">
-            <div class="metric-title">增速差 (CapEx - Revenue)</div>
-            <div class="metric-value yellow">{diff:.2f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+risk_gap = latest_capex_growth - latest_rev_growth
 
-    with col4:
-        status = "过热预警" if overheat else "正常"
-        color = "red" if overheat else "green"
+overheat = latest_capex_growth > latest_rev_growth * 1.2
 
-        st.markdown(f"""
-        <div class="card">
-            <div class="metric-title">状态判断</div>
-            <div class="metric-value {color}">{status}</div>
-        </div>
-        """, unsafe_allow_html=True)
 
-    # =========================
-    # BIG ALERT（中间大横幅）
-    # =========================
-    if overheat:
-        alert_text = "⚠️ AI资本开支扩张速度明显高于收入增长，进入过热阶段"
-        alert_color = "red"
-    else:
-        alert_text = "✅ 当前资本扩张仍由收入增长支撑，结构健康"
-        alert_color = "green"
+# =========================
+# UI HEADER
+# =========================
+st.title(f"📊 AI Compute-Dollar Risk Terminal — {symbol}")
 
-    st.markdown(f"""
-    <div class="big-alert">
-        <div class="alert-title {alert_color}">结论：{status}</div>
-        <div style="margin-top:8px;">{alert_text}</div>
-        <div class="small">规则：CapEx增长 > 收入增长 × 1.2 → 过热信号</div>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # =========================
-    # LAYOUT: LEFT TEXT + RIGHT CHART
-    # =========================
-    left, right = st.columns([1, 1])
+# =========================
+# KPI CARDS
+# =========================
+col1, col2, col3, col4 = st.columns(4)
 
-    with left:
-        st.subheader("🧠 检测逻辑")
+col1.metric("Revenue Growth", f"{latest_rev_growth*100:.2f}%")
+col2.metric("CapEx Growth", f"{latest_capex_growth*100:.2f}%")
+col3.metric("Risk Gap", f"{risk_gap*100:.2f}%")
+col4.metric("Status", "OVERHEAT" if overheat else "NORMAL")
 
-        st.markdown(f"""
-        <div class="card">
-        1️⃣ 获取收入 & 资本开支数据<br>
-        2️⃣ 计算 YoY 增速<br>
-        3️⃣ 计算增速差：CapEx - Revenue<br>
-        4️⃣ 判断是否超过阈值（×1.2）<br><br>
 
-        <b>当前计算：</b><br>
-        收入增长：{rev_growth*100:.2f}%<br>
-        CapEx增长：{capex_growth*100:.2f}%<br>
-        阈值：{threshold*100:.2f}%
-        </div>
-        """, unsafe_allow_html=True)
-
-    with right:
-        st.subheader("📈 趋势对比")
-
-        # build mini trend from list
-        rev_series = [safe(x, "revenue") for x in income[:6]][::-1]
-        capex_series = [abs(safe(x, "capitalExpenditure")) for x in cash[:6]][::-1]
-
-        fig = go.Figure()
-
-        fig.add_trace(go.Scatter(
-            y=rev_series,
-            name="Revenue",
-            line=dict(color="green")
-        ))
-
-        fig.add_trace(go.Scatter(
-            y=capex_series,
-            name="CapEx",
-            line=dict(color="red")
-        ))
-
-        fig.update_layout(
-            paper_bgcolor="#0b1220",
-            plot_bgcolor="#0b1220",
-            font=dict(color="white"),
-            height=420,
-            margin=dict(l=10, r=10, t=30, b=10)
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
+# =========================
+# ALERT
+# =========================
+if overheat:
+    st.error("⚠️ 资本开支增长显著高于收入增长 —— 可能进入过热阶段")
 else:
-    st.error("API数据不足或请求失败")
+    st.success("✅ 资本开支与收入增长结构健康")
+
+
+# =========================
+# CHART
+# =========================
+fig = go.Figure()
+
+fig.add_trace(go.Scatter(
+    y=df["revenue"],
+    x=df["date"],
+    name="Revenue"
+))
+
+fig.add_trace(go.Scatter(
+    y=df["capex"],
+    x=df["date"],
+    name="CapEx"
+))
+
+fig.update_layout(
+    height=500,
+    paper_bgcolor="#0e1117",
+    plot_bgcolor="#0e1117",
+    font=dict(color="white"),
+    margin=dict(l=10, r=10, t=30, b=10)
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+
+# =========================
+# TABLE
+# =========================
+st.subheader("Raw Data")
+st.dataframe(df)
