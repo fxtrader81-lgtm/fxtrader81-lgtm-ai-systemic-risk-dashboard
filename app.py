@@ -1,13 +1,9 @@
 import streamlit as st
 import requests
-import pandas as pd
-import matplotlib.pyplot as plt
 
-# =========================
-# CONFIG
-# =========================
-st.set_page_config(layout="wide")
-st.title("📊 AI Compute-Dollar Risk Terminal v13 (Visual Edition)")
+st.set_page_config(layout="centered")
+
+st.title("📊 AI Compute-Dollar Risk Terminal v12")
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
@@ -15,112 +11,111 @@ BASE = "https://financialmodelingprep.com/stable"
 symbol = st.text_input("Symbol", "NVDA")
 
 
-# =========================
-# FETCH
-# =========================
 def fetch(url):
     try:
-        return requests.get(url, timeout=10).json()
+        return requests.get(url).json()
     except:
         return []
 
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
+def safe(x, k):
+    try:
+        return float(x.get(k, 0))
+    except:
+        return 0.0
 
 
-# =========================
-# VALIDATE
-# =========================
-if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2 and len(cash) >= 2:
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
+cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
 
-    # =========================
-    # BUILD DATAFRAME
-    # =========================
-    rev_list = []
-    capex_list = []
-    fcf_list = []
-    dates = []
 
-    for i in range(min(len(income), len(cash))):
-        inc = income[i]
-        cf = cash[i]
+if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-        rev = inc.get("revenue", 0)
-        capex = abs(cf.get("capitalExpenditure", 0))
-        fcf = cf.get("freeCashFlow", 0)
-        date = inc.get("date", str(i))
+    inc0, inc1 = income[0], income[1]
+    cf0, cf1 = cash[0], cash[1]
 
-        rev_list.append(rev)
-        capex_list.append(capex)
-        fcf_list.append(fcf)
-        dates.append(date)
+    revenue = safe(inc0, "revenue")
+    revenue_prev = safe(inc1, "revenue")
 
-    df = pd.DataFrame({
-        "date": dates,
-        "revenue": rev_list,
-        "capex": capex_list,
-        "fcf": fcf_list
-    })
+    capex = abs(safe(cf0, "capitalExpenditure"))
+    capex_prev = abs(safe(cf1, "capitalExpenditure"))
 
-    df = df[::-1]  # chronological order
+    fcf = safe(cf0, "freeCashFlow")
+    fcf_prev = safe(cf1, "freeCashFlow")
 
     # =========================
-    # DERIVED METRICS
+    # STRAW 1 — 核心判断
     # =========================
-    df["rev_growth"] = df["revenue"].pct_change()
-    df["capex_growth"] = df["capex"].pct_change()
-    df["capex_ratio"] = df["capex"] / df["revenue"]
+    rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
+    capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
 
-    df["risk_score"] = df["capex_growth"] - df["rev_growth"]
-
-    # =========================
-    # LAYOUT
-    # =========================
-    col1, col2 = st.columns(2)
-
-    # =========================
-    # CHART 1 - Revenue vs CapEx
-    # =========================
-    with col1:
-        st.subheader("📈 Revenue vs CapEx")
-
-        fig, ax = plt.subplots()
-        ax.plot(df["date"], df["revenue"], label="Revenue")
-        ax.plot(df["date"], df["capex"], label="CapEx")
-        ax.legend()
-        ax.set_xticklabels(df["date"], rotation=45)
-        st.pyplot(fig)
+    if capex_growth > rev_growth * 1.2:
+        straw1 = "🟡 OVERHEAT（资本开支跑赢收入）"
+        straw1_msg = "AI资本扩张 > 真实需求增长，进入过热阶段"
+    elif capex_growth > rev_growth:
+        straw1 = "🟠 WARNING（轻度偏离）"
+        straw1_msg = "资本扩张开始领先收入，但尚未失衡"
+    else:
+        straw1 = "🟢 HEALTHY（良性扩张）"
+        straw1_msg = "收入增长仍能支撑资本开支"
 
     # =========================
-    # CHART 2 - Growth Rate
+    # STRAW 2 — 利润质量
     # =========================
-    with col2:
-        st.subheader("📊 Growth Rate")
+    margin = safe(inc0, "operatingIncome") / revenue if revenue else 0
 
-        fig2, ax2 = plt.subplots()
-        ax2.plot(df["date"], df["rev_growth"], label="Revenue Growth")
-        ax2.plot(df["date"], df["capex_growth"], label="CapEx Growth")
-        ax2.legend()
-        ax2.set_xticklabels(df["date"], rotation=45)
-        st.pyplot(fig2)
+    straw2 = "🟢 OK" if margin > 0.25 else "🟡 WEAK"
+    straw2_msg = "盈利能力稳定" if margin > 0.25 else "利润率压力出现"
 
     # =========================
-    # CHART 3 - Risk Curve
+    # STRAW 3 — CapEx 压力
     # =========================
-    st.subheader("🧨 Risk Curve (CapEx - Revenue Growth)")
+    capex_ratio = capex / revenue if revenue else 0
 
-    fig3, ax3 = plt.subplots()
-    ax3.plot(df["date"], df["risk_score"], color="red")
-    ax3.axhline(0, linestyle="--")
-    ax3.set_xticklabels(df["date"], rotation=45)
-    st.pyplot(fig3)
+    straw3 = "🟢 OK" if capex_ratio < 0.05 else "🟡 HIGH"
+    straw3_msg = "资本开支可控" if capex_ratio < 0.05 else "资本开支偏重"
 
     # =========================
-    # TABLE
+    # STRAW 4 — 现金流
     # =========================
-    st.subheader("📊 Raw Data Table")
-    st.dataframe(df)
+    fcf_trend = fcf - fcf_prev
+
+    straw4 = "🟢 STRONG" if fcf_trend > 0 else "🟡 WEAK"
+    straw4_msg = "现金流改善" if fcf_trend > 0 else "现金流走弱"
+
+    # =========================
+    # STRAW 5 — 系统风险
+    # =========================
+    system_score = rev_growth + (0.5 * capex_growth)
+
+    if system_score > 0.8:
+        straw5 = "🔴 RISK"
+        straw5_msg = "系统进入高波动扩张阶段"
+    elif system_score > 0.3:
+        straw5 = "🟡 WATCH"
+        straw5_msg = "结构性风险上升"
+    else:
+        straw5 = "🟢 STABLE"
+        straw5_msg = "系统稳定"
+
+    # =========================
+    # UI（只显示结论）
+    # =========================
+
+    st.subheader("🧨 Straw 1 - AI Capital Cycle")
+    st.metric(straw1, straw1_msg)
+
+    st.subheader("🧨 Straw 2 - Profit Quality")
+    st.metric(straw2, straw2_msg)
+
+    st.subheader("🧨 Straw 3 - CapEx Pressure")
+    st.metric(straw3, straw3_msg)
+
+    st.subheader("🧨 Straw 4 - Cash Flow")
+    st.metric(straw4, straw4_msg)
+
+    st.subheader("🧨 Straw 5 - System Risk")
+    st.metric(straw5, straw5_msg)
 
 else:
-    st.error("数据不足或API失败")
+    st.error("API数据不足或请求失败")
