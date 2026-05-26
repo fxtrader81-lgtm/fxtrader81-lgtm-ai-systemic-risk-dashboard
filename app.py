@@ -1,23 +1,33 @@
 import streamlit as st
 import requests
+import pandas as pd
+import plotly.graph_objects as go
 
-st.set_page_config(layout="centered")
-
-st.title("📊 AI Compute-Dollar Risk Terminal v12")
+# =========================
+# CONFIG
+# =========================
+st.set_page_config(layout="wide")
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 symbol = st.text_input("Symbol", "NVDA")
 
-
+# =========================
+# DATA FETCH
+# =========================
 def fetch(url):
     try:
-        return requests.get(url).json()
+        return requests.get(url, timeout=10).json()
     except:
         return []
 
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
+cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
 
+# =========================
+# SAFE
+# =========================
 def safe(x, k):
     try:
         return float(x.get(k, 0))
@@ -25,10 +35,71 @@ def safe(x, k):
         return 0.0
 
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
+# =========================
+# CSS (关键：看板风格)
+# =========================
+st.markdown("""
+<style>
+
+body {
+    background-color: #0b1220;
+}
+
+.main {
+    background-color: #0b1220;
+}
+
+.block-container {
+    padding-top: 2rem;
+}
+
+.card {
+    background: #111827;
+    padding: 18px;
+    border-radius: 14px;
+    border: 1px solid #243244;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.metric-title {
+    font-size: 13px;
+    color: #9ca3af;
+}
+
+.metric-value {
+    font-size: 26px;
+    font-weight: 700;
+}
+
+.red { color: #ef4444; }
+.green { color: #22c55e; }
+.yellow { color: #fbbf24; }
+
+.big-alert {
+    padding: 18px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #1f2937, #111827);
+    border: 1px solid #374151;
+    margin-top: 10px;
+}
+
+.alert-title {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.small {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 
+# =========================
+# VALIDATION
+# =========================
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
     inc0, inc1 = income[0], income[1]
@@ -40,82 +111,131 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     capex = abs(safe(cf0, "capitalExpenditure"))
     capex_prev = abs(safe(cf1, "capitalExpenditure"))
 
-    fcf = safe(cf0, "freeCashFlow")
-    fcf_prev = safe(cf1, "freeCashFlow")
-
     # =========================
-    # STRAW 1 — 核心判断
+    # METRICS
     # =========================
     rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
     capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
 
-    if capex_growth > rev_growth * 1.2:
-        straw1 = "🟡 OVERHEAT（资本开支跑赢收入）"
-        straw1_msg = "AI资本扩张 > 真实需求增长，进入过热阶段"
-    elif capex_growth > rev_growth:
-        straw1 = "🟠 WARNING（轻度偏离）"
-        straw1_msg = "资本扩张开始领先收入，但尚未失衡"
+    threshold = rev_growth * 1.2
+    overheat = capex_growth > threshold
+
+    # =========================
+    # HEADER
+    # =========================
+    st.title(f"📊 AI Compute-Dollar Risk Terminal — {symbol}")
+
+    # =========================
+    # KPI ROW (像你图里的卡片)
+    # =========================
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="card">
+            <div class="metric-title">收入增长率 (YoY)</div>
+            <div class="metric-value green">{rev_growth*100:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="card">
+            <div class="metric-title">资本开支增长率</div>
+            <div class="metric-value red">{capex_growth*100:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        diff = (capex_growth - rev_growth) * 100
+        st.markdown(f"""
+        <div class="card">
+            <div class="metric-title">增速差 (CapEx - Revenue)</div>
+            <div class="metric-value yellow">{diff:.2f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        status = "过热预警" if overheat else "正常"
+        color = "red" if overheat else "green"
+
+        st.markdown(f"""
+        <div class="card">
+            <div class="metric-title">状态判断</div>
+            <div class="metric-value {color}">{status}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # =========================
+    # BIG ALERT（中间大横幅）
+    # =========================
+    if overheat:
+        alert_text = "⚠️ AI资本开支扩张速度明显高于收入增长，进入过热阶段"
+        alert_color = "red"
     else:
-        straw1 = "🟢 HEALTHY（良性扩张）"
-        straw1_msg = "收入增长仍能支撑资本开支"
+        alert_text = "✅ 当前资本扩张仍由收入增长支撑，结构健康"
+        alert_color = "green"
+
+    st.markdown(f"""
+    <div class="big-alert">
+        <div class="alert-title {alert_color}">结论：{status}</div>
+        <div style="margin-top:8px;">{alert_text}</div>
+        <div class="small">规则：CapEx增长 > 收入增长 × 1.2 → 过热信号</div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # =========================
-    # STRAW 2 — 利润质量
+    # LAYOUT: LEFT TEXT + RIGHT CHART
     # =========================
-    margin = safe(inc0, "operatingIncome") / revenue if revenue else 0
+    left, right = st.columns([1, 1])
 
-    straw2 = "🟢 OK" if margin > 0.25 else "🟡 WEAK"
-    straw2_msg = "盈利能力稳定" if margin > 0.25 else "利润率压力出现"
+    with left:
+        st.subheader("🧠 检测逻辑")
 
-    # =========================
-    # STRAW 3 — CapEx 压力
-    # =========================
-    capex_ratio = capex / revenue if revenue else 0
+        st.markdown(f"""
+        <div class="card">
+        1️⃣ 获取收入 & 资本开支数据<br>
+        2️⃣ 计算 YoY 增速<br>
+        3️⃣ 计算增速差：CapEx - Revenue<br>
+        4️⃣ 判断是否超过阈值（×1.2）<br><br>
 
-    straw3 = "🟢 OK" if capex_ratio < 0.05 else "🟡 HIGH"
-    straw3_msg = "资本开支可控" if capex_ratio < 0.05 else "资本开支偏重"
+        <b>当前计算：</b><br>
+        收入增长：{rev_growth*100:.2f}%<br>
+        CapEx增长：{capex_growth*100:.2f}%<br>
+        阈值：{threshold*100:.2f}%
+        </div>
+        """, unsafe_allow_html=True)
 
-    # =========================
-    # STRAW 4 — 现金流
-    # =========================
-    fcf_trend = fcf - fcf_prev
+    with right:
+        st.subheader("📈 趋势对比")
 
-    straw4 = "🟢 STRONG" if fcf_trend > 0 else "🟡 WEAK"
-    straw4_msg = "现金流改善" if fcf_trend > 0 else "现金流走弱"
+        # build mini trend from list
+        rev_series = [safe(x, "revenue") for x in income[:6]][::-1]
+        capex_series = [abs(safe(x, "capitalExpenditure")) for x in cash[:6]][::-1]
 
-    # =========================
-    # STRAW 5 — 系统风险
-    # =========================
-    system_score = rev_growth + (0.5 * capex_growth)
+        fig = go.Figure()
 
-    if system_score > 0.8:
-        straw5 = "🔴 RISK"
-        straw5_msg = "系统进入高波动扩张阶段"
-    elif system_score > 0.3:
-        straw5 = "🟡 WATCH"
-        straw5_msg = "结构性风险上升"
-    else:
-        straw5 = "🟢 STABLE"
-        straw5_msg = "系统稳定"
+        fig.add_trace(go.Scatter(
+            y=rev_series,
+            name="Revenue",
+            line=dict(color="green")
+        ))
 
-    # =========================
-    # UI（只显示结论）
-    # =========================
+        fig.add_trace(go.Scatter(
+            y=capex_series,
+            name="CapEx",
+            line=dict(color="red")
+        ))
 
-    st.subheader("🧨 Straw 1 - AI Capital Cycle")
-    st.metric(straw1, straw1_msg)
+        fig.update_layout(
+            paper_bgcolor="#0b1220",
+            plot_bgcolor="#0b1220",
+            font=dict(color="white"),
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10)
+        )
 
-    st.subheader("🧨 Straw 2 - Profit Quality")
-    st.metric(straw2, straw2_msg)
-
-    st.subheader("🧨 Straw 3 - CapEx Pressure")
-    st.metric(straw3, straw3_msg)
-
-    st.subheader("🧨 Straw 4 - Cash Flow")
-    st.metric(straw4, straw4_msg)
-
-    st.subheader("🧨 Straw 5 - System Risk")
-    st.metric(straw5, straw5_msg)
+        st.plotly_chart(fig, use_container_width=True)
 
 else:
     st.error("API数据不足或请求失败")
