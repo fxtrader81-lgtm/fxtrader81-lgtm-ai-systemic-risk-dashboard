@@ -7,31 +7,17 @@ import time
 # =========================
 # UI
 # =========================
-st.set_page_config(page_title="AI Systemic Risk Terminal", layout="wide")
-st.title("📊 AI Compute-Dollar Systemic Risk Terminal (v1)")
+st.set_page_config(page_title="AI Systemic Risk Terminal v2", layout="wide")
+st.title("📊 AI Compute-Dollar Systemic Risk Terminal (v2)")
 
-st.caption("No synthetic data. Only real market signals or explicit missing data.")
+st.caption("No synthetic data. All signals are real market data or explicit missing values.")
 
 # =========================
-# Safe utils
+# SAFE TOOLS
 # =========================
-def safe_float(x):
-    try:
-        if isinstance(x, pd.Series):
-            x = x.dropna()
-            if len(x) == 0:
-                return None
-            return float(x.iloc[-1])
-        if pd.isna(x):
-            return None
-        return float(x)
-    except:
-        return None
-
-
 def load(ticker):
     try:
-        time.sleep(0.4)
+        time.sleep(0.3)
         df = yf.download(ticker, period="6mo", interval="1d", progress=False)
         if df is None or df.empty:
             return None
@@ -40,10 +26,10 @@ def load(ticker):
         return None
 
 
-def return_30d(df):
-    if df is None or df.empty:
-        return None
+def ret_30(df):
     try:
+        if df is None or df.empty:
+            return None
         c = df["Close"].dropna()
         if len(c) < 30:
             return None
@@ -52,79 +38,44 @@ def return_30d(df):
         return None
 
 
-def risk(score):
-    if score is None:
-        return "⚪ 无数据"
-    if score > 15:
-        return "🔴 高风险"
-    if score > 8:
-        return "🟠 中风险"
-    return "🟢 稳定"
+def fmt(x):
+    return "无法采集数据" if x is None else f"{x:.2f}%"
+
 
 # =========================
 # DATA LAYER
 # =========================
-
 nvda = load("NVDA")
 msft = load("MSFT")
 qqq = load("QQQ")
 tsla = load("TSLA")
-dxy = load("DX-Y.NYB")   # 美元指数 proxy
-tnx = load("^TNX")       # 10Y yield
+dxy = load("DX-Y.NYB")
+tnx = load("^TNX")
 
-nvda_r = return_30d(nvda)
-msft_r = return_30d(msft)
-qqq_r = return_30d(qqq)
-tsla_r = return_30d(tsla)
-dxy_r = return_30d(dxy)
-tnx_r = return_30d(tnx)
-
-# =========================
-# DASHBOARD
-# =========================
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.subheader("💻 AI 核心资产（稻草1）")
-    st.write("NVDA:", nvda_r, risk(-nvda_r if nvda_r else None))
-    st.write("MSFT:", msft_r, risk(-msft_r if msft_r else None))
-    st.write("QQQ:", qqq_r, risk(-qqq_r if qqq_r else None))
-
-with col2:
-    st.subheader("💰 流动性与美元（稻草5）")
-    st.write("DXY:", dxy_r)
-    st.write("10Y Yield:", tnx_r)
-
-with col3:
-    st.subheader("⚡ AI 高波动资产")
-    st.write("TSLA:", tsla_r, risk(-tsla_r if tsla_r else None))
+nvda_r = ret_30(nvda)
+msft_r = ret_30(msft)
+qqq_r = ret_30(qqq)
+tsla_r = ret_30(tsla)
+dxy_r = ret_30(dxy)
+tnx_r = ret_30(tnx)
 
 # =========================
-# RISK ENGINE
+# RISK ENGINE (simple but stable)
 # =========================
-
-st.divider()
-st.subheader("🧠 Systemic Risk Engine")
-
 risk_score = 0
 
-# 稻草1：AI CapEx/泡沫 proxy（用 NVDA/MSFT/QQQ）
 if nvda_r is not None:
     risk_score += max(0, -nvda_r) * 0.4
 
 if msft_r is not None:
     risk_score += max(0, -msft_r) * 0.3
 
-# 稻草2：市场风险
 if qqq_r is not None:
     risk_score += max(0, -qqq_r) * 0.3
 
-# 稻草3：高波动
 if tsla_r is not None:
     risk_score += max(0, -tsla_r) * 0.2
 
-# 稻草5：利率压力（简单 proxy）
 if tnx_r is not None:
     risk_score += max(0, tnx_r) * 0.1
 
@@ -134,35 +85,118 @@ status = (
     "🟢 STABLE"
 )
 
-st.metric("Risk Score", round(risk_score, 2))
-st.write("Status:", status)
+# =========================
+# HEADER DASHBOARD
+# =========================
+colA, colB, colC = st.columns(3)
 
-# =========================
-# FIVE STRAWS PANEL
-# =========================
+with colA:
+    st.metric("System Risk Score", round(risk_score, 2))
+    st.write("Status:", status)
+
+with colB:
+    st.metric("DXY (USD proxy)", fmt(dxy_r))
+    st.metric("10Y Yield (pressure)", fmt(tnx_r))
+
+with colC:
+    st.metric("NVDA (AI core)", fmt(nvda_r))
+    st.metric("MSFT (AI cloud)", fmt(msft_r))
 
 st.divider()
-st.subheader("🧨 Five Straw Breakdown (AI Bubble Fragility Map)")
-
-st.markdown("""
-### 稻草1：AI 收入 vs CapEx 压力（用 NVDA / MSFT / QQQ proxy）
-如果 AI 相关资产持续下跌 → 说明资本对 AI 盈利能力开始怀疑
-
-### 稻草2：开源模型冲击（目前无法直接数据化）
-观察 proxy：云计算公司（MSFT / AMZN）
-
-### 稻草3：数据中心资产风险（未直接可测）
-观察 NVDA / QQQ / utilities proxy
-
-### 稻草4：能源瓶颈
-用 10Y yield + DXY proxy 观察资金成本与能源压力
-
-### 稻草5：美元流动性
-DXY + 利率上行 = 全球美元回收 → AI 杠杆收缩
-""")
 
 # =========================
-# FOOTER
+# STRAW 1
 # =========================
+st.subheader("🧨 稻草一：AI 收入 vs CapEx 压力（AI 资产泡沫）")
 
-st.caption("v1: proxy-based systemic risk model | upgrade path: FRED + VIX + energy markets + liquidity spreads")
+st.markdown("**监测逻辑：** AI 公司靠未来利润定价，如果 AI 核心资产持续下跌，说明市场开始怀疑 AI 盈利能力。")
+
+st.markdown("**指标体系：**")
+st.write("- NVDA 30日收益率（GPU需求 proxy）")
+st.write("- MSFT 30日收益率（AI云收入 proxy）")
+st.write("- QQQ 30日收益率（AI科技整体估值）")
+
+st.markdown("**当前数据：**")
+st.write("NVDA:", fmt(nvda_r))
+st.write("MSFT:", fmt(msft_r))
+st.write("QQQ:", fmt(qqq_r))
+
+st.divider()
+
+# =========================
+# STRAW 2
+# =========================
+st.subheader("🧨 稻草二：开源模型冲击（智力税崩塌风险）")
+
+st.markdown("**监测逻辑：** 如果AI能力商品化（开源追平闭源），云厂商溢价会下降。")
+
+st.markdown("**指标体系：**")
+st.write("- MSFT（云AI定价能力 proxy）")
+st.write("- QQQ（AI行业整体定价能力）")
+
+st.markdown("**当前数据：**")
+st.write("MSFT:", fmt(msft_r))
+st.write("QQQ:", fmt(qqq_r))
+
+st.divider()
+
+# =========================
+# STRAW 3
+# =========================
+st.subheader("🧨 稻草三：数据中心资产风险（重资产贬值）")
+
+st.markdown("**监测逻辑：** AI数据中心是长周期资产，如果科技资产回撤，意味着未来CapEx可能收缩。")
+
+st.markdown("**指标体系：**")
+st.write("- NVDA（GPU资产链）")
+st.write("- QQQ（科技资本开支预期）")
+
+st.markdown("**当前数据：**")
+st.write("NVDA:", fmt(nvda_r))
+st.write("QQQ:", fmt(qqq_r))
+
+st.divider()
+
+# =========================
+# STRAW 4
+# =========================
+st.subheader("🧨 稻草四：能源瓶颈（热力学约束）")
+
+st.markdown("**监测逻辑：** AI = 电力工业，如果利率+能源成本上升，扩张速度下降。")
+
+st.markdown("**指标体系：**")
+st.write("- 10Y国债收益率（资金成本）")
+st.write("- DXY美元指数（全球流动性收缩 proxy）")
+
+st.markdown("**当前数据：**")
+st.write("10Y Yield:", fmt(tnx_r))
+st.write("DXY:", fmt(dxy_r))
+
+st.divider()
+
+# =========================
+# STRAW 5
+# =========================
+st.subheader("🧨 稻草五：美元流动性收缩（AI杠杆系统核心风险）")
+
+st.markdown("**监测逻辑：** AI投资依赖美元流动性，利率上升 + 美元走强 = 全球资金回流美国 = AI融资收缩。")
+
+st.markdown("**指标体系：**")
+st.write("- DXY（美元回流强度）")
+st.write("- 10Y Yield（融资成本）")
+
+st.markdown("**当前数据：**")
+st.write("DXY:", fmt(dxy_r))
+st.write("10Y:", fmt(tnx_r))
+
+st.divider()
+
+# =========================
+# FINAL VIEW
+# =========================
+st.subheader("🧠 System Summary")
+
+st.write("这是一个基于五大风险稻草的 AI 次贷结构监测模型。")
+st.write("核心不是预测市场，而是监测 AI 资本结构是否进入去杠杆阶段。")
+
+st.caption("v2: structured risk engine | data-driven | no synthetic values")
