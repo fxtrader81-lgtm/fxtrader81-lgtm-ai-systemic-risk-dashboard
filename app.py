@@ -3,7 +3,7 @@ import requests
 import plotly.graph_objects as go
 
 # ======================================================
-# PAGE
+# PAGE CONFIG
 # ======================================================
 
 st.set_page_config(
@@ -12,96 +12,192 @@ st.set_page_config(
 )
 
 # ======================================================
-# API
+# API CONFIG
 # ======================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 # ======================================================
-# STYLE
+# GLOBAL STYLE
 # ======================================================
 
 st.markdown("""
 <style>
 
-html, body, [class*="css"]  {
+html, body, [class*="css"] {
     background-color: #050816;
     color: white;
+    font-family: "Inter", sans-serif;
 }
 
+/* Main Layout */
 .block-container {
-    padding-top: 1rem;
+    padding-top: 1.5rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 1600px;
 }
 
-div[data-testid="metric-container"] {
-
-    background: linear-gradient(
-        180deg,
-        #111827 0%,
-        #0f172a 100%
-    );
-
-    border: 1px solid #1f2937;
-
-    padding: 20px;
-
-    border-radius: 18px;
-
-    box-shadow:
-        0 0 25px rgba(0,0,0,0.35);
-}
-
-.label {
-    color: #94a3b8;
-    font-size: 14px;
-}
-
-.big-title {
-    font-size: 42px;
+/* Header */
+.main-title {
+    font-size: 48px;
     font-weight: 800;
-    margin-bottom: 10px;
+    color: white;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
 }
 
 .sub-title {
     color: #94a3b8;
-    margin-bottom: 30px;
+    font-size: 18px;
+    margin-bottom: 35px;
 }
 
+/* Metric Cards */
+.metric-card {
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(17,24,39,0.98) 0%,
+            rgba(15,23,42,0.98) 100%
+        );
+
+    border: 1px solid rgba(255,255,255,0.06);
+
+    border-radius: 24px;
+
+    padding: 28px;
+
+    min-height: 260px;
+
+    box-shadow:
+        0 0 40px rgba(0,0,0,0.35);
+
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-label {
+    color: #94a3b8;
+    font-size: 15px;
+    margin-bottom: 22px;
+}
+
+.metric-number {
+    font-size: 52px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    line-height: 1;
+}
+
+.metric-desc {
+    color: #cbd5e1;
+    font-size: 15px;
+    line-height: 1.9;
+}
+
+/* Colors */
+.green {
+    color: #22c55e;
+}
+
+.red {
+    color: #ef4444;
+}
+
+.yellow {
+    color: #fbbf24;
+}
+
+/* Alert Box */
 .alert-box {
 
-    margin-top: 25px;
+    margin-top: 30px;
 
-    background: linear-gradient(
-        90deg,
-        rgba(70,50,0,0.95),
-        rgba(20,15,5,0.98)
-    );
+    background:
+        linear-gradient(
+            90deg,
+            rgba(70,50,0,0.95),
+            rgba(20,15,5,0.98)
+        );
 
-    border: 1px solid #7c5a10;
+    border: 1px solid rgba(251,191,36,0.25);
 
-    border-radius: 20px;
+    border-radius: 26px;
 
-    padding: 30px;
+    padding: 36px;
+
+    box-shadow:
+        0 0 50px rgba(251,191,36,0.08);
 }
 
 .alert-title {
     color: #fbbf24;
-    font-size: 32px;
+    font-size: 38px;
     font-weight: 800;
+    margin-bottom: 18px;
 }
 
 .alert-text {
     color: white;
-    font-size: 18px;
-    line-height: 1.8;
-    margin-top: 14px;
+    font-size: 20px;
+    line-height: 2;
 }
 
+/* Section Card */
+.section-card {
+
+    margin-top: 32px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(17,24,39,0.98) 0%,
+            rgba(15,23,42,0.98) 100%
+        );
+
+    border: 1px solid rgba(255,255,255,0.06);
+
+    border-radius: 24px;
+
+    padding: 28px;
+
+    min-height: 560px;
+
+    box-shadow:
+        0 0 40px rgba(0,0,0,0.35);
+}
+
+.section-title {
+    font-size: 30px;
+    font-weight: 700;
+    margin-bottom: 28px;
+}
+
+.logic-item {
+    font-size: 17px;
+    line-height: 2;
+    color: #e2e8f0;
+    margin-bottom: 16px;
+}
+
+/* Footer */
 .footer {
+    margin-top: 24px;
     color: #64748b;
-    margin-top: 20px;
-    font-size: 13px;
+    font-size: 14px;
+}
+
+.stTextInput input {
+    background-color: #111827 !important;
+    color: white !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
 }
 
 </style>
@@ -111,12 +207,12 @@ div[data-testid="metric-container"] {
 # HEADER
 # ======================================================
 
-left, right = st.columns([5,1])
+left, right = st.columns([5, 1])
 
 with left:
 
     st.markdown("""
-    <div class="big-title">
+    <div class="main-title">
     稻草一：AI资本开支循环检测
     </div>
 
@@ -166,7 +262,7 @@ def safe(x, key):
         return 0
 
 # ======================================================
-# DATA
+# API DATA
 # ======================================================
 
 income = fetch(
@@ -205,6 +301,10 @@ if isinstance(income, list) and len(income) > 1:
     revenue = revenue[::-1]
     capex = capex[::-1]
 
+    # ======================================================
+    # CORE METRICS
+    # ======================================================
+
     rev_growth = (
         (revenue[-1] - revenue[-2])
         / revenue[-2]
@@ -218,49 +318,108 @@ if isinstance(income, list) and len(income) > 1:
     diff = capex_growth - rev_growth
 
     status = "🟢 健康"
+    status_color = "green"
 
     if diff > 0:
         status = "🟡 偏热"
+        status_color = "yellow"
 
     if diff > 0.2:
         status = "🟡 过热预警"
+        status_color = "yellow"
 
     # ======================================================
-    # KPI
+    # KPI CARDS
     # ======================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
-        st.metric(
-            "收入增长率 (YoY)",
-            f"{rev_growth*100:.2f}%",
-            "AI需求仍维持高增长"
-        )
+
+        st.markdown(f"""
+        <div class="metric-card">
+
+            <div class="metric-label">
+            收入增长率 (YoY)
+            </div>
+
+            <div class="metric-number green">
+            {rev_growth*100:.2f}%
+            </div>
+
+            <div class="metric-desc">
+            AI需求仍维持高增长，<br>
+            当前收入扩张速度保持强劲。
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
     with c2:
-        st.metric(
-            "资本开支增长率 (YoY)",
-            f"{capex_growth*100:.2f}%",
-            "AI基础设施投入持续提升"
-        )
+
+        st.markdown(f"""
+        <div class="metric-card">
+
+            <div class="metric-label">
+            资本开支增长率 (YoY)
+            </div>
+
+            <div class="metric-number red">
+            {capex_growth*100:.2f}%
+            </div>
+
+            <div class="metric-desc">
+            企业正在加速AI基础设施投入，<br>
+            CapEx扩张速度持续提升。
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
     with c3:
-        st.metric(
-            "增速差 (CapEx - Revenue)",
-            f"{diff*100:.2f}%",
-            "资本扩张已开始超过收入增长"
-        )
+
+        st.markdown(f"""
+        <div class="metric-card">
+
+            <div class="metric-label">
+            增速差 (CapEx - Revenue)
+            </div>
+
+            <div class="metric-number yellow">
+            +{diff*100:.2f}%
+            </div>
+
+            <div class="metric-desc">
+            资本扩张速度已经开始超过<br>
+            收入增长速度。
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
     with c4:
-        st.metric(
-            "状态判断",
-            status,
-            "AI资本扩张进入高波动阶段"
-        )
+
+        st.markdown(f"""
+        <div class="metric-card">
+
+            <div class="metric-label">
+            状态判断
+            </div>
+
+            <div class="metric-number {status_color}">
+            {status}
+            </div>
+
+            <div class="metric-desc">
+            当前AI资本扩张已经进入<br>
+            高波动风险阶段。
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
 
     # ======================================================
-    # ALERT
+    # ALERT BOX
     # ======================================================
 
     st.markdown(f"""
@@ -273,10 +432,14 @@ if isinstance(income, list) and len(income) > 1:
         <div class="alert-text">
 
         当前资本开支增速比收入增速高出
-        {diff*100:.2f}% 。
+        <span class="yellow">
+        {diff*100:.2f}%
+        </span>，
 
         企业AI基础设施投入已经开始超出
         现实需求支撑。
+
+        <br><br>
 
         若趋势持续，
         将提升未来盈利与现金流压力。
@@ -287,69 +450,222 @@ if isinstance(income, list) and len(income) > 1:
     """, unsafe_allow_html=True)
 
     # ======================================================
-    # CHART
+    # LOWER PANELS
     # ======================================================
 
-    st.markdown("## 📈 趋势对比（最近5年）")
+    left_panel, right_panel = st.columns([1, 1])
 
-    rev_growths = []
-    capex_growths = []
+    # ======================================================
+    # LOGIC PANEL
+    # ======================================================
 
-    for i in range(1, len(revenue)):
+    with left_panel:
 
-        rg = (
-            (revenue[i] - revenue[i-1])
-            / revenue[i-1]
-        ) * 100
+        st.markdown("""
+        <div class="section-card">
 
-        cg = (
-            (capex[i] - capex[i-1])
-            / capex[i-1]
-        ) * 100
+            <div class="section-title">
+            ⚙️ 检测逻辑
+            </div>
 
-        rev_growths.append(rg)
-        capex_growths.append(cg)
+            <div class="logic-item">
+            ① 获取最近5年收入与资本开支数据
+            </div>
 
-    fig = go.Figure()
+            <div class="logic-item">
+            ② 计算 Revenue YoY 增长率
+            </div>
 
-    fig.add_trace(go.Scatter(
-        x=years[1:],
-        y=rev_growths,
-        mode="lines+markers",
-        name="收入增长率",
-        line=dict(
-            color="#22c55e",
-            width=4
+            <div class="logic-item">
+            ③ 计算 CapEx YoY 增长率
+            </div>
+
+            <div class="logic-item">
+            ④ 计算增速差：
+            <br>
+            CapEx Growth - Revenue Growth
+            </div>
+
+            <div class="logic-item">
+            ⑤ 风险阈值：
+            <br><br>
+
+            增速差 ≥ 20%
+            → 过热预警
+
+            <br><br>
+
+            0% ~ 20%
+            → 偏热
+
+            <br><br>
+
+            小于 0%
+            → 健康
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ======================================================
+    # CHART PANEL
+    # ======================================================
+
+    with right_panel:
+
+        st.markdown("""
+        <div class="section-card">
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
+        <div class="section-title">
+        📈 趋势对比（最近5年）
+        </div>
+        """, unsafe_allow_html=True)
+
+        rev_growths = []
+        capex_growths = []
+
+        for i in range(1, len(revenue)):
+
+            rg = (
+                (revenue[i] - revenue[i - 1])
+                / revenue[i - 1]
+            ) * 100
+
+            cg = (
+                (capex[i] - capex[i - 1])
+                / capex[i - 1]
+            ) * 100
+
+            rev_growths.append(rg)
+            capex_growths.append(cg)
+
+        chart_years = years[1:]
+
+        fig = go.Figure()
+
+        # Revenue Line
+        fig.add_trace(go.Scatter(
+
+            x=chart_years,
+            y=rev_growths,
+
+            mode="lines+markers+text",
+
+            name="收入增长率",
+
+            text=[
+                f"{x:.1f}%"
+                for x in rev_growths
+            ],
+
+            textposition="top center",
+
+            line=dict(
+                color="#22c55e",
+                width=5
+            ),
+
+            marker=dict(
+                size=10
+            )
+        ))
+
+        # CapEx Line
+        fig.add_trace(go.Scatter(
+
+            x=chart_years,
+            y=capex_growths,
+
+            mode="lines+markers+text",
+
+            name="资本开支增长率",
+
+            text=[
+                f"{x:.1f}%"
+                for x in capex_growths
+            ],
+
+            textposition="bottom center",
+
+            line=dict(
+                color="#ef4444",
+                width=5
+            ),
+
+            marker=dict(
+                size=10
+            )
+        ))
+
+        fig.update_layout(
+
+            height=500,
+
+            paper_bgcolor="#111827",
+            plot_bgcolor="#111827",
+
+            hovermode="x unified",
+
+            font=dict(
+                color="white",
+                size=15
+            ),
+
+            margin=dict(
+                l=20,
+                r=20,
+                t=20,
+                b=20
+            ),
+
+            legend=dict(
+
+                orientation="h",
+
+                yanchor="bottom",
+                y=1.02,
+
+                xanchor="right",
+                x=1,
+
+                font=dict(
+                    size=14
+                )
+            ),
+
+            xaxis=dict(
+
+                showgrid=False,
+
+                tickfont=dict(
+                    size=14
+                )
+            ),
+
+            yaxis=dict(
+
+                title="增长率 (%)",
+
+                gridcolor="rgba(255,255,255,0.08)",
+
+                zerolinecolor="rgba(255,255,255,0.2)"
+            )
         )
-    ))
 
-    fig.add_trace(go.Scatter(
-        x=years[1:],
-        y=capex_growths,
-        mode="lines+markers",
-        name="资本开支增长率",
-        line=dict(
-            color="#ef4444",
-            width=4
+        st.plotly_chart(
+            fig,
+            use_container_width=True
         )
-    ))
 
-    fig.update_layout(
+        st.markdown("""
+        </div>
+        """, unsafe_allow_html=True)
 
-        paper_bgcolor="#111827",
-        plot_bgcolor="#111827",
-
-        height=500,
-
-        font=dict(
-            color="white"
-        )
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+    # ======================================================
+    # FOOTER
+    # ======================================================
 
     st.markdown("""
     <div class="footer">
