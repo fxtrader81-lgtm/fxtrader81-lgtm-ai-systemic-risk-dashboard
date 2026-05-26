@@ -2,27 +2,37 @@ import streamlit as st
 import requests
 import matplotlib.pyplot as plt
 
-# ========== 配置 ==========
-KEY = "你的FMP_API_KEY"   # ← 把这里换成你的key
+# ========== CONFIG ==========
+KEY = "你的FMP_API_KEY"   # ← 只改这一行
+BASE = "https://financialmodelingprep.com/stable"
+
+st.title("📊 AI Compute-Dollar Risk Terminal v1")
+
 symbol = st.text_input("Symbol", "NVDA")
 
-# ========== 数据获取 ==========
+
+# ========== DATA ==========
 def fetch_income(symbol):
-    url = f"https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=5&apikey={KEY}"
+    url = f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={KEY}"
     return requests.get(url).json()
 
 def fetch_cash(symbol):
-    url = f"https://financialmodelingprep.com/stable/cash-flow-statement?symbol={symbol}&limit=5&apikey={KEY}"
+    url = f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={KEY}"
     return requests.get(url).json()
 
-# ========== 主逻辑 ==========
+
+# ========== RUN ==========
 if st.button("Run Analysis"):
 
     income = fetch_income(symbol)
     cash = fetch_cash(symbol)
 
-    if not income or not cash:
-        st.error("API没有返回数据，请检查KEY或权限")
+    if not isinstance(income, list) or not isinstance(cash, list):
+        st.error("API返回错误，请检查Key或权限")
+        st.stop()
+
+    if len(income) < 2 or len(cash) < 2:
+        st.error("数据不足（至少需要2年数据）")
         st.stop()
 
     years = []
@@ -38,32 +48,41 @@ if st.button("Run Analysis"):
     revenue = revenue[::-1]
     capex = capex[::-1]
 
-    st.subheader("📊 Revenue vs CapEx Trend")
+    # ========== CHART ==========
+    st.subheader("📈 Revenue vs CapEx Trend")
 
     fig, ax = plt.subplots()
     ax.plot(years, revenue, label="Revenue")
     ax.plot(years, capex, label="CapEx")
-
     ax.legend()
+
     st.pyplot(fig)
 
-    # ========== 稻草1基础指标 ==========
-    st.subheader("🧨 Straw 1 Snapshot")
+    # ========== STRAW 1 ==========
+    st.subheader("🧨 Straw 1 Signal")
 
-    capex_growth = (capex[-1] - capex[-2]) / capex[-2]
     revenue_growth = (revenue[-1] - revenue[-2]) / revenue[-2]
+    capex_growth = (capex[-1] - capex[-2]) / capex[-2]
 
-    risk = "🟢 HEALTHY"
+    score = 0
+    status = "🟢 HEALTHY"
 
     if capex_growth > revenue_growth:
-        risk = "🟡 OVERHEATING"
+        score += 1
     if capex_growth > revenue_growth * 1.5:
-        risk = "🔴 STRESS"
+        score += 1
+
+    if score == 1:
+        status = "🟡 WATCH"
+    if score >= 2:
+        status = "🔴 OVERHEAT"
 
     st.json({
+        "symbol": symbol,
         "Revenue": revenue[-1],
         "CapEx": capex[-1],
         "Revenue Growth": round(revenue_growth, 4),
         "CapEx Growth": round(capex_growth, 4),
-        "Status": risk
+        "Risk Score": score,
+        "Status": status
     })
