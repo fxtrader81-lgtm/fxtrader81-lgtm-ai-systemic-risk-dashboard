@@ -1,130 +1,118 @@
-import streamlit as st
-import requests
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<title>Straw System - NVDA</title>
 
-st.set_page_config(page_title="AI Risk Terminal", layout="wide")
-
-API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
-BASE = "https://financialmodelingprep.com/stable"
-
-# =========================
-# 🎨 UI STYLE（金融终端风）
-# =========================
-st.markdown("""
 <style>
-body {
-    background-color: #0b0f19;
-    color: #ffffff;
+body{
+    background:#0f1115;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+    color:#e5e7eb;
 }
 
-.block {
-    background: #121a2a;
-    padding: 18px;
-    border-radius: 14px;
-    margin-bottom: 12px;
-    border: 1px solid #1f2a44;
+.card{
+    width:420px;
+    padding:18px;
+    border-radius:14px;
+    background:#151922;
+    border:1px solid #2a2f3a;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);
 }
 
-.title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #7dd3fc;
+.title{
+    font-size:16px;
+    font-weight:700;
+    margin-bottom:10px;
 }
 
-.metric {
-    font-size: 16px;
-    margin-top: 6px;
-    color: #e5e7eb;
+.symbol{
+    color:#93c5fd;
+    font-weight:600;
 }
 
-.good { color: #22c55e; }
-.warn { color: #fbbf24; }
-.bad  { color: #ef4444; }
+.status{
+    margin-top:10px;
+    padding:10px;
+    border-radius:10px;
+    background:#1f2937;
+    font-weight:600;
+}
 
-.small {
-    font-size: 13px;
-    color: #94a3b8;
+.status.warn{
+    color:#fbbf24;
+}
+
+.metric{
+    margin-top:10px;
+    font-size:13px;
+    color:#cbd5e1;
+    line-height:1.6;
+}
+
+.logic{
+    margin-top:12px;
+    font-size:12px;
+    color:#94a3b8;
+    background:#0b1220;
+    padding:10px;
+    border-radius:10px;
+}
+
+.badge{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:999px;
+    font-size:12px;
+    background:#334155;
+    color:#e2e8f0;
 }
 </style>
-""", unsafe_allow_html=True)
+</head>
 
+<body>
 
-symbol = st.text_input("Symbol", "NVDA")
+<div class="card">
 
-
-def fetch(url):
-    try:
-        return requests.get(url).json()
-    except:
-        return []
-
-
-def safe(x, k):
-    try:
-        return float(x.get(k, 0))
-    except:
-        return 0.0
-
-
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=2&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=2&apikey={API_KEY}")
-
-
-if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
-
-    inc0, inc1 = income[0], income[1]
-    cf0, cf1 = cash[0], cash[1]
-
-    revenue = safe(inc0, "revenue")
-    revenue_prev = safe(inc1, "revenue")
-
-    capex = abs(safe(cf0, "capitalExpenditure"))
-    capex_prev = abs(safe(cf1, "capitalExpenditure"))
-
-    # =========================
-    # 🧨 Straw 1 核心逻辑
-    # =========================
-    rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
-    capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
-
-    # 判断逻辑（核心）
-    # CapEx 增速 > 收入增速 => 资本过热
-    if capex_growth > rev_growth * 1.2:
-        status = "🟡 过热风险"
-        cls = "warn"
-        desc = "资本开支扩张速度明显高于收入增长，进入过热阶段"
-    elif capex_growth > rev_growth:
-        status = "🟠 偏热"
-        cls = "warn"
-        desc = "资本扩张开始领先收入增长，但尚未失衡"
-    else:
-        status = "🟢 健康"
-        cls = "good"
-        desc = "收入增长仍能覆盖资本开支扩张"
-
-    # =========================
-    # 🧨 UI 卡片
-    # =========================
-    st.markdown(f"""
-    <div class="block">
-        <div class="title">🧨 稻草一：AI资本开支循环检测</div>
-
-        <div class="metric">
-            当前状态：<b class="{cls}">{status}</b>
-        </div>
-
-        <div class="metric">
-            核心判断：{desc}
-        </div>
-
-        <div class="small">
-            逻辑：当资本开支增速 > 收入增速 × 1.2 时，判定为资本过热信号
-        </div>
-
-        <div class="small">
-            收入增速：{rev_growth:.2%} ｜ CapEx增速：{capex_growth:.2%}
-        </div>
+    <div class="title">
+        Symbol：<span class="symbol">NVDA</span>
     </div>
-    """, unsafe_allow_html=True)
 
-else:
-    st.error("数据加载失败")
+    <div class="title">🧨 稻草一：AI资本开支循环检测</div>
+
+    <div id="status" class="status warn">
+        当前状态：🟡 过热风险
+    </div>
+
+    <div class="metric">
+        核心判断：资本开支扩张速度明显高于收入增长，进入潜在泡沫扩张阶段
+    </div>
+
+    <div class="metric">
+        收入增速：<span id="rev">65.47</span>% ｜ CapEx增速：<span id="capex">86.71</span>%
+    </div>
+
+    <div class="logic">
+        检测逻辑：当 CapEx增速 &gt; 收入增速 × 1.2 时 → 判定为“资本过热信号”
+        <br><br>
+        当前计算：86.71 &gt; 65.47 × 1.2 = 78.56 → <span class="badge">触发过热</span>
+    </div>
+
+</div>
+
+<script>
+const revenue = 65.47;
+const capex = 86.71;
+
+const threshold = revenue * 1.2;
+const isHot = capex > threshold;
+
+document.getElementById("status").innerHTML =
+    "当前状态：" + (isHot ? "🟡 过热风险" : "🟢 正常区间");
+
+document.getElementById("status").className =
+    "status " + (isHot ? "warn" : "");
+</script>
+
+</body>
+</html>
