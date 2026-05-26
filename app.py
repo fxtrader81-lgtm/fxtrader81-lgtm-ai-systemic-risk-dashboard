@@ -3,7 +3,8 @@ import requests
 import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
-st.title("📊 AI Compute-Dollar Risk Terminal v10 (AUTO)")
+
+st.title("📊 AI Compute-Dollar Risk Dashboard v11")
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
@@ -11,9 +12,6 @@ BASE = "https://financialmodelingprep.com/stable"
 symbol = st.text_input("Symbol", "NVDA")
 
 
-# ======================
-# FETCH
-# ======================
 def fetch(url):
     try:
         return requests.get(url).json()
@@ -28,9 +26,6 @@ def safe(x, k):
         return 0.0
 
 
-# ======================
-# AUTO RUN (核心变化)
-# ======================
 income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
@@ -52,67 +47,59 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
     fcf = fcf[::-1]
 
     # ======================
-    # CHART AUTO
+    # CHART (缩小版)
     # ======================
-    st.subheader("📈 Auto Trend")
+    st.subheader("📈 Trend")
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6, 3))
     ax.plot(years, revenue, label="Revenue")
     ax.plot(years, capex, label="CapEx")
     ax.plot(years, fcf, label="FCF")
-    ax.legend()
+    ax.legend(fontsize=8)
+    ax.tick_params(labelsize=8)
 
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=False)
 
     # ======================
-    # STRAWS
+    # STRAW ENGINE
     # ======================
-    st.subheader("🧨 Straw System (AUTO)")
-
     rev_g = (revenue[-1] - revenue[-2]) / revenue[-2] if revenue[-2] else 0
     capex_g = (capex[-1] - capex[-2]) / capex[-2] if capex[-2] else 0
 
-    straw1 = {
-        "Revenue": revenue[-1],
-        "CapEx": capex[-1],
-        "Revenue Growth": rev_g,
-        "CapEx Growth": capex_g,
-        "Status": "🟢 HEALTHY"
-    }
-
+    straw1_status = "🟢 HEALTHY"
     if capex_g > rev_g:
-        straw1["Status"] = "🟡 OVERHEAT"
+        straw1_status = "🟡 OVERHEAT"
     if capex_g > rev_g * 1.5:
-        straw1["Status"] = "🔴 STRESS"
+        straw1_status = "🔴 STRESS"
 
-    straw2 = {
-        "Operating Margin": revenue[-1] and 0.6,
-        "Status": "🟢 OK"
-    }
+    margin = 0.6
+    capex_ratio = capex[-1] / revenue[-1] if revenue[-1] else 0
+    fcf_trend = fcf[-1] - fcf[-2]
+    system_score = rev_g + capex_g
 
-    straw3 = {
-        "CapEx Ratio": capex[-1] / revenue[-1] if revenue[-1] else 0,
-        "Status": "🟢 OK"
-    }
+    # ======================
+    # DASHBOARD UI
+    # ======================
+    st.subheader("🧨 Straw System Dashboard")
 
-    straw4 = {
-        "FCF": fcf[-1],
-        "FCF Trend": fcf[-1] - fcf[-2],
-        "Status": "🟢 STRONG"
-    }
+    col1, col2, col3 = st.columns(3)
 
-    straw5 = {
-        "System Score": rev_g + capex_g,
-        "Status": "🟢 STABLE"
-    }
+    with col1:
+        st.metric("Straw 1 - AI CapEx Cycle", straw1_status, f"RevG {rev_g:.2%} | CapExG {capex_g:.2%}")
 
-    st.json({
-        "Straw 1": straw1,
-        "Straw 2": straw2,
-        "Straw 3": straw3,
-        "Straw 4": straw4,
-        "Straw 5": straw5
-    })
+    with col2:
+        st.metric("Straw 2 - Margin", f"{margin:.2f}", "OK")
+
+    with col3:
+        st.metric("Straw 3 - CapEx Ratio", f"{capex_ratio:.2%}", "OK")
+
+    col4, col5 = st.columns(2)
+
+    with col4:
+        st.metric("Straw 4 - FCF", f"{fcf[-1]:,.0f}", f"{fcf_trend:,.0f}")
+
+    with col5:
+        st.metric("Straw 5 - System Score", f"{system_score:.2f}", "STABLE")
 
 else:
-    st.warning("等待API数据加载中 / 或API失败")
+    st.warning("Loading data or API error")
