@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 
 st.title("📊 AI Compute-Dollar Risk Terminal v1")
 
+# ✅ 直接写死你的 key（不再输入）
+KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+
 symbol = st.text_input("Symbol", "NVDA")
-KEY = st.text_input("FMP Key", "")
 
 BASE = "https://financialmodelingprep.com/api/v3"
 
@@ -20,25 +22,21 @@ def fetch(url):
 
 if st.button("Run Analysis"):
 
-    if not KEY:
-        st.error("请输入API Key")
-        st.stop()
-
     income_url = f"{BASE}/income-statement/{symbol}?limit=5&apikey={KEY}"
     cash_url = f"{BASE}/cash-flow-statement/{symbol}?limit=5&apikey={KEY}"
 
     income = fetch(income_url)
     cash = fetch(cash_url)
 
-    # 🚨 强制显示API返回（关键）
-    st.subheader("📡 Raw Income API Response")
-    st.json(income)
+    # 🚨 如果API失败，直接暴露
+    if not isinstance(income, list):
+        st.error("Income API失败")
+        st.json(income)
+        st.stop()
 
-    st.subheader("📡 Raw CashFlow API Response")
-    st.json(cash)
-
-    if not isinstance(income, list) or not isinstance(cash, list):
-        st.error("API失败：请看上方返回内容（不是代码问题，是API权限/endpoint）")
+    if not isinstance(cash, list):
+        st.error("Cashflow API失败")
+        st.json(cash)
         st.stop()
 
     years, revenue, capex = [], [], []
