@@ -2,25 +2,26 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 
-# =====================================================
-# PAGE CONFIG
-# =====================================================
+# ======================================================
+# PAGE
+# ======================================================
 
 st.set_page_config(
     page_title="AI Risk Terminal",
     layout="wide"
 )
 
-# =====================================================
-# API CONFIG
-# =====================================================
+# ======================================================
+# API
+# ======================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+
 BASE = "https://financialmodelingprep.com/stable"
 
-# =====================================================
-# STYLE
-# =====================================================
+# ======================================================
+# CSS
+# ======================================================
 
 st.markdown("""
 <style>
@@ -28,16 +29,15 @@ st.markdown("""
 html, body, [class*="css"] {
     background-color: #050b16;
     color: white;
+    font-family: sans-serif;
 }
 
-/* remove white padding */
 .block-container {
     padding-top: 1rem;
     padding-left: 2rem;
     padding-right: 2rem;
 }
 
-/* title */
 .title {
     font-size: 42px;
     font-weight: 800;
@@ -49,7 +49,6 @@ html, body, [class*="css"] {
     margin-bottom: 20px;
 }
 
-/* top cards */
 .metric-card {
 
     background: linear-gradient(
@@ -88,7 +87,6 @@ html, body, [class*="css"] {
     line-height: 1.7;
 }
 
-/* colors */
 .green {
     color: #22c55e;
 }
@@ -101,7 +99,6 @@ html, body, [class*="css"] {
     color: #fbbf24;
 }
 
-/* alert box */
 .alert-box {
 
     margin-top: 24px;
@@ -132,7 +129,6 @@ html, body, [class*="css"] {
     line-height: 1.8;
 }
 
-/* section */
 .section-card {
 
     margin-top: 24px;
@@ -158,7 +154,6 @@ html, body, [class*="css"] {
     margin-bottom: 18px;
 }
 
-/* logic item */
 .logic-item {
     font-size: 16px;
     line-height: 1.9;
@@ -166,7 +161,6 @@ html, body, [class*="css"] {
     margin-bottom: 14px;
 }
 
-/* footer */
 .footer {
     margin-top: 18px;
     color: #64748b;
@@ -176,9 +170,9 @@ html, body, [class*="css"] {
 </style>
 """, unsafe_allow_html=True)
 
-# =====================================================
+# ======================================================
 # HEADER
-# =====================================================
+# ======================================================
 
 left, right = st.columns([5,1])
 
@@ -198,9 +192,9 @@ with right:
 
     symbol = st.text_input("股票代码", "NVDA")
 
-# =====================================================
+# ======================================================
 # FETCH
-# =====================================================
+# ======================================================
 
 @st.cache_data(ttl=300)
 def fetch(url):
@@ -217,9 +211,9 @@ def fetch(url):
     except:
         return []
 
-# =====================================================
+# ======================================================
 # SAFE
-# =====================================================
+# ======================================================
 
 def safe(x, key):
 
@@ -228,9 +222,9 @@ def safe(x, key):
     except:
         return 0
 
-# =====================================================
+# ======================================================
 # API
-# =====================================================
+# ======================================================
 
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
@@ -240,9 +234,9 @@ cash = fetch(
     f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
 
-# =====================================================
+# ======================================================
 # MAIN
-# =====================================================
+# ======================================================
 
 if isinstance(income, list) and len(income) > 1:
 
@@ -268,10 +262,6 @@ if isinstance(income, list) and len(income) > 1:
     revenue = revenue[::-1]
     capex = capex[::-1]
 
-    # =====================================================
-    # CALC
-    # =====================================================
-
     rev_growth = (
         (revenue[-1] - revenue[-2])
         / revenue[-2]
@@ -284,10 +274,6 @@ if isinstance(income, list) and len(income) > 1:
 
     diff = capex_growth - rev_growth
 
-    # =====================================================
-    # STATUS
-    # =====================================================
-
     status = "🟢 健康"
     status_color = "green"
 
@@ -299,9 +285,9 @@ if isinstance(income, list) and len(income) > 1:
         status = "🟡 过热预警"
         status_color = "yellow"
 
-    # =====================================================
-    # KPI ROW
-    # =====================================================
+    # ======================================================
+    # KPI
+    # ======================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -389,9 +375,9 @@ if isinstance(income, list) and len(income) > 1:
         </div>
         """, unsafe_allow_html=True)
 
-    # =====================================================
+    # ======================================================
     # ALERT
-    # =====================================================
+    # ======================================================
 
     st.markdown(f"""
     <div class="alert-box">
@@ -403,9 +389,7 @@ if isinstance(income, list) and len(income) > 1:
         <div class="alert-text">
 
         当前资本开支增速比收入增速高出
-        <span class="yellow">
-        {diff*100:.2f}%
-        </span>，
+        {diff*100:.2f}%，
 
         企业AI基础设施投入已经开始超出
         现实需求支撑。
@@ -418,15 +402,11 @@ if isinstance(income, list) and len(income) > 1:
     </div>
     """, unsafe_allow_html=True)
 
-    # =====================================================
+    # ======================================================
     # LOWER
-    # =====================================================
+    # ======================================================
 
     left2, right2 = st.columns([1,1.3])
-
-    # =====================================================
-    # LOGIC
-    # =====================================================
 
     with left2:
 
@@ -472,10 +452,6 @@ if isinstance(income, list) and len(income) > 1:
 
         </div>
         """, unsafe_allow_html=True)
-
-    # =====================================================
-    # CHART
-    # =====================================================
 
     with right2:
 
@@ -563,10 +539,6 @@ if isinstance(income, list) and len(income) > 1:
         )
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-    # =====================================================
-    # FOOTER
-    # =====================================================
 
     st.markdown("""
     <div class="footer">
