@@ -1,150 +1,110 @@
 import streamlit as st
 import requests
-import pandas as pd
 import plotly.graph_objects as go
 
-# =========================================================
+# =====================================================
 # PAGE CONFIG
-# =========================================================
+# =====================================================
+
 st.set_page_config(
     page_title="AI Risk Terminal",
     layout="wide"
 )
 
-# =========================================================
-# CONFIG
-# =========================================================
+# =====================================================
+# API CONFIG
+# =====================================================
+
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
-# =========================================================
-# CSS（真正 Bloomberg / Terminal 风格）
-# =========================================================
+# =====================================================
+# STYLE
+# =====================================================
+
 st.markdown("""
 <style>
-
-/* =========================
-GLOBAL
-========================= */
 
 html, body, [class*="css"] {
     background-color: #050b16;
     color: white;
-    font-family: "Inter", sans-serif;
 }
 
-/* 去除默认padding */
+/* remove white padding */
 .block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 1rem;
+    padding-top: 1rem;
     padding-left: 2rem;
     padding-right: 2rem;
 }
 
-/* =========================
-TOP HEADER
-========================= */
-
-.topbar {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
+/* title */
+.title {
+    font-size: 42px;
+    font-weight: 800;
+    color: white;
 }
 
-.main-title {
-    font-size:44px;
-    font-weight:800;
-    color:white;
-    letter-spacing:-1px;
+.subtitle {
+    color: #94a3b8;
+    margin-bottom: 20px;
 }
 
-.sub-title {
-    color:#94a3b8;
-    font-size:15px;
-    margin-top:4px;
-}
-
-.symbol-box {
-    background:#111827;
-    border:1px solid #1e293b;
-    border-radius:12px;
-    padding:10px 18px;
-    font-size:22px;
-    font-weight:700;
-    color:#38bdf8;
-}
-
-/* =========================
-CARD
-========================= */
-
+/* top cards */
 .metric-card {
+
     background: linear-gradient(
         180deg,
-        rgba(17,24,39,0.98),
-        rgba(10,15,25,0.98)
+        #111827 0%,
+        #0f172a 100%
     );
 
-    border:1px solid #1f2937;
+    border: 1px solid #1f2937;
 
-    border-radius:18px;
+    border-radius: 20px;
 
-    padding:24px;
+    padding: 24px;
 
-    height:190px;
+    height: 190px;
 
     box-shadow:
-    0 0 0 1px rgba(255,255,255,0.02),
-    0 10px 30px rgba(0,0,0,0.35);
+        0 0 30px rgba(0,0,0,0.35);
 }
 
-/* 卡片标题 */
 .metric-label {
-    color:#94a3b8;
-    font-size:14px;
-    margin-bottom:20px;
+    color: #94a3b8;
+    font-size: 14px;
+    margin-bottom: 20px;
 }
 
-/* 卡片主数值 */
 .metric-number {
-    font-size:42px;
-    font-weight:800;
-    margin-bottom:12px;
+    font-size: 42px;
+    font-weight: 800;
 }
 
-/* 卡片说明 */
 .metric-desc {
-    color:#cbd5e1;
-    font-size:14px;
-    line-height:1.7;
+    color: #cbd5e1;
+    font-size: 14px;
+    margin-top: 14px;
+    line-height: 1.7;
 }
 
-/* =========================
-COLORS
-========================= */
-
+/* colors */
 .green {
-    color:#22c55e;
-}
-
-.yellow {
-    color:#fbbf24;
+    color: #22c55e;
 }
 
 .red {
-    color:#ef4444;
+    color: #ef4444;
 }
 
-.blue {
-    color:#38bdf8;
+.yellow {
+    color: #fbbf24;
 }
 
-/* =========================
-BIG ALERT
-========================= */
-
+/* alert box */
 .alert-box {
+
+    margin-top: 24px;
 
     background: linear-gradient(
         90deg,
@@ -152,117 +112,101 @@ BIG ALERT
         rgba(20,15,5,0.98)
     );
 
-    border:1px solid #7c5a10;
+    border: 1px solid #7c5a10;
 
-    border-radius:20px;
+    border-radius: 20px;
 
-    padding:30px;
-
-    margin-top:22px;
-    margin-bottom:24px;
+    padding: 28px;
 }
 
 .alert-title {
-    font-size:40px;
-    font-weight:800;
-    color:#fbbf24;
-    margin-bottom:10px;
+    color: #fbbf24;
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 14px;
 }
 
 .alert-text {
-    font-size:18px;
-    color:#f8fafc;
-    line-height:1.8;
+    color: white;
+    font-size: 18px;
+    line-height: 1.8;
 }
 
-/* =========================
-SECTION
-========================= */
-
+/* section */
 .section-card {
+
+    margin-top: 24px;
 
     background: linear-gradient(
         180deg,
-        rgba(17,24,39,0.98),
-        rgba(10,15,25,0.98)
+        #111827 0%,
+        #0f172a 100%
     );
 
-    border:1px solid #1f2937;
+    border: 1px solid #1f2937;
 
-    border-radius:18px;
+    border-radius: 20px;
 
-    padding:24px;
+    padding: 24px;
 
-    min-height:520px;
+    min-height: 500px;
 }
 
 .section-title {
-    font-size:26px;
-    font-weight:700;
-    margin-bottom:20px;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 18px;
 }
 
-/* =========================
-LOGIC ITEM
-========================= */
-
+/* logic item */
 .logic-item {
-    margin-bottom:18px;
-    font-size:16px;
-    color:#e2e8f0;
-    line-height:1.7;
+    font-size: 16px;
+    line-height: 1.9;
+    color: #e2e8f0;
+    margin-bottom: 14px;
 }
 
-/* =========================
-FOOTER
-========================= */
-
+/* footer */
 .footer {
-    margin-top:18px;
-    color:#64748b;
-    font-size:13px;
+    margin-top: 18px;
+    color: #64748b;
+    font-size: 13px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# =========================================================
+# =====================================================
 # HEADER
-# =========================================================
+# =====================================================
+
 left, right = st.columns([5,1])
 
 with left:
 
     st.markdown("""
-    <div class="main-title">
+    <div class="title">
     稻草一：AI资本开支循环检测
     </div>
 
-    <div class="sub-title">
+    <div class="subtitle">
     核心检测维度：资本开支扩张速度是否超过收入增长速度
     </div>
     """, unsafe_allow_html=True)
 
 with right:
 
-    st.markdown("""
-    <div class="symbol-box">
-    NVDA
-    </div>
-    """, unsafe_allow_html=True)
+    symbol = st.text_input("股票代码", "NVDA")
 
-# =========================================================
-# INPUT
-# =========================================================
-symbol = st.text_input("股票代码", "NVDA")
-
-# =========================================================
+# =====================================================
 # FETCH
-# =========================================================
+# =====================================================
+
 @st.cache_data(ttl=300)
 def fetch(url):
 
     try:
+
         r = requests.get(url, timeout=10)
 
         if r.status_code != 200:
@@ -273,19 +217,21 @@ def fetch(url):
     except:
         return []
 
-# =========================================================
+# =====================================================
 # SAFE
-# =========================================================
-def safe(x, k):
+# =====================================================
+
+def safe(x, key):
 
     try:
-        return float(x.get(k, 0))
+        return float(x.get(key, 0))
     except:
-        return 0.0
+        return 0
 
-# =========================================================
+# =====================================================
 # API
-# =========================================================
+# =====================================================
+
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
@@ -294,22 +240,20 @@ cash = fetch(
     f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
 
-# =========================================================
+# =====================================================
 # MAIN
-# =========================================================
-if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
+# =====================================================
+
+if isinstance(income, list) and len(income) > 1:
 
     years = []
     revenue = []
     capex = []
-    fcf = []
 
-    n = min(len(income), len(cash))
-
-    for i in range(n):
+    for i in range(min(len(income), len(cash))):
 
         years.append(
-            income[i].get("date", "")[:4]
+            income[i]["date"][:4]
         )
 
         revenue.append(
@@ -320,47 +264,45 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             abs(safe(cash[i], "capitalExpenditure"))
         )
 
-        fcf.append(
-            safe(cash[i], "freeCashFlow")
-        )
-
     years = years[::-1]
     revenue = revenue[::-1]
     capex = capex[::-1]
-    fcf = fcf[::-1]
 
-    # =========================================================
-    # CALCULATION
-    # =========================================================
-    rev_g = (
-        (revenue[-1] - revenue[-2]) / revenue[-2]
-        if revenue[-2] else 0
+    # =====================================================
+    # CALC
+    # =====================================================
+
+    rev_growth = (
+        (revenue[-1] - revenue[-2])
+        / revenue[-2]
     )
 
-    capex_g = (
-        (capex[-1] - capex[-2]) / capex[-2]
-        if capex[-2] else 0
+    capex_growth = (
+        (capex[-1] - capex[-2])
+        / capex[-2]
     )
 
-    diff = capex_g - rev_g
+    diff = capex_growth - rev_growth
 
-    # =========================================================
+    # =====================================================
     # STATUS
-    # =========================================================
-    status = "健康"
+    # =====================================================
+
+    status = "🟢 健康"
     status_color = "green"
 
     if diff > 0:
-        status = "偏热"
+        status = "🟡 偏热"
         status_color = "yellow"
 
     if diff > 0.2:
-        status = "过热预警"
+        status = "🟡 过热预警"
         status_color = "yellow"
 
-    # =========================================================
+    # =====================================================
     # KPI ROW
-    # =========================================================
+    # =====================================================
+
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
@@ -373,7 +315,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             </div>
 
             <div class="metric-number green">
-            {rev_g*100:.2f}%
+            {rev_growth*100:.2f}%
             </div>
 
             <div class="metric-desc">
@@ -394,7 +336,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             </div>
 
             <div class="metric-number red">
-            {capex_g*100:.2f}%
+            {capex_growth*100:.2f}%
             </div>
 
             <div class="metric-desc">
@@ -435,7 +377,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             状态判断
             </div>
 
-            <div class="metric-number yellow">
+            <div class="metric-number {status_color}">
             {status}
             </div>
 
@@ -447,40 +389,45 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
         </div>
         """, unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # ALERT
-    # =========================================================
+    # =====================================================
+
     st.markdown(f"""
     <div class="alert-box">
 
         <div class="alert-title">
-        结论：AI资本开支扩张速度明显高于收入增长，进入过热阶段
+        结论：AI资本开支扩张速度明显高于收入增长
         </div>
 
         <div class="alert-text">
 
         当前资本开支增速比收入增速高出
-        <span class="yellow">{diff*100:.2f}%</span>，
+        <span class="yellow">
+        {diff*100:.2f}%
+        </span>，
 
-        显示企业在AI基础设施上的投入扩张已经超出
+        企业AI基础设施投入已经开始超出
         现实需求支撑。
 
-        若该趋势持续，
-        将提升未来盈利与现金流承压风险。
+        若趋势持续，
+        将提升未来盈利与现金流压力。
 
         </div>
 
     </div>
     """, unsafe_allow_html=True)
 
-    # =========================================================
-    # LOWER SECTION
-    # =========================================================
-    left2, right2 = st.columns([1,1.2])
+    # =====================================================
+    # LOWER
+    # =====================================================
 
-    # =========================================================
+    left2, right2 = st.columns([1,1.3])
+
+    # =====================================================
     # LOGIC
-    # =========================================================
+    # =====================================================
+
     with left2:
 
         st.markdown("""
@@ -508,7 +455,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             </div>
 
             <div class="logic-item">
-            ⑤ 根据阈值判断系统风险：
+            ⑤ 风险阈值：
             <br><br>
 
             增速差 ≥ 20%
@@ -526,9 +473,10 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
         </div>
         """, unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # CHART
-    # =========================================================
+    # =====================================================
+
     with right2:
 
         st.markdown("""
@@ -547,17 +495,17 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
         for i in range(1, len(revenue)):
 
             rg = (
-                (revenue[i] - revenue[i-1]) / revenue[i-1]
-                if revenue[i-1] else 0
-            )
+                (revenue[i] - revenue[i-1])
+                / revenue[i-1]
+            ) * 100
 
             cg = (
-                (capex[i] - capex[i-1]) / capex[i-1]
-                if capex[i-1] else 0
-            )
+                (capex[i] - capex[i-1])
+                / capex[i-1]
+            ) * 100
 
-            rev_growths.append(rg * 100)
-            capex_growths.append(cg * 100)
+            rev_growths.append(rg)
+            capex_growths.append(cg)
 
         chart_years = years[1:]
 
@@ -568,7 +516,10 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             y=rev_growths,
             mode="lines+markers",
             name="收入增长率",
-            line=dict(color="#22c55e", width=4)
+            line=dict(
+                color="#22c55e",
+                width=4
+            )
         ))
 
         fig.add_trace(go.Scatter(
@@ -576,7 +527,10 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             y=capex_growths,
             mode="lines+markers",
             name="资本开支增长率",
-            line=dict(color="#ef4444", width=4)
+            line=dict(
+                color="#ef4444",
+                width=4
+            )
         ))
 
         fig.update_layout(
@@ -599,19 +553,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             ),
 
             legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="left",
-                x=0
-            ),
-
-            xaxis=dict(
-                showgrid=False
-            ),
-
-            yaxis=dict(
-                gridcolor="rgba(255,255,255,0.08)"
+                orientation="h"
             )
         )
 
@@ -620,13 +562,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
             use_container_width=True
         )
 
-        st.markdown("""
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # FOOTER
-    # =========================================================
+    # =====================================================
+
     st.markdown("""
     <div class="footer">
     数据来源：Financial Modeling Prep（FMP）
