@@ -1,148 +1,128 @@
 import streamlit as st
 import requests
-import time
-
-FRED_KEY = "你的FRED_KEY"
-FMP_KEY = "你的FMP_KEY"
 
 # =========================
-# SAFE REQUEST
+# CONFIG
 # =========================
+FMP_KEY = st.secrets.get("FMP_KEY", "")
+FRED_KEY = st.secrets.get("FRED_KEY", "")
 
-def safe_get(url, params=None):
+# =========================
+# DATA LAYER (NO SILENT FAIL)
+# =========================
+def fetch_json(url):
     try:
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url, timeout=10)
         if r.status_code != 200:
-            return None
-        return r.json()
+            return None, f"HTTP {r.status_code}"
+        return r.json(), None
+    except Exception as e:
+        return None, str(e)
+
+
+def get_fmp_cashflow(symbol):
+    url = f"https://financialmodelingprep.com/api/v3/cash-flow-statement/{symbol}?apikey={FMP_KEY}"
+    data, err = fetch_json(url)
+    if err or not data:
+        return None, err
+    try:
+        return float(data[0]["capitalExpenditures"])
     except:
+        return None, "parse_error"
+
+
+def get_fmp_income(symbol):
+    url = f"https://financialmodelingprep.com/api/v3/income-statement/{symbol}?apikey={FMP_KEY}"
+    data, err = fetch_json(url)
+    if err or not data:
+        return None, err
+    try:
+        return float(data[0]["revenue"])
+    except:
+        return None, "parse_error"
+
+
+def get_fred(series):
+    url = f"https://api.stlouisfed.org/fred/series/observations?series_id={series}&api_key={FRED_KEY}&file_type=json"
+    data, err = fetch_json(url)
+    if err or not data:
+        return None, err
+    try:
+        return float(data["observations"][-1]["value"])
+    except:
+        return None, "parse_error"
+
+
+# =========================
+# SAFE CALC
+# =========================
+def pct_change(new, old):
+    if new is None or old is None or old == 0:
         return None
+    return (new - old) / abs(old) * 100
+
+
+def risk_level(x, yellow, red):
+    if x is None:
+        return "⚪ 无数据"
+    if x >= red:
+        return "🔴 CRITICAL"
+    if x >= yellow:
+        return "🟠 WARNING"
+    return "🟢 NORMAL"
 
 
 # =========================
-# FRED LAYER
+# STRAW 1 (CORE LOGIC)
 # =========================
+def straw1():
+    msft_capex = get_fmp_cashflow("MSFT")
+    amzn_capex = get_fmp_cashflow("AMZN")
 
-def fred(series):
-    url = "https://api.stlouisfed.org/fred/series/observations"
-    params = {
-        "series_id": series,
-        "api_key": FRED_KEY,
-        "file_type": "json"
+    msft_rev = get_fmp_income("MSFT")
+    amzn_rev = get_fmp_income("AMZN")
+
+    capex_score = None
+    revenue_score = None
+
+    if msft_capex and amzn_capex:
+        capex_score = msft_capex + amzn_capex
+
+    if msft_rev and amzn_rev:
+        revenue_score = msft_rev + amzn_rev
+
+    gap = None
+    if capex_score and revenue_score:
+        gap = (capex_score / revenue_score) * 100
+
+    return {
+        "capex": capex_score,
+        "revenue": revenue_score,
+        "gap": gap
     }
 
-    data = safe_get(url, params)
-    if not data:
-        return None
-
-    try:
-        vals = []
-        for x in data["observations"]:
-            v = x["value"]
-            if v != ".":
-                vals.append(float(v))
-
-        return vals[-1] if vals else None
-    except:
-        return None
-
 
 # =========================
-# FMP LAYER
+# UI
 # =========================
-
-def fmp_quote(symbol):
-    url = f"https://financialmodelingprep.com/api/v3/quote/{symbol}"
-    params = {"apikey": FMP_KEY}
-
-    data = safe_get(url, params)
-    if not data or len(data) == 0:
-        return None
-
-    return data[0]
-
-
-# =========================
-# YFINANCE FALLBACK (optional)
-# =========================
-
-def yfinance_price(symbol):
-    try:
-        import yfinance as yf
-        df = yf.download(symbol, period="1mo", interval="1d", progress=False)
-        if df is None or df.empty:
-            return None
-        return float(df["Close"].iloc[-1])
-    except:
-        return None
-
-
-# =========================
-# UNIFIED DATA GETTER
-# =========================
-
-def get_data(symbol):
-    # 1. FMP
-    d = fmp_quote(symbol)
-    if d and "price" in d:
-        return d["price"]
-
-    # 2. fallback yfinance
-    return yfinance_price(symbol)
-
-
-def get_macro(series):
-    return fred(series)
-
-
-# =========================
-# STRAW 1 LOGIC (REAL)
-# =========================
-
-def straw1():
-    nvda = get_data("NVDA")
-    msft = get_data("MSFT")
-    qqq = get_data("QQQ")
-
-    capex = get_macro("B009RC1Q027SBEA")
-    rate = get_macro("DGS10")
-
-    score = 0
-    if capex:
-        score += capex
-    if rate:
-        score += rate
-
-    return nvda, msft, qqq, capex, rate, score
-
-
-# =========================
-# UI SAFE FORMAT
-# =========================
-
-def fmt(x):
-    return "无法采集数据" if x is None else f"{x:.2f}"
-
-
-# =========================
-# APP
-# =========================
-
-st.title("📊 AI Compute-Dollar Systemic Risk Terminal (v7)")
-
-nvda, msft, qqq, capex, rate, score = straw1()
+st.title("📊 AI Compute-Dollar Systemic Risk Terminal (v8)")
 
 st.subheader("🧨 稻草1：AI资本循环")
 
-st.write("NVDA:", fmt(nvda))
-st.write("MSFT:", fmt(msft))
-st.write("QQQ:", fmt(qqq))
+s1 = straw1()
 
-st.write("CapEx:", fmt(capex))
-st.write("10Y Rate:", fmt(rate))
+st.metric("CapEx (MSFT+AMZN)", "无法采集" if s1["capex"] is None else f"{s1['capex']:.0f}")
+st.metric("Revenue (MSFT+AMZN)", "无法采集" if s1["revenue"] is None else f"{s1['revenue']:.0f}")
 
-st.subheader("🧠 System Score")
+if s1["gap"] is None:
+    st.warning("⚪ 稻草1：数据不足，无法计算结构失衡")
+else:
+    st.metric("CapEx/Revenue Pressure", f"{s1['gap']:.2f}%")
 
-st.write(score if score else "无法计算")
-
-st.success("系统运行成功（无 synthetic data）")
+    if s1["gap"] > 30:
+        st.error("🔴 AI资本循环过热")
+    elif s1["gap"] > 20:
+        st.warning("🟠 资本扩张偏快")
+    else:
+        st.success("🟢 正常结构")
+        
