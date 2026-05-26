@@ -1,146 +1,155 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Straw System - NVDA</title>
+import streamlit as st
+import requests
 
-<style>
-body{
-    margin:0;
-    background:#0b0f17;
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;
-    color:#e5e7eb;
-    display:flex;
-    justify-content:center;
-    padding:40px;
-}
+# =========================
+# CONFIG
+# =========================
+st.set_page_config(layout="centered")
+st.title("📊 AI Compute-Dollar Risk Terminal v12")
 
-.card{
-    width:460px;
-    background:#111827;
-    border:1px solid #263041;
-    border-radius:14px;
-    padding:18px 18px 14px 18px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.45);
-}
+# ⚠️ API KEY（已写死）
+API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+BASE = "https://financialmodelingprep.com/stable"
 
-.title{
-    font-size:15px;
-    font-weight:700;
-    margin-bottom:10px;
-}
+symbol = st.text_input("Symbol", "NVDA")
 
-.symbol{
-    color:#93c5fd;
-    font-weight:700;
-}
 
-.metric{
-    margin-top:10px;
-    font-size:13px;
-    color:#cbd5e1;
-    line-height:1.6;
-}
+# =========================
+# SAFE REQUEST
+# =========================
+def fetch(url):
+    try:
+        r = requests.get(url, timeout=10)
+        return r.json()
+    except:
+        return []
 
-.small{
-    margin-top:8px;
-    font-size:12px;
-    color:#94a3b8;
-    line-height:1.5;
-}
 
-.status{
-    margin-top:12px;
-    padding:10px;
-    border-radius:10px;
-    background:#0f172a;
-    border:1px solid #263041;
-    font-weight:700;
-}
+def safe(x, k):
+    try:
+        v = x.get(k, 0)
+        return float(v) if v is not None else 0.0
+    except:
+        return 0.0
 
-.warn{
-    color:#fbbf24;
-}
 
-.good{
-    color:#34d399;
-}
+def safe_div(a, b):
+    return a / b if b else 0.0
 
-.badge{
-    display:inline-block;
-    padding:2px 8px;
-    border-radius:999px;
-    font-size:11px;
-    background:#1f2937;
-    color:#e5e7eb;
-    margin-left:6px;
-}
-</style>
-</head>
 
-<body>
+# =========================
+# DATA
+# =========================
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
+cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
 
-<div class="card">
 
-    <div class="title">
-        Symbol：<span class="symbol">NVDA</span>
-    </div>
+# =========================
+# VALIDATION
+# =========================
+if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2 and len(cash) >= 2:
 
-    <div class="title">
-        🧨 稻草一：AI资本开支循环检测
-    </div>
+    inc0, inc1 = income[0], income[1]
+    cf0, cf1 = cash[0], cash[1]
 
-    <div id="status" class="status">
-        当前状态：计算中...
-    </div>
+    revenue = safe(inc0, "revenue")
+    revenue_prev = safe(inc1, "revenue")
 
-    <div class="metric">
-        核心判断：资本开支扩张速度 vs 收入增长速度
-    </div>
+    capex = abs(safe(cf0, "capitalExpenditure"))
+    capex_prev = abs(safe(cf1, "capitalExpenditure"))
 
-    <div class="small">
-        规则：当 CapEx 增速 > 收入增速 × 1.2 → 资本开支过热信号
-    </div>
+    fcf = safe(cf0, "freeCashFlow")
+    fcf_prev = safe(cf1, "freeCashFlow")
 
-    <div class="metric">
-        收入增速：<span id="rev">65.47</span>% ｜ 
-        CapEx增速：<span id="capex">86.71</span>%
-    </div>
+    # =========================
+    # STRAW 1 - AI CAPITAL CYCLE
+    # =========================
+    rev_growth = safe_div(revenue - revenue_prev, revenue_prev)
+    capex_growth = safe_div(capex - capex_prev, capex_prev)
 
-    <div class="small" id="calc"></div>
+    if capex_growth > rev_growth * 1.2:
+        straw1 = "🟡 OVERHEAT"
+        straw1_msg = "资本开支明显跑赢收入增长"
+    elif capex_growth > rev_growth:
+        straw1 = "🟠 WARNING"
+        straw1_msg = "资本扩张领先收入"
+    else:
+        straw1 = "🟢 HEALTHY"
+        straw1_msg = "收入支撑资本扩张"
 
-</div>
 
-<script>
-// ===== 数据 =====
-const revenueGrowth = 65.47;
-const capexGrowth = 86.71;
+    # =========================
+    # STRAW 2 - PROFIT QUALITY
+    # =========================
+    margin = safe_div(safe(inc0, "operatingIncome"), revenue)
 
-// ===== 规则 =====
-const threshold = revenueGrowth * 1.2;
-const isOverheat = capexGrowth > threshold;
+    if margin > 0.25:
+        straw2 = "🟢 OK"
+        straw2_msg = "盈利能力健康"
+    else:
+        straw2 = "🟡 WEAK"
+        straw2_msg = "利润承压"
 
-// ===== UI 更新 =====
-const status = document.getElementById("status");
-const calc = document.getElementById("calc");
 
-// 状态显示
-if (isOverheat) {
-    status.innerHTML = "当前状态：🟡 过热风险 <span class='badge'>HOT</span>";
-    status.classList.add("warn");
-} else {
-    status.innerHTML = "当前状态：🟢 正常区间 <span class='badge'>OK</span>";
-    status.classList.add("good");
-}
+    # =========================
+    # STRAW 3 - CAPEX BURDEN
+    # =========================
+    capex_ratio = safe_div(capex, revenue)
 
-// 计算过程展示
-calc.innerHTML =
-    "计算：CapEx " + capexGrowth +
-    " vs 阈值 " + threshold.toFixed(2) +
-    "（收入 × 1.2） → " +
-    (isOverheat ? "触发过热信号" : "未触发风险");
-</script>
+    if capex_ratio < 0.05:
+        straw3 = "🟢 OK"
+        straw3_msg = "资本开支正常"
+    else:
+        straw3 = "🟡 HIGH"
+        straw3_msg = "资本开支偏重"
 
-</body>
-</html>
+
+    # =========================
+    # STRAW 4 - CASH FLOW
+    # =========================
+    fcf_trend = fcf - fcf_prev
+
+    if fcf_trend > 0:
+        straw4 = "🟢 STRONG"
+        straw4_msg = "现金流改善"
+    else:
+        straw4 = "🟡 WEAK"
+        straw4_msg = "现金流下降"
+
+
+    # =========================
+    # STRAW 5 - SYSTEM RISK
+    # =========================
+    system_score = rev_growth + (0.5 * capex_growth)
+
+    if system_score > 0.8:
+        straw5 = "🔴 RISK"
+        straw5_msg = "高波动扩张阶段"
+    elif system_score > 0.3:
+        straw5 = "🟡 WATCH"
+        straw5_msg = "结构性风险上升"
+    else:
+        straw5 = "🟢 STABLE"
+        straw5_msg = "系统稳定"
+
+
+    # =========================
+    # UI
+    # =========================
+    st.subheader("🧨 Straw 1 - AI Capital Cycle")
+    st.metric(straw1, straw1_msg)
+
+    st.subheader("🧨 Straw 2 - Profit Quality")
+    st.metric(straw2, straw2_msg)
+
+    st.subheader("🧨 Straw 3 - CapEx Pressure")
+    st.metric(straw3, straw3_msg)
+
+    st.subheader("🧨 Straw 4 - Cash Flow")
+    st.metric(straw4, straw4_msg)
+
+    st.subheader("🧨 Straw 5 - System Risk")
+    st.metric(straw5, straw5_msg)
+
+else:
+    st.error("API数据不足或请求失败")
