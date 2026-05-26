@@ -2,45 +2,38 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Straw System - NVDA</title>
 
 <style>
 body{
-    background:#0f1115;
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+    margin:0;
+    background:#0b0f17;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;
     color:#e5e7eb;
+    display:flex;
+    justify-content:center;
+    padding:40px;
 }
 
 .card{
-    width:420px;
-    padding:18px;
+    width:460px;
+    background:#111827;
+    border:1px solid #263041;
     border-radius:14px;
-    background:#151922;
-    border:1px solid #2a2f3a;
-    box-shadow:0 8px 24px rgba(0,0,0,0.4);
+    padding:18px 18px 14px 18px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.45);
 }
 
 .title{
-    font-size:16px;
+    font-size:15px;
     font-weight:700;
     margin-bottom:10px;
 }
 
 .symbol{
     color:#93c5fd;
-    font-weight:600;
-}
-
-.status{
-    margin-top:10px;
-    padding:10px;
-    border-radius:10px;
-    background:#1f2937;
-    font-weight:600;
-}
-
-.status.warn{
-    color:#fbbf24;
+    font-weight:700;
 }
 
 .metric{
@@ -50,22 +43,38 @@ body{
     line-height:1.6;
 }
 
-.logic{
-    margin-top:12px;
+.small{
+    margin-top:8px;
     font-size:12px;
     color:#94a3b8;
-    background:#0b1220;
+    line-height:1.5;
+}
+
+.status{
+    margin-top:12px;
     padding:10px;
     border-radius:10px;
+    background:#0f172a;
+    border:1px solid #263041;
+    font-weight:700;
+}
+
+.warn{
+    color:#fbbf24;
+}
+
+.good{
+    color:#34d399;
 }
 
 .badge{
     display:inline-block;
     padding:2px 8px;
     border-radius:999px;
-    font-size:12px;
-    background:#334155;
-    color:#e2e8f0;
+    font-size:11px;
+    background:#1f2937;
+    color:#e5e7eb;
+    margin-left:6px;
 }
 </style>
 </head>
@@ -78,40 +87,59 @@ body{
         Symbol：<span class="symbol">NVDA</span>
     </div>
 
-    <div class="title">🧨 稻草一：AI资本开支循环检测</div>
+    <div class="title">
+        🧨 稻草一：AI资本开支循环检测
+    </div>
 
-    <div id="status" class="status warn">
-        当前状态：🟡 过热风险
+    <div id="status" class="status">
+        当前状态：计算中...
     </div>
 
     <div class="metric">
-        核心判断：资本开支扩张速度明显高于收入增长，进入潜在泡沫扩张阶段
+        核心判断：资本开支扩张速度 vs 收入增长速度
+    </div>
+
+    <div class="small">
+        规则：当 CapEx 增速 > 收入增速 × 1.2 → 资本开支过热信号
     </div>
 
     <div class="metric">
-        收入增速：<span id="rev">65.47</span>% ｜ CapEx增速：<span id="capex">86.71</span>%
+        收入增速：<span id="rev">65.47</span>% ｜ 
+        CapEx增速：<span id="capex">86.71</span>%
     </div>
 
-    <div class="logic">
-        检测逻辑：当 CapEx增速 &gt; 收入增速 × 1.2 时 → 判定为“资本过热信号”
-        <br><br>
-        当前计算：86.71 &gt; 65.47 × 1.2 = 78.56 → <span class="badge">触发过热</span>
-    </div>
+    <div class="small" id="calc"></div>
 
 </div>
 
 <script>
-const revenue = 65.47;
-const capex = 86.71;
+// ===== 数据 =====
+const revenueGrowth = 65.47;
+const capexGrowth = 86.71;
 
-const threshold = revenue * 1.2;
-const isHot = capex > threshold;
+// ===== 规则 =====
+const threshold = revenueGrowth * 1.2;
+const isOverheat = capexGrowth > threshold;
 
-document.getElementById("status").innerHTML =
-    "当前状态：" + (isHot ? "🟡 过热风险" : "🟢 正常区间");
+// ===== UI 更新 =====
+const status = document.getElementById("status");
+const calc = document.getElementById("calc");
 
-document.getElementById("status").className =
-    "status " + (isHot ? "warn" : "");
+// 状态显示
+if (isOverheat) {
+    status.innerHTML = "当前状态：🟡 过热风险 <span class='badge'>HOT</span>";
+    status.classList.add("warn");
+} else {
+    status.innerHTML = "当前状态：🟢 正常区间 <span class='badge'>OK</span>";
+    status.classList.add("good");
+}
+
+// 计算过程展示
+calc.innerHTML =
+    "计算：CapEx " + capexGrowth +
+    " vs 阈值 " + threshold.toFixed(2) +
+    "（收入 × 1.2） → " +
+    (isOverheat ? "触发过热信号" : "未触发风险");
 </script>
 
 </body>
