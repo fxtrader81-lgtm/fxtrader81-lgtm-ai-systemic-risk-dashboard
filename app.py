@@ -1,13 +1,52 @@
 import streamlit as st
 import requests
-import matplotlib.pyplot as plt
 
-st.set_page_config(layout="wide")
-
-st.title("📊 AI Compute-Dollar Risk Dashboard v11")
+st.set_page_config(page_title="AI Risk Terminal", layout="wide")
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
+
+# =========================
+# 🎨 UI STYLE（金融终端风）
+# =========================
+st.markdown("""
+<style>
+body {
+    background-color: #0b0f19;
+    color: #ffffff;
+}
+
+.block {
+    background: #121a2a;
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    border: 1px solid #1f2a44;
+}
+
+.title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #7dd3fc;
+}
+
+.metric {
+    font-size: 16px;
+    margin-top: 6px;
+    color: #e5e7eb;
+}
+
+.good { color: #22c55e; }
+.warn { color: #fbbf24; }
+.bad  { color: #ef4444; }
+
+.small {
+    font-size: 13px;
+    color: #94a3b8;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 symbol = st.text_input("Symbol", "NVDA")
 
@@ -26,80 +65,66 @@ def safe(x, k):
         return 0.0
 
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=2&apikey={API_KEY}")
+cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=2&apikey={API_KEY}")
 
-if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
 
-    years, revenue, capex, fcf = [], [], [], []
+if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-    n = min(len(income), len(cash))
+    inc0, inc1 = income[0], income[1]
+    cf0, cf1 = cash[0], cash[1]
 
-    for i in range(n):
-        years.append(income[i].get("date", "")[:4])
-        revenue.append(safe(income[i], "revenue"))
-        capex.append(abs(safe(cash[i], "capitalExpenditure")))
-        fcf.append(safe(cash[i], "freeCashFlow"))
+    revenue = safe(inc0, "revenue")
+    revenue_prev = safe(inc1, "revenue")
 
-    years = years[::-1]
-    revenue = revenue[::-1]
-    capex = capex[::-1]
-    fcf = fcf[::-1]
+    capex = abs(safe(cf0, "capitalExpenditure"))
+    capex_prev = abs(safe(cf1, "capitalExpenditure"))
 
-    # ======================
-    # CHART (缩小版)
-    # ======================
-    st.subheader("📈 Trend")
+    # =========================
+    # 🧨 Straw 1 核心逻辑
+    # =========================
+    rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
+    capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
 
-    fig, ax = plt.subplots(figsize=(6, 3))
-    ax.plot(years, revenue, label="Revenue")
-    ax.plot(years, capex, label="CapEx")
-    ax.plot(years, fcf, label="FCF")
-    ax.legend(fontsize=8)
-    ax.tick_params(labelsize=8)
+    # 判断逻辑（核心）
+    # CapEx 增速 > 收入增速 => 资本过热
+    if capex_growth > rev_growth * 1.2:
+        status = "🟡 过热风险"
+        cls = "warn"
+        desc = "资本开支扩张速度明显高于收入增长，进入过热阶段"
+    elif capex_growth > rev_growth:
+        status = "🟠 偏热"
+        cls = "warn"
+        desc = "资本扩张开始领先收入增长，但尚未失衡"
+    else:
+        status = "🟢 健康"
+        cls = "good"
+        desc = "收入增长仍能覆盖资本开支扩张"
 
-    st.pyplot(fig, use_container_width=False)
+    # =========================
+    # 🧨 UI 卡片
+    # =========================
+    st.markdown(f"""
+    <div class="block">
+        <div class="title">🧨 稻草一：AI资本开支循环检测</div>
 
-    # ======================
-    # STRAW ENGINE
-    # ======================
-    rev_g = (revenue[-1] - revenue[-2]) / revenue[-2] if revenue[-2] else 0
-    capex_g = (capex[-1] - capex[-2]) / capex[-2] if capex[-2] else 0
+        <div class="metric">
+            当前状态：<b class="{cls}">{status}</b>
+        </div>
 
-    straw1_status = "🟢 HEALTHY"
-    if capex_g > rev_g:
-        straw1_status = "🟡 OVERHEAT"
-    if capex_g > rev_g * 1.5:
-        straw1_status = "🔴 STRESS"
+        <div class="metric">
+            核心判断：{desc}
+        </div>
 
-    margin = 0.6
-    capex_ratio = capex[-1] / revenue[-1] if revenue[-1] else 0
-    fcf_trend = fcf[-1] - fcf[-2]
-    system_score = rev_g + capex_g
+        <div class="small">
+            逻辑：当资本开支增速 > 收入增速 × 1.2 时，判定为资本过热信号
+        </div>
 
-    # ======================
-    # DASHBOARD UI
-    # ======================
-    st.subheader("🧨 Straw System Dashboard")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Straw 1 - AI CapEx Cycle", straw1_status, f"RevG {rev_g:.2%} | CapExG {capex_g:.2%}")
-
-    with col2:
-        st.metric("Straw 2 - Margin", f"{margin:.2f}", "OK")
-
-    with col3:
-        st.metric("Straw 3 - CapEx Ratio", f"{capex_ratio:.2%}", "OK")
-
-    col4, col5 = st.columns(2)
-
-    with col4:
-        st.metric("Straw 4 - FCF", f"{fcf[-1]:,.0f}", f"{fcf_trend:,.0f}")
-
-    with col5:
-        st.metric("Straw 5 - System Score", f"{system_score:.2f}", "STABLE")
+        <div class="small">
+            收入增速：{rev_growth:.2%} ｜ CapEx增速：{capex_growth:.2%}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 else:
-    st.warning("Loading data or API error")
+    st.error("数据加载失败")
