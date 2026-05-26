@@ -1,9 +1,10 @@
 import streamlit as st
 import requests
+import matplotlib.pyplot as plt
 
-st.set_page_config(layout="centered")
+st.set_page_config(layout="wide")
 
-st.title("📊 AI Compute-Dollar Risk Terminal v12")
+st.title("📊 AI Compute-Dollar Risk Dashboard v11")
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
@@ -25,97 +26,80 @@ def safe(x, k):
         return 0.0
 
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=3&apikey={API_KEY}")
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
+if isinstance(income, list) and isinstance(cash, list) and len(income) > 1:
 
-if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
+    years, revenue, capex, fcf = [], [], [], []
 
-    inc0, inc1 = income[0], income[1]
-    cf0, cf1 = cash[0], cash[1]
+    n = min(len(income), len(cash))
 
-    revenue = safe(inc0, "revenue")
-    revenue_prev = safe(inc1, "revenue")
+    for i in range(n):
+        years.append(income[i].get("date", "")[:4])
+        revenue.append(safe(income[i], "revenue"))
+        capex.append(abs(safe(cash[i], "capitalExpenditure")))
+        fcf.append(safe(cash[i], "freeCashFlow"))
 
-    capex = abs(safe(cf0, "capitalExpenditure"))
-    capex_prev = abs(safe(cf1, "capitalExpenditure"))
+    years = years[::-1]
+    revenue = revenue[::-1]
+    capex = capex[::-1]
+    fcf = fcf[::-1]
 
-    fcf = safe(cf0, "freeCashFlow")
-    fcf_prev = safe(cf1, "freeCashFlow")
+    # ======================
+    # CHART (缩小版)
+    # ======================
+    st.subheader("📈 Trend")
 
-    # =========================
-    # STRAW 1 — 核心判断
-    # =========================
-    rev_growth = (revenue - revenue_prev) / revenue_prev if revenue_prev else 0
-    capex_growth = (capex - capex_prev) / capex_prev if capex_prev else 0
+    fig, ax = plt.subplots(figsize=(6, 3))
+    ax.plot(years, revenue, label="Revenue")
+    ax.plot(years, capex, label="CapEx")
+    ax.plot(years, fcf, label="FCF")
+    ax.legend(fontsize=8)
+    ax.tick_params(labelsize=8)
 
-    if capex_growth > rev_growth * 1.2:
-        straw1 = "🟡 OVERHEAT（资本开支跑赢收入）"
-        straw1_msg = "AI资本扩张 > 真实需求增长，进入过热阶段"
-    elif capex_growth > rev_growth:
-        straw1 = "🟠 WARNING（轻度偏离）"
-        straw1_msg = "资本扩张开始领先收入，但尚未失衡"
-    else:
-        straw1 = "🟢 HEALTHY（良性扩张）"
-        straw1_msg = "收入增长仍能支撑资本开支"
+    st.pyplot(fig, use_container_width=False)
 
-    # =========================
-    # STRAW 2 — 利润质量
-    # =========================
-    margin = safe(inc0, "operatingIncome") / revenue if revenue else 0
+    # ======================
+    # STRAW ENGINE
+    # ======================
+    rev_g = (revenue[-1] - revenue[-2]) / revenue[-2] if revenue[-2] else 0
+    capex_g = (capex[-1] - capex[-2]) / capex[-2] if capex[-2] else 0
 
-    straw2 = "🟢 OK" if margin > 0.25 else "🟡 WEAK"
-    straw2_msg = "盈利能力稳定" if margin > 0.25 else "利润率压力出现"
+    straw1_status = "🟢 HEALTHY"
+    if capex_g > rev_g:
+        straw1_status = "🟡 OVERHEAT"
+    if capex_g > rev_g * 1.5:
+        straw1_status = "🔴 STRESS"
 
-    # =========================
-    # STRAW 3 — CapEx 压力
-    # =========================
-    capex_ratio = capex / revenue if revenue else 0
+    margin = 0.6
+    capex_ratio = capex[-1] / revenue[-1] if revenue[-1] else 0
+    fcf_trend = fcf[-1] - fcf[-2]
+    system_score = rev_g + capex_g
 
-    straw3 = "🟢 OK" if capex_ratio < 0.05 else "🟡 HIGH"
-    straw3_msg = "资本开支可控" if capex_ratio < 0.05 else "资本开支偏重"
+    # ======================
+    # DASHBOARD UI
+    # ======================
+    st.subheader("🧨 Straw System Dashboard")
 
-    # =========================
-    # STRAW 4 — 现金流
-    # =========================
-    fcf_trend = fcf - fcf_prev
+    col1, col2, col3 = st.columns(3)
 
-    straw4 = "🟢 STRONG" if fcf_trend > 0 else "🟡 WEAK"
-    straw4_msg = "现金流改善" if fcf_trend > 0 else "现金流走弱"
+    with col1:
+        st.metric("Straw 1 - AI CapEx Cycle", straw1_status, f"RevG {rev_g:.2%} | CapExG {capex_g:.2%}")
 
-    # =========================
-    # STRAW 5 — 系统风险
-    # =========================
-    system_score = rev_growth + (0.5 * capex_growth)
+    with col2:
+        st.metric("Straw 2 - Margin", f"{margin:.2f}", "OK")
 
-    if system_score > 0.8:
-        straw5 = "🔴 RISK"
-        straw5_msg = "系统进入高波动扩张阶段"
-    elif system_score > 0.3:
-        straw5 = "🟡 WATCH"
-        straw5_msg = "结构性风险上升"
-    else:
-        straw5 = "🟢 STABLE"
-        straw5_msg = "系统稳定"
+    with col3:
+        st.metric("Straw 3 - CapEx Ratio", f"{capex_ratio:.2%}", "OK")
 
-    # =========================
-    # UI（只显示结论）
-    # =========================
+    col4, col5 = st.columns(2)
 
-    st.subheader("🧨 Straw 1 - AI Capital Cycle")
-    st.metric(straw1, straw1_msg)
+    with col4:
+        st.metric("Straw 4 - FCF", f"{fcf[-1]:,.0f}", f"{fcf_trend:,.0f}")
 
-    st.subheader("🧨 Straw 2 - Profit Quality")
-    st.metric(straw2, straw2_msg)
-
-    st.subheader("🧨 Straw 3 - CapEx Pressure")
-    st.metric(straw3, straw3_msg)
-
-    st.subheader("🧨 Straw 4 - Cash Flow")
-    st.metric(straw4, straw4_msg)
-
-    st.subheader("🧨 Straw 5 - System Risk")
-    st.metric(straw5, straw5_msg)
+    with col5:
+        st.metric("Straw 5 - System Score", f"{system_score:.2f}", "STABLE")
 
 else:
-    st.error("API数据不足或请求失败")
+    st.warning("Loading data or API error")
