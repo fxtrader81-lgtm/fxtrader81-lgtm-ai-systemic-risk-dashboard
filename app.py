@@ -4,46 +4,44 @@ import matplotlib.pyplot as plt
 
 st.title("📊 AI Compute-Dollar Risk Terminal v1")
 
-# 👉 只改这里：填你的 key
-KEY = st.text_input("Enter FMP Key", "")
-
 symbol = st.text_input("Symbol", "NVDA")
-
+KEY = st.text_input("FMP Key", "")
 
 BASE = "https://financialmodelingprep.com/api/v3"
 
 
-def fetch_income(symbol):
-    url = f"{BASE}/income-statement/{symbol}?limit=5&apikey={KEY}"
-    return requests.get(url).json()
-
-
-def fetch_cash(symbol):
-    url = f"{BASE}/cash-flow-statement/{symbol}?limit=5&apikey={KEY}"
-    return requests.get(url).json()
+def fetch(url):
+    r = requests.get(url)
+    try:
+        return r.json()
+    except:
+        return {"error": "invalid response", "text": r.text}
 
 
 if st.button("Run Analysis"):
 
     if not KEY:
-        st.error("请先输入API Key")
+        st.error("请输入API Key")
         st.stop()
 
-    income = fetch_income(symbol)
-    cash = fetch_cash(symbol)
+    income_url = f"{BASE}/income-statement/{symbol}?limit=5&apikey={KEY}"
+    cash_url = f"{BASE}/cash-flow-statement/{symbol}?limit=5&apikey={KEY}"
+
+    income = fetch(income_url)
+    cash = fetch(cash_url)
+
+    # 🚨 强制显示API返回（关键）
+    st.subheader("📡 Raw Income API Response")
+    st.json(income)
+
+    st.subheader("📡 Raw CashFlow API Response")
+    st.json(cash)
 
     if not isinstance(income, list) or not isinstance(cash, list):
-        st.error("API返回异常：Key或权限问题")
-        st.json(income)
+        st.error("API失败：请看上方返回内容（不是代码问题，是API权限/endpoint）")
         st.stop()
 
-    if len(income) < 2 or len(cash) < 2:
-        st.error("数据不足")
-        st.stop()
-
-    years = []
-    revenue = []
-    capex = []
+    years, revenue, capex = [], [], []
 
     for i in range(len(income)):
         years.append(income[i]["date"][:4])
@@ -69,7 +67,6 @@ if st.button("Run Analysis"):
     capex_g = (capex[-1] - capex[-2]) / capex[-2]
 
     status = "🟢 HEALTHY"
-
     if capex_g > rev_g:
         status = "🟡 OVERHEAT"
     if capex_g > rev_g * 1.5:
