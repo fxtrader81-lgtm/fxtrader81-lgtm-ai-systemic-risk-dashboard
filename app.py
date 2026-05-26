@@ -28,7 +28,7 @@ st.markdown("""
 html, body, [class*="css"] {
     background-color: #050b16;
     color: white;
-    font-family: sans-serif;
+    font-family: "Inter", sans-serif;
 }
 
 .block-container {
@@ -37,15 +37,17 @@ html, body, [class*="css"] {
     padding-right: 2rem;
 }
 
-.title {
+.main-title {
     font-size: 42px;
     font-weight: 800;
     color: white;
+    margin-bottom: 6px;
 }
 
-.subtitle {
+.sub-title {
     color: #94a3b8;
-    margin-bottom: 20px;
+    font-size: 16px;
+    margin-bottom: 30px;
 }
 
 .metric-card {
@@ -56,9 +58,11 @@ html, body, [class*="css"] {
     );
 
     border: 1px solid #1f2937;
-    border-radius: 20px;
+    border-radius: 22px;
+
     padding: 24px;
-    height: 220px;
+
+    min-height: 250px;
 
     box-shadow:
         0 0 30px rgba(0,0,0,0.35);
@@ -66,19 +70,19 @@ html, body, [class*="css"] {
 
 .metric-label {
     color: #94a3b8;
-    font-size: 14px;
-    margin-bottom: 20px;
+    font-size: 15px;
+    margin-bottom: 22px;
 }
 
 .metric-number {
-    font-size: 42px;
+    font-size: 48px;
     font-weight: 800;
+    margin-bottom: 20px;
 }
 
 .metric-desc {
     color: #cbd5e1;
-    font-size: 14px;
-    margin-top: 14px;
+    font-size: 15px;
     line-height: 1.8;
 }
 
@@ -96,37 +100,37 @@ html, body, [class*="css"] {
 
 .alert-box {
 
-    margin-top: 24px;
+    margin-top: 28px;
 
     background: linear-gradient(
         90deg,
-        rgba(60,40,0,0.95),
+        rgba(70,50,0,0.95),
         rgba(20,15,5,0.98)
     );
 
     border: 1px solid #7c5a10;
 
-    border-radius: 20px;
+    border-radius: 24px;
 
-    padding: 30px;
+    padding: 34px;
 }
 
 .alert-title {
     color: #fbbf24;
-    font-size: 34px;
+    font-size: 36px;
     font-weight: 800;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
 }
 
 .alert-text {
     color: white;
-    font-size: 18px;
-    line-height: 1.9;
+    font-size: 20px;
+    line-height: 2;
 }
 
 .section-card {
 
-    margin-top: 24px;
+    margin-top: 28px;
 
     background: linear-gradient(
         180deg,
@@ -136,30 +140,30 @@ html, body, [class*="css"] {
 
     border: 1px solid #1f2937;
 
-    border-radius: 20px;
+    border-radius: 24px;
 
-    padding: 24px;
+    padding: 26px;
 
-    min-height: 500px;
+    min-height: 520px;
 }
 
 .section-title {
-    font-size: 28px;
+    font-size: 30px;
     font-weight: 700;
-    margin-bottom: 18px;
+    margin-bottom: 24px;
 }
 
 .logic-item {
-    font-size: 16px;
-    line-height: 1.9;
+    font-size: 17px;
+    line-height: 2;
     color: #e2e8f0;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .footer {
-    margin-top: 18px;
+    margin-top: 20px;
     color: #64748b;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 </style>
@@ -174,11 +178,11 @@ left, right = st.columns([5,1])
 with left:
 
     st.markdown("""
-    <div class="title">
+    <div class="main-title">
     稻草一：AI资本开支循环检测
     </div>
 
-    <div class="subtitle">
+    <div class="sub-title">
     核心检测维度：资本开支扩张速度是否超过收入增长速度
     </div>
     """, unsafe_allow_html=True)
@@ -290,6 +294,7 @@ if isinstance(income, list) and len(income) > 1:
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             收入增长率 (YoY)
             </div>
@@ -299,9 +304,10 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="metric-desc">
-            AI需求仍维持高增长，
+            AI需求仍维持高增长，<br>
             当前收入扩张速度保持强劲。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -309,6 +315,7 @@ if isinstance(income, list) and len(income) > 1:
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             资本开支增长率 (YoY)
             </div>
@@ -318,9 +325,10 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="metric-desc">
-            企业正在加速AI基础设施投入，
+            企业正在加速AI基础设施投入，<br>
             CapEx扩张速度持续提升。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -328,6 +336,7 @@ if isinstance(income, list) and len(income) > 1:
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             增速差 (CapEx - Revenue)
             </div>
@@ -337,9 +346,10 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="metric-desc">
-            资本扩张速度已经开始超过
+            资本扩张速度已经开始超过<br>
             收入增长速度。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -347,6 +357,7 @@ if isinstance(income, list) and len(income) > 1:
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             状态判断
             </div>
@@ -356,9 +367,10 @@ if isinstance(income, list) and len(income) > 1:
             </div>
 
             <div class="metric-desc">
-            当前AI资本扩张已经进入
+            当前AI资本扩张已经进入<br>
             高波动风险阶段。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -376,10 +388,14 @@ if isinstance(income, list) and len(income) > 1:
         <div class="alert-text">
 
         当前资本开支增速比收入增速高出
-        {diff*100:.2f}% ，
+        <span class="yellow">
+        {diff*100:.2f}%
+        </span>，
 
         企业AI基础设施投入已经开始超出
         现实需求支撑。
+
+        <br><br>
 
         若趋势持续，
         将提升未来盈利与现金流压力。
@@ -390,84 +406,163 @@ if isinstance(income, list) and len(income) > 1:
     """, unsafe_allow_html=True)
 
     # ======================================================
+    # LOWER LAYOUT
+    # ======================================================
+
+    left_col, right_col = st.columns([1,1])
+
+    # ======================================================
+    # LOGIC
+    # ======================================================
+
+    with left_col:
+
+        st.markdown("""
+        <div class="section-card">
+
+            <div class="section-title">
+            ⚙️ 检测逻辑
+            </div>
+
+            <div class="logic-item">
+            ① 获取最近5年收入与资本开支数据
+            </div>
+
+            <div class="logic-item">
+            ② 计算 Revenue YoY 增长率
+            </div>
+
+            <div class="logic-item">
+            ③ 计算 CapEx YoY 增长率
+            </div>
+
+            <div class="logic-item">
+            ④ 计算增速差：
+            <br>
+            CapEx Growth - Revenue Growth
+            </div>
+
+            <div class="logic-item">
+            ⑤ 风险阈值：
+            <br><br>
+
+            增速差 ≥ 20%
+            → 过热预警
+
+            <br><br>
+
+            0% ~ 20%
+            → 偏热
+
+            <br><br>
+
+            小于 0%
+            → 健康
+            </div>
+
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ======================================================
     # CHART
     # ======================================================
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    with right_col:
 
-    st.markdown("""
-    <div class="section-title">
-    📈 趋势对比（最近5年）
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <div class="section-card">
+        """, unsafe_allow_html=True)
 
-    rev_growths = []
-    capex_growths = []
+        st.markdown("""
+        <div class="section-title">
+        📈 趋势对比（最近5年）
+        </div>
+        """, unsafe_allow_html=True)
 
-    for i in range(1, len(revenue)):
+        rev_growths = []
+        capex_growths = []
 
-        rg = (
-            (revenue[i] - revenue[i-1])
-            / revenue[i-1]
-        ) * 100
+        for i in range(1, len(revenue)):
 
-        cg = (
-            (capex[i] - capex[i-1])
-            / capex[i-1]
-        ) * 100
+            rg = (
+                (revenue[i] - revenue[i-1])
+                / revenue[i-1]
+            ) * 100
 
-        rev_growths.append(rg)
-        capex_growths.append(cg)
+            cg = (
+                (capex[i] - capex[i-1])
+                / capex[i-1]
+            ) * 100
 
-    chart_years = years[1:]
+            rev_growths.append(rg)
+            capex_growths.append(cg)
 
-    fig = go.Figure()
+        chart_years = years[1:]
 
-    fig.add_trace(go.Scatter(
-        x=chart_years,
-        y=rev_growths,
-        mode="lines+markers",
-        name="收入增长率",
-        line=dict(
-            color="#22c55e",
-            width=4
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=chart_years,
+            y=rev_growths,
+            mode="lines+markers",
+            name="收入增长率",
+            line=dict(
+                color="#22c55e",
+                width=4
+            )
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=chart_years,
+            y=capex_growths,
+            mode="lines+markers",
+            name="资本开支增长率",
+            line=dict(
+                color="#ef4444",
+                width=4
+            )
+        ))
+
+        fig.update_layout(
+
+            height=420,
+
+            paper_bgcolor="#111827",
+            plot_bgcolor="#111827",
+
+            font=dict(
+                color="white",
+                size=14
+            ),
+
+            margin=dict(
+                l=20,
+                r=20,
+                t=20,
+                b=20
+            ),
+
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
         )
-    ))
 
-    fig.add_trace(go.Scatter(
-        x=chart_years,
-        y=capex_growths,
-        mode="lines+markers",
-        name="资本开支增长率",
-        line=dict(
-            color="#ef4444",
-            width=4
+        st.plotly_chart(
+            fig,
+            use_container_width=True
         )
-    ))
 
-    fig.update_layout(
-        height=500,
+        st.markdown("""
+        </div>
+        """, unsafe_allow_html=True)
 
-        paper_bgcolor="#111827",
-        plot_bgcolor="#111827",
-
-        font=dict(
-            color="white",
-            size=14
-        ),
-
-        margin=dict(
-            l=20,
-            r=20,
-            t=20,
-            b=20
-        )
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+    # ======================================================
+    # FOOTER
+    # ======================================================
 
     st.markdown("""
     <div class="footer">
