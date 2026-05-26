@@ -8,55 +8,67 @@ import plotly.graph_objects as go
 # =========================
 st.set_page_config(layout="wide")
 
-API_KEY = "YOUR_API_KEY_HERE"
-BASE = "https://financialmodelingprep.com/stable"
+API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+
+# ⚠️ 关键修复：不要用 /stable
+BASE = "https://financialmodelingprep.com/api/v3"
 
 symbol = st.text_input("Symbol", "NVDA")
 
 
 # =========================
-# CACHE (防止限流)
+# FETCH (带错误显示)
 # =========================
 @st.cache_data(ttl=3600)
 def fetch(url):
     try:
         r = requests.get(url, timeout=10)
 
-        # HTTP error
         if r.status_code != 200:
-            return {"error": f"HTTP {r.status_code}"}
+            return {"error": f"HTTP {r.status_code}", "url": url}
 
         data = r.json()
 
-        # API error message
         if isinstance(data, dict) and "Error Message" in data:
-            return {"error": data["Error Message"]}
+            return {"error": data["Error Message"], "url": url}
 
         return data
 
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "url": url}
 
 
 # =========================
-# SAFE FIELD PARSER
+# SAFE GET
 # =========================
-def get_value(x, keys):
-    """Try multiple possible keys"""
+def get(x, keys):
     for k in keys:
-        if isinstance(x, dict) and k in x and x[k] is not None:
-            try:
+        try:
+            if k in x and x[k] is not None:
                 return float(x[k])
-            except:
-                pass
+        except:
+            pass
     return 0.0
 
 
 # =========================
-# FETCH DATA
+# API CALLS（修复路径）
 # =========================
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
-cash = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
+income_url = f"{BASE}/income-statement/{symbol}?limit=8&apikey={API_KEY}"
+cash_url = f"{BASE}/cash-flow-statement/{symbol}?limit=8&apikey={API_KEY}"
+
+income = fetch(income_url)
+cash = fetch(cash_url)
+
+
+# =========================
+# DEBUG（关键：避免黑盒）
+# =========================
+with st.expander("🔍 Debug Info"):
+    st.write("Income URL:", income_url)
+    st.write("Cash URL:", cash_url)
+    st.write("Income RAW:", income[:1] if isinstance(income, list) else income)
+    st.write("Cash RAW:", cash[:1] if isinstance(cash, list) else cash)
 
 
 # =========================
@@ -67,43 +79,42 @@ if isinstance(income, dict) and "error" in income:
     st.stop()
 
 if isinstance(cash, dict) and "error" in cash:
-    st.error(f"Cashflow API Error: {cash['error']}")
+    st.error(f"Cash API Error: {cash['error']}")
     st.stop()
 
 if not isinstance(income, list) or not isinstance(cash, list):
-    st.error("API返回结构异常（非list）")
+    st.error("API返回格式异常（不是list）")
     st.stop()
 
 if len(income) < 2 or len(cash) < 2:
-    st.error("数据不足（至少需要2期数据）")
+    st.error("数据不足（至少需要2期财报）")
     st.stop()
 
 
 # =========================
-# BUILD DATA
+# BUILD DATAFRAME
 # =========================
-rev, capex, dates = [], [], []
+dates, revenue, capex = [], [], []
 
 for i in range(min(len(income), len(cash))):
     inc = income[i]
     cf = cash[i]
 
-    revenue = get_value(inc, ["revenue", "revenueUSD", "totalRevenue"])
-    capex_v = abs(get_value(cf, ["capitalExpenditure", "capex"]))
-    date = inc.get("date", str(i))
+    dates.append(inc.get("date", str(i)))
 
-    rev.append(revenue)
-    capex.append(capex_v)
-    dates.append(date)
+    revenue.append(
+        get(inc, ["revenue", "revenueUSD", "totalRevenue"])
+    )
 
+    capex.append(
+        abs(get(cf, ["capitalExpenditure", "capex"]))
+    )
 
 df = pd.DataFrame({
     "date": dates,
-    "revenue": rev,
+    "revenue": revenue,
     "capex": capex
-})
-
-df = df.iloc[::-1]  # chronological
+}).iloc[::-1]
 
 
 # =========================
@@ -112,27 +123,23 @@ df = df.iloc[::-1]  # chronological
 df["rev_growth"] = df["revenue"].pct_change()
 df["capex_growth"] = df["capex"].pct_change()
 
-latest_rev_growth = df["rev_growth"].iloc[-1] if len(df) > 1 else 0
-latest_capex_growth = df["capex_growth"].iloc[-1] if len(df) > 1 else 0
+rev_g = df["rev_growth"].iloc[-1]
+capex_g = df["capex_growth"].iloc[-1]
 
-risk_gap = latest_capex_growth - latest_rev_growth
+risk_gap = capex_g - rev_g
 
-overheat = latest_capex_growth > latest_rev_growth * 1.2
+overheat = capex_g > rev_g * 1.2
 
 
 # =========================
-# UI HEADER
+# UI
 # =========================
 st.title(f"📊 AI Compute-Dollar Risk Terminal — {symbol}")
 
-
-# =========================
-# KPI CARDS
-# =========================
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Revenue Growth", f"{latest_rev_growth*100:.2f}%")
-col2.metric("CapEx Growth", f"{latest_capex_growth*100:.2f}%")
+col1.metric("Revenue Growth", f"{rev_g*100:.2f}%")
+col2.metric("CapEx Growth", f"{capex_g*100:.2f}%")
 col3.metric("Risk Gap", f"{risk_gap*100:.2f}%")
 col4.metric("Status", "OVERHEAT" if overheat else "NORMAL")
 
@@ -141,9 +148,9 @@ col4.metric("Status", "OVERHEAT" if overheat else "NORMAL")
 # ALERT
 # =========================
 if overheat:
-    st.error("⚠️ 资本开支增长显著高于收入增长 —— 可能进入过热阶段")
+    st.error("⚠️ CapEx增长显著高于Revenue增长（潜在AI过热）")
 else:
-    st.success("✅ 资本开支与收入增长结构健康")
+    st.success("✅ 结构健康：收入仍支撑资本开支")
 
 
 # =========================
@@ -152,14 +159,14 @@ else:
 fig = go.Figure()
 
 fig.add_trace(go.Scatter(
-    y=df["revenue"],
     x=df["date"],
+    y=df["revenue"],
     name="Revenue"
 ))
 
 fig.add_trace(go.Scatter(
-    y=df["capex"],
     x=df["date"],
+    y=df["capex"],
     name="CapEx"
 ))
 
@@ -167,8 +174,7 @@ fig.update_layout(
     height=500,
     paper_bgcolor="#0e1117",
     plot_bgcolor="#0e1117",
-    font=dict(color="white"),
-    margin=dict(l=10, r=10, t=30, b=10)
+    font=dict(color="white")
 )
 
 st.plotly_chart(fig, use_container_width=True)
