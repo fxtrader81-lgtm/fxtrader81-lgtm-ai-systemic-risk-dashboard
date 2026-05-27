@@ -1,14 +1,15 @@
 import streamlit as st
 import requests
+import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
 # =========================================================
-# PAGE
+# 页面配置
 # =========================================================
 
 st.set_page_config(
-    page_title="AI Capital Risk Dashboard",
+    page_title="AI资本开支风险终端",
     layout="wide"
 )
 
@@ -20,215 +21,218 @@ API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 # =========================================================
-# STYLE
+# CSS
 # =========================================================
 
 st.markdown("""
 <style>
 
 html, body, [class*="css"] {
-    background-color: #050b16;
+    background: #050b14;
     color: white;
-    font-family: Inter, sans-serif;
+    font-family: -apple-system,BlinkMacSystemFont,sans-serif;
 }
 
-/* Streamlit */
-#MainMenu {visibility:hidden;}
-footer {visibility:hidden;}
-header {visibility:hidden;}
-
+/* 主容器 */
 .main .block-container{
+    padding-top: 24px;
+    padding-left: 28px;
+    padding-right: 28px;
     max-width: 1600px;
-    padding-top: 1.2rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
-    padding-bottom: 2rem;
 }
 
-/* Hero */
-.hero-box{
-    background:
-    radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 35%),
-    linear-gradient(135deg,#07111f 0%, #040816 100%);
-    border:1px solid rgba(255,255,255,0.08);
-    border-radius:26px;
-    padding:28px 34px;
-    margin-bottom:24px;
-    box-shadow:0 0 40px rgba(0,0,0,0.45);
-}
-
-.hero-top{
+/* 顶部 */
+.topbar{
     display:flex;
     justify-content:space-between;
     align-items:flex-start;
+    margin-bottom:20px;
 }
 
-.hero-title{
-    font-size:42px;
+.main-title{
+    font-size:52px;
     font-weight:800;
-    margin-bottom:8px;
-    letter-spacing:-1px;
-}
-
-.hero-sub{
-    color:#94a3b8;
-    font-size:17px;
-}
-
-.hero-right{
-    text-align:right;
-}
-
-.hero-time{
-    color:#94a3b8;
-    font-size:14px;
+    color:white;
+    line-height:1.1;
     margin-bottom:10px;
 }
 
-.hero-symbol{
-    background:rgba(255,255,255,0.06);
+.sub-title{
+    color:#94a3b8;
+    font-size:18px;
+    font-weight:500;
+}
+
+/* 股票代码 */
+.ticker-box{
+    background:#0f172a;
     border:1px solid rgba(255,255,255,0.08);
-    border-radius:14px;
-    padding:10px 18px;
-    display:inline-block;
-    font-size:22px;
+    padding:14px 18px;
+    border-radius:16px;
+    width:160px;
+}
+
+.ticker-label{
+    color:#64748b;
+    font-size:12px;
+    margin-bottom:6px;
+}
+
+.ticker-value{
+    color:white;
+    font-size:34px;
     font-weight:700;
 }
 
-/* Cards */
+/* 指标卡 */
 .metric-card{
-    background:
-    radial-gradient(circle at top left, rgba(37,99,235,0.14), transparent 35%),
-    linear-gradient(180deg,#08101f 0%, #050b16 100%);
-    border:1px solid rgba(255,255,255,0.08);
+    background: radial-gradient(circle at top left,#0d1b3d,#050b14);
+    border:1px solid rgba(255,255,255,0.06);
     border-radius:22px;
-    padding:22px;
-    min-height:170px;
-    box-shadow:0 0 24px rgba(0,0,0,0.35);
+    padding:24px;
+    height:230px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.35);
 }
 
 .metric-label{
-    color:#d1d5db;
-    font-size:16px;
+    color:#cbd5e1;
+    font-size:17px;
     font-weight:600;
-    margin-bottom:22px;
+    margin-bottom:26px;
 }
 
 .metric-number{
-    font-size:44px;
+    font-size:54px;
     font-weight:800;
     line-height:1;
-    margin-bottom:16px;
-    letter-spacing:-1px;
+    margin-bottom:18px;
 }
 
 .metric-desc{
     color:#94a3b8;
-    font-size:14px;
-    line-height:1.7;
+    font-size:15px;
+    line-height:1.8;
 }
 
+/* 颜色 */
 .green{
     color:#22c55e;
 }
 
 .red{
-    color:#ef4444;
+    color:#ff5b4d;
 }
 
 .yellow{
     color:#fbbf24;
 }
 
-/* Alert */
+/* 结论 */
 .alert-box{
-    margin-top:22px;
-    background:
-    radial-gradient(circle at left, rgba(251,191,36,0.18), transparent 28%),
-    linear-gradient(135deg,#1a1205 0%, #090909 100%);
-    border:1px solid rgba(251,191,36,0.35);
-    border-radius:24px;
-    padding:30px;
-    display:flex;
-    gap:24px;
-    align-items:flex-start;
-}
-
-.alert-icon{
-    font-size:62px;
-    line-height:1;
+    margin-top:24px;
+    margin-bottom:24px;
+    background: linear-gradient(90deg,rgba(251,191,36,0.12),rgba(0,0,0,0.2));
+    border:1px solid rgba(251,191,36,0.28);
+    border-radius:22px;
+    padding:28px;
 }
 
 .alert-title{
-    color:#fbbf24;
-    font-size:32px;
+    font-size:40px;
     font-weight:800;
-    margin-bottom:12px;
+    color:#fbbf24;
+    margin-bottom:18px;
     line-height:1.3;
 }
 
 .alert-text{
     color:#d1d5db;
-    font-size:18px;
-    line-height:1.9;
+    font-size:20px;
+    line-height:2;
 }
 
-/* Panels */
+/* 下方模块 */
 .panel{
-    margin-top:24px;
-    background:
-    radial-gradient(circle at top left, rgba(37,99,235,0.12), transparent 35%),
-    linear-gradient(180deg,#08101f 0%, #050b16 100%);
-    border:1px solid rgba(255,255,255,0.08);
-    border-radius:24px;
+    background: radial-gradient(circle at top left,#0d1b3d,#050b14);
+    border:1px solid rgba(255,255,255,0.06);
+    border-radius:22px;
     padding:26px;
-    min-height:580px;
+    height:100%;
 }
 
 .panel-title{
-    font-size:28px;
-    font-weight:800;
+    font-size:30px;
+    font-weight:700;
     margin-bottom:22px;
 }
 
+/* 逻辑 */
 .logic-item{
     color:#d1d5db;
     font-size:18px;
     line-height:2;
-    margin-bottom:6px;
+    margin-bottom:10px;
 }
 
-.logic-sub{
-    color:#94a3b8;
-    font-size:16px;
-    margin-left:18px;
-    line-height:2;
-}
-
+/* footer */
 .footer{
-    margin-top:24px;
-    text-align:center;
-    color:#6b7280;
-    font-size:13px;
+    margin-top:18px;
+    color:#64748b;
+    font-size:14px;
+}
+
+/* Streamlit输入框 */
+.stTextInput > div > div > input{
+    background:#111827;
+    color:white;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.08);
+    font-size:18px;
+}
+
+/* 图表压缩 */
+.js-plotly-plot{
+    margin-top:-10px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# INPUT
+# 顶部
 # =========================================================
 
-symbol = st.text_input("股票代码", "NVDA")
+left, right = st.columns([5,1])
+
+with left:
+
+    st.markdown("""
+    <div class="main-title">
+    稻草一：AI资本开支循环检测
+    </div>
+
+    <div class="sub-title">
+    核心检测维度：资本开支扩张速度是否超过收入增长速度
+    </div>
+    """, unsafe_allow_html=True)
+
+with right:
+
+    symbol = st.text_input("股票代码", "NVDA")
 
 # =========================================================
-# FUNCTIONS
+# API
 # =========================================================
 
 def fetch(url):
     try:
         r = requests.get(url, timeout=15)
+
+        if r.status_code != 200:
+            return []
+
         return r.json()
+
     except:
         return []
 
@@ -237,10 +241,6 @@ def safe(x, k):
         return float(x.get(k, 0))
     except:
         return 0
-
-# =========================================================
-# API DATA
-# =========================================================
 
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
@@ -251,25 +251,22 @@ cash = fetch(
 )
 
 # =========================================================
-# MAIN
+# 数据
 # =========================================================
 
 if (
     isinstance(income, list)
     and isinstance(cash, list)
-    and len(income) >= 5
-    and len(cash) >= 5
+    and len(income) >= 2
 ):
 
     years = []
     revenue = []
     capex = []
 
-    for i in range(5):
+    for i in range(min(len(income), len(cash))):
 
-        years.append(
-            income[i]["date"][:4]
-        )
+        years.append(income[i]["date"][:4])
 
         revenue.append(
             safe(income[i], "revenue")
@@ -279,92 +276,63 @@ if (
             abs(safe(cash[i], "capitalExpenditure"))
         )
 
-    years.reverse()
-    revenue.reverse()
-    capex.reverse()
+    years = years[::-1]
+    revenue = revenue[::-1]
+    capex = capex[::-1]
 
-    rev_growths = []
-    capex_growths = []
+    # =========================================================
+    # 当前增长率
+    # =========================================================
 
-    for i in range(1, len(revenue)):
+    revenue_growth = (
+        (revenue[-1] - revenue[-2])
+        / revenue[-2]
+    )
 
-        rg = (
-            (revenue[i] - revenue[i-1])
-            / revenue[i-1]
-        ) * 100
+    capex_growth = (
+        (capex[-1] - capex[-2])
+        / capex[-2]
+    )
 
-        cg = (
-            (capex[i] - capex[i-1])
-            / capex[i-1]
-        ) * 100
+    diff = capex_growth - revenue_growth
 
-        rev_growths.append(rg)
-        capex_growths.append(cg)
+    # =========================================================
+    # 状态
+    # =========================================================
 
-    rev_growth = rev_growths[-1]
-    capex_growth = capex_growths[-1]
-    diff = capex_growth - rev_growth
+    if diff >= 0.2:
 
-    # =====================================================
-    # STATUS
-    # =====================================================
-
-    if diff >= 20:
         status = "过热预警"
         status_color = "yellow"
-        status_desc = "当前AI资本扩张已经进入高波动风险阶段。"
+
+        status_desc = """
+        当前AI资本扩张已经进入<br>
+        高波动风险阶段。
+        """
 
     elif diff >= 0:
+
         status = "偏热"
         status_color = "yellow"
-        status_desc = "资本扩张开始领先收入增长。"
+
+        status_desc = """
+        资本扩张开始领先收入增长，<br>
+        进入偏热阶段。
+        """
 
     else:
+
         status = "健康"
         status_color = "green"
-        status_desc = "收入增长仍高于资本扩张速度。"
 
-    # =====================================================
-    # HERO
-    # =====================================================
+        status_desc = """
+        当前收入增长仍覆盖资本扩张，<br>
+        系统处于健康状态。
+        """
 
-    st.markdown(f"""
-    <div class="hero-box">
-
-        <div class="hero-top">
-
-            <div>
-
-                <div class="hero-title">
-                🌾 稻草一：AI资本开支循环检测
-                </div>
-
-                <div class="hero-sub">
-                核心检测维度：资本开支扩张速度是否超过收入增长速度
-                </div>
-
-            </div>
-
-            <div class="hero-right">
-
-                <div class="hero-time">
-                更新时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-                </div>
-
-                <div class="hero-symbol">
-                {symbol.upper()}
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
-    """, unsafe_allow_html=True)
-
-    # =====================================================
-    # METRICS
-    # =====================================================
+    # =========================================================
+    # 卡片
+    # =========================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -378,7 +346,7 @@ if (
             </div>
 
             <div class="metric-number green">
-            {rev_growth:.2f}%
+            {revenue_growth*100:.2f}%
             </div>
 
             <div class="metric-desc">
@@ -399,7 +367,7 @@ if (
             </div>
 
             <div class="metric-number red">
-            {capex_growth:.2f}%
+            {capex_growth*100:.2f}%
             </div>
 
             <div class="metric-desc">
@@ -420,7 +388,7 @@ if (
             </div>
 
             <div class="metric-number yellow">
-            +{diff:.2f}%
+            +{diff*100:.2f}%
             </div>
 
             <div class="metric-desc">
@@ -451,57 +419,51 @@ if (
         </div>
         """, unsafe_allow_html=True)
 
-    # =====================================================
-    # ALERT
-    # =====================================================
+    # =========================================================
+    # 结论
+    # =========================================================
 
     st.markdown(f"""
     <div class="alert-box">
 
-        <div class="alert-icon">
-        ⚠️
+        <div class="alert-title">
+        结论：AI资本开支扩张速度明显高于收入增长，进入过热阶段
         </div>
 
-        <div>
+        <div class="alert-text">
 
-            <div class="alert-title">
-            结论：AI资本开支扩张速度明显高于收入增长，进入过热阶段
-            </div>
+        当前资本开支增速比收入增速高出
+        <span class="yellow">
+        {diff*100:.2f}%
+        </span>，
 
-            <div class="alert-text">
+        显示企业在AI基础设施上的投入扩张已经超出
+        现实需求支撑。
 
-            当前资本开支增速比收入增速高出
-            <span class="yellow">{diff:.2f}%</span>，
+        <br><br>
 
-            显示企业在AI基础设施上的投入扩张已经超出
-            现实需求支撑。
-
-            <br><br>
-
-            若该趋势持续，
-            将提升未来盈利与现金流承压风险，
-            需要重点跟踪需求兑现情况。
-
-            </div>
+        若该趋势持续，
+        将提升未来盈利与现金流承压风险，
+        需要重点跟踪需求兑现情况。
 
         </div>
 
     </div>
     """, unsafe_allow_html=True)
 
-    # =====================================================
-    # LOWER PANELS
-    # =====================================================
+    # =========================================================
+    # 下方布局
+    # =========================================================
 
-    left_panel, right_panel = st.columns([1, 1.4])
+    left_panel, right_panel = st.columns([1, 1.35])
 
-    # =====================================================
-    # LEFT
-    # =====================================================
+    # =========================================================
+    # 左侧逻辑
+    # =========================================================
 
     with left_panel:
 
-        st.markdown("""
+        st.markdown(f"""
         <div class="panel">
 
             <div class="panel-title">
@@ -509,7 +471,7 @@ if (
             </div>
 
             <div class="logic-item">
-            ① 获取最近5年财年数据：收入、资本开支
+            ① 获取最近5年收入与资本开支数据
             </div>
 
             <div class="logic-item">
@@ -517,35 +479,37 @@ if (
             </div>
 
             <div class="logic-item">
-            ③ 计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支
+            ③ 计算资本开支增长率 = (本期CapEx - 上期CapEx) / 上期CapEx
             </div>
 
             <div class="logic-item">
-            ④ 计算增速差 = 资本开支增长率 - 收入增长率
+            ④ 计算增速差 = 资本开支增速 - 收入增速
             </div>
 
             <div class="logic-item">
-            ⑤ 根据阈值判断系统风险：
+            ⑤ 根据阈值判断系统状态：
+            <br><br>
+
+            • 增速差 ≥ 20% → 过热预警
+            <br>
+
+            • 0% ≤ 增速差 ＜ 20% → 偏热
+            <br>
+
+            • 增速差 ＜ 0% → 健康
             </div>
 
-            <div class="logic-sub">
-            🔴 增速差 ≥ 20% → 过热预警
-            </div>
-
-            <div class="logic-sub">
-            🟡 0% ≤ 增速差 ＜ 20% → 偏热
-            </div>
-
-            <div class="logic-sub">
-            🟢 增速差 ＜ 0% → 健康
+            <div class="logic-item">
+            当前系统用于检测AI基础设施投资是否开始
+            脱离真实需求增长。
             </div>
 
         </div>
         """, unsafe_allow_html=True)
 
-    # =====================================================
-    # RIGHT
-    # =====================================================
+    # =========================================================
+    # 图表
+    # =========================================================
 
     with right_panel:
 
@@ -556,10 +520,30 @@ if (
         </div>
         """, unsafe_allow_html=True)
 
+        rev_growths = []
+        capex_growths = []
+
+        for i in range(1, len(revenue)):
+
+            rg = (
+                (revenue[i] - revenue[i-1])
+                / revenue[i-1]
+            ) * 100
+
+            cg = (
+                (capex[i] - capex[i-1])
+                / capex[i-1]
+            ) * 100
+
+            rev_growths.append(rg)
+            capex_growths.append(cg)
+
+        chart_years = years[1:]
+
         fig = go.Figure()
 
         fig.add_trace(go.Scatter(
-            x=years[1:],
+            x=chart_years,
             y=rev_growths,
             mode="lines+markers",
             name="收入增长率 (%)",
@@ -573,12 +557,12 @@ if (
         ))
 
         fig.add_trace(go.Scatter(
-            x=years[1:],
+            x=chart_years,
             y=capex_growths,
             mode="lines+markers",
             name="资本开支增长率 (%)",
             line=dict(
-                color="#ef4444",
+                color="#ff5b4d",
                 width=4
             ),
             marker=dict(
@@ -588,58 +572,57 @@ if (
 
         fig.update_layout(
 
-            height=470,
+            height=460,
 
-            paper_bgcolor="#050b16",
-            plot_bgcolor="#050b16",
-
-            margin=dict(
-                l=10,
-                r=10,
-                t=20,
-                b=10
-            ),
+            paper_bgcolor="#050b14",
+            plot_bgcolor="#050b14",
 
             font=dict(
                 color="white",
                 size=14
             ),
 
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font=dict(size=14)
+            margin=dict(
+                l=20,
+                r=20,
+                t=20,
+                b=20
             ),
 
             hovermode="x unified",
 
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.05,
+                xanchor="left",
+                x=0,
+                font=dict(size=14)
+            ),
+
             xaxis=dict(
                 showgrid=False,
-                tickfont=dict(size=14)
+                tickfont=dict(size=16)
             ),
 
             yaxis=dict(
                 title="增长率 (%)",
-                title_font=dict(size=15),
-                gridcolor="rgba(255,255,255,0.06)",
-                zerolinecolor="rgba(255,255,255,0.1)",
-                tickfont=dict(size=13)
+                title_font=dict(size=14),
+                tickfont=dict(size=14),
+                gridcolor="rgba(255,255,255,0.08)"
             )
         )
 
         st.plotly_chart(
             fig,
-            width="stretch"
+            width='stretch'
         )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # =====================================================
-    # FOOTER
-    # =====================================================
+    # =========================================================
+    # Footer
+    # =========================================================
 
     st.markdown("""
     <div class="footer">
@@ -649,4 +632,4 @@ if (
 
 else:
 
-    st.error("API数据加载失败，请检查 API KEY 或接口权限")
+    st.error("API数据加载失败，请检查API KEY或接口权限")
