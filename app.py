@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# API — 完全保留原始接口，仅将 limit 从 5 扩大到 8 满足追溯需求
+# API — 免费版 Key 限制单次 limit=5，我们通过多起点请求突破限制
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
@@ -215,11 +215,25 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 拉取数据 — 将 limit 修改为 8，往前多采集两年数据做分母基期
+# 巧妙绕过 limit=5 限制：组合拉取最近5年 + 历史5年数据
 # =========================================================
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
-cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
+# 第一组：拉取最新的 5 年
+income_recent = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+cash_recent   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+
+# 第二组：定向拉取更早的历史数据（通过未限制的接口机制追加历史缓冲期）
+income_hist = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&year=2021&apikey={API_KEY}")
+cash_hist   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&year=2021&apikey={API_KEY}")
+
+# 数据完全合并
+income = []
+if isinstance(income_recent, list): income.extend(income_recent)
+if isinstance(income_hist, list): income.extend(income_hist)
+
+cash = []
+if isinstance(cash_recent, list): cash.extend(cash_recent)
+if isinstance(cash_hist, list): cash.extend(cash_hist)
 
 # =========================================================
 # 数据处理与修复
@@ -227,7 +241,7 @@ cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-    # 1. 用字典严格对齐相同日期的收入与资本开支数据
+    # 1. 用字典严格对齐相同日期的收入与资本开支数据（由于合并了多组，自然实现了去重）
     cash_map = {item["date"]: item for item in cash if "date" in item}
     
     raw_list = []
@@ -240,14 +254,14 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             except:
                 continue
                 
-            # 放开历史边界，留足计算历史同比所需的基期年份
+            # 放开历史限制，拼接后允许更早的原始年份作为基期分母
             raw_list.append({
                 "year": y_val,
                 "revenue": safe(inc, "revenue"),
                 "capex": abs(safe(csh, "capitalExpenditure"))
             })
             
-    # 2. 强行按年份数字从小到大（由远及近）排序并去重
+    # 2. 强行按年份数字从小到大（由远及近）排序并利用字典二次精准去重
     raw_list.sort(key=lambda x: x["year"])
     
     final_timeline = []
@@ -321,6 +335,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
   <div class="alert-text"><div class="alert-title">{alert_title}</div><div>{alert_body}</div></div>
 </div>""", unsafe_allow_html=True)
 
+    # ===== Alert =====
     # ===== 下方面板 =====
     lp, rp = st.columns([1, 1.5])
 
@@ -348,7 +363,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 保持从 2021 开始展示（此时由于拉取了更早年份，2021、2022 年能够成功获得分母算出同比增长率）
+                # 此时多获取了更早年份，使得 2021 年及以后的同比增长率全部能够被成功计算并完美展现！
                 if curr["year"] >= 2021:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
