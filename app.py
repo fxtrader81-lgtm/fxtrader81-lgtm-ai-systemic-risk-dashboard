@@ -333,7 +333,6 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 </div>""", unsafe_allow_html=True)
 
     with rp:
-        # 恢复经典的“最近5年”标题
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
         rg_list, cg_list, cy_list = [], [], []
@@ -341,7 +340,6 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 恢复经典过滤条件：按最安稳的边界过滤出可渲染的点
                 if curr["year"] >= 2023:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
@@ -355,12 +353,34 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
                 name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
 
-            annotations = [
-                dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
-                     showarrow=False, xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)),
-                dict(x=cy_list[-1], y=cg_list[-1], text=f"<b>{cg_list[-1]:.2f}%</b>",
-                     showarrow=False, xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)),
-            ]
+            # 动态生成所有节点的数值标注
+            annotations = []
+            for idx in range(len(cy_list)):
+                year = cy_list[idx]
+                rev_val = rg_list[idx]
+                cap_val = cg_list[idx]
+                
+                # 判断是否为最新的一个点（最后一年）
+                if idx == len(cy_list) - 1:
+                    # 调整1：最新2026年数据，移到右侧空白区，加粗放大（字号从 13px 放大到 15px）
+                    annotations.append(
+                        dict(x=year, y=rev_val, text=f"<b>{rev_val:.2f}%</b>",
+                             showarrow=False, xanchor="left", xshift=12, font=dict(color="#22c55e", size=15))
+                    )
+                    annotations.append(
+                        dict(x=year, y=cap_val, text=f"<b>{cap_val:.2f}%</b>",
+                             showarrow=False, xanchor="left", xshift=12, font=dict(color="#ef4444", size=15))
+                    )
+                else:
+                    # 调整2：过去历史节点（2023、2024、2025），直接标在数据点上方，字号缩小（11px）以防喧宾夺主
+                    annotations.append(
+                        dict(x=year, y=rev_val, text=f"{rev_val:.2f}%",
+                             showarrow=False, yanchor="bottom", yshift=8, font=dict(color="#22c55e", size=11))
+                    )
+                    annotations.append(
+                        dict(x=year, y=cap_val, text=f"{cap_val:.2f}%",
+                             showarrow=False, yanchor="bottom", yshift=8, font=dict(color="#ef4444", size=11))
+                    )
         else:
             annotations = []
 
@@ -368,8 +388,8 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#64748b", size=12),
-            legend=dict(orientation="h", y=1.1, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=10, r=60, t=10, b=10),
+            legend=dict(orientation="h", y=1.15, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
+            margin=dict(l=10, r=75, t=10, b=10), # 稍微加宽右边距，防止放大的最新数据溢出
             annotations=annotations,
             xaxis=dict(
                 type="linear",
@@ -394,4 +414,3 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
 else:
     st.error(f"API数据加载失败，请检查股票代码是否正确。")
-    
