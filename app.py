@@ -222,7 +222,7 @@ income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY
 cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理与修复 — 彻底终结垂直竖线问题
+# 数据处理与修复 — 精准支持从 2021 年开始过滤
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
@@ -235,17 +235,18 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         d_str = inc.get("date", "")
         if d_str in cash_map:
             csh = cash_map[d_str]
-            # 提取纯数字年份，丢弃可能干扰轴渲染的非标字符串
             try:
                 y_val = int(inc.get("calendarYear", d_str[:4]))
             except:
                 continue
                 
-            raw_list.append({
-                "year": y_val,
-                "revenue": safe(inc, "revenue"),
-                "capex": abs(safe(csh, "capitalExpenditure"))
-            })
+            # 【核心修改】在此处增加过滤，只保留 2021 年及以后的财年数据
+            if y_val >= 2021:
+                raw_list.append({
+                    "year": y_val,
+                    "revenue": safe(inc, "revenue"),
+                    "capex": abs(safe(csh, "capitalExpenditure"))
+                })
             
     # 2. 强行按年份数字从小到大（由远及近）排序并去重
     raw_list.sort(key=lambda x: x["year"])
@@ -342,7 +343,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     with rp:
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
-        # 4. 严格一对一计算多财年的横向趋势数据
+        # 4. 计算多财年的横向趋势数据
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
@@ -350,7 +351,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             if prev["revenue"] > 0 and prev["capex"] > 0:
                 rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                 cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
-                cy_list.append(curr["year"]) # 这里是纯纯的整数型 list
+                cy_list.append(curr["year"])
 
         fig = go.Figure()
         
@@ -369,7 +370,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         else:
             annotations = []
 
-        # 5. 精准排布画布：废除 category 轴，采用线性整数轴并强制重绘刻度
+        # 5. 排布画布
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -378,9 +379,9 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             margin=dict(l=10, r=60, t=10, b=10),
             annotations=annotations,
             xaxis=dict(
-                type="linear",                    # 强制改为线性数轴
-                tickvals=cy_list,                 # 强行指定哪些数字位置显示刻度
-                ticktext=[str(y) for y in cy_list], # 刻度文字显示为对应的年份文本
+                type="linear",
+                tickvals=cy_list,
+                ticktext=[str(y) for y in cy_list],
                 showgrid=False, 
                 zeroline=False,
                 tickfont=dict(color="#64748b", size=11)
