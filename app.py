@@ -222,26 +222,39 @@ income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY
 cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理 — 精准修复 X 轴真实年份映射问题
+# 数据处理与修复 — 彻底重构防堆叠机制
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-    years, revenue, capex = [], [], []
-    n = min(len(income), len(cash))
+    # 1. 建立基于具体日期的字典映射，确保收入与资本开支实现行对齐
+    cash_map = {item["date"]: item for item in cash if "date" in item}
+    
+    valid_data = []
+    for inc in income:
+        d_str = inc.get("date", "")
+        if d_str in cash_map:
+            csh = cash_map[d_str]
+            valid_data.append({
+                "year": str(inc.get("calendarYear", d_str[:4])),
+                "date": d_str,
+                "revenue": safe(inc, "revenue"),
+                "capex": abs(safe(csh, "capitalExpenditure"))
+            })
+            
+    # 按时间由远到近排序 (例如 2020 -> 2023)
+    valid_data.sort(key=lambda x: x["date"])
 
-    # 【精准修复】确保按每一条数据的真实索引分别提取其对应财年的年份
-    for i in range(n):
-        years.append(str(income[i].get("calendarYear", income[i]["date"][:4])))
-        revenue.append(safe(income[i], "revenue"))
-        capex.append(abs(safe(cash[i], "capitalExpenditure")))
+    # 2. 如果存在相同年份的不同报表数据，进行去重，只保留每年的最新的一条数据
+    unique_years = {}
+    for item in valid_data:
+        unique_years[item["year"]] = item
+    
+    final_timeline = sorted(list(unique_years.values()), key=lambda x: x["date"])
 
-    years.reverse()
-    revenue.reverse()
-    capex.reverse()
-
-    rev_growth   = (revenue[-1] - revenue[-2]) / revenue[-2]
-    capex_growth = (capex[-1]   - capex[-2])   / capex[-2]
+    # 3. 计算最新财年的增长率与增速差
+    rev_growth   = (final_timeline[-1]["revenue"] - final_timeline[-2]["revenue"]) / final_timeline[-2]["revenue"]
+    capex_growth = (final_timeline[-1]["capex"] - final_timeline[-2]["capex"]) / final_timeline[-2]["capex"]
     diff         = capex_growth - rev_growth
 
     # 状态判断 — 原始逻辑
@@ -324,27 +337,36 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     with rp:
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
-        # 图表计算 — 原始逻辑
+        # 4. 生成多财年的横向趋势数据
         rg_list, cg_list, cy_list = [], [], []
-        for i in range(1, len(revenue)):
-            rg_list.append(((revenue[i] - revenue[i-1]) / revenue[i-1]) * 100)
-            cg_list.append(((capex[i]   - capex[i-1])   / capex[i-1])   * 100)
-            cy_list.append(str(years[i])) # 确保年份作为纯文本轴标签铺开
-
-        annotations = [
-            dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
-                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)),
-            dict(x=cy_list[-1], y=cg_list[-1], text=f"<b>{cg_list[-1]:.2f}%</b>",
-                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)),
-        ]
+        for i in range(1, len(final_timeline)):
+            prev = final_timeline[i-1]
+            curr = final_timeline[i]
+            
+            # 严格按照对应的上期数据计算历史每一期的YoY增长率
+            if prev["revenue"] > 0 and prev["capex"] > 0:
+                rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
+                cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
+                cy_list.append(curr["year"])
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=cy_list, y=rg_list, mode="lines+markers",
-            name="收入增长率(%)", line=dict(color="#22c55e", width=2.5), marker=dict(size=7)))
-        fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
-            name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
+        
+        if cy_list:
+            fig.add_trace(go.Scatter(x=cy_list, y=rg_list, mode="lines+markers",
+                name="收入增长率(%)", line=dict(color="#22c55e", width=2.5), marker=dict(size=7)))
+            fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
+                name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
 
-        # xaxis 显式声明为离散的类目轴 (category)，随不同年份横向正常延展
+            annotations = [
+                dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
+                     showarrow=False, xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)),
+                dict(x=cy_list[-1], y=cg_list[-1], text=f"<b>{cg_list[-1]:.2f}%</b>",
+                     showarrow=False, xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)),
+            ]
+        else:
+            annotations = []
+
+        # 5. 排布画布布局
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
