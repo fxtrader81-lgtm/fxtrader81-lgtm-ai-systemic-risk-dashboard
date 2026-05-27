@@ -127,7 +127,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     padding: 22px; border: 1px solid rgba(255,255,255,0.07);
 }
 
-/* 【修改】面板标题样式：由原来的 15px 增加 5 个字号到 20px */
+/* 面板标题样式：增加5个字号到 20px */
 .panel-title { 
     font-size: 20px !important; 
     font-weight: 700; 
@@ -222,7 +222,7 @@ income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY
 cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理 — 原始逻辑与修复
+# 数据处理 — 精准修复 X 轴真实年份映射问题
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
@@ -230,8 +230,9 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     years, revenue, capex = [], [], []
     n = min(len(income), len(cash))
 
+    # 【精准修复】确保按每一条数据的真实索引分别提取其对应财年的年份
     for i in range(n):
-        years.append(str(income[i]["date"][:4])) # 确保年份为标准字符串格式
+        years.append(str(income[i].get("calendarYear", income[i]["date"][:4])))
         revenue.append(safe(income[i], "revenue"))
         capex.append(abs(safe(cash[i], "capitalExpenditure")))
 
@@ -328,7 +329,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         for i in range(1, len(revenue)):
             rg_list.append(((revenue[i] - revenue[i-1]) / revenue[i-1]) * 100)
             cg_list.append(((capex[i]   - capex[i-1])   / capex[i-1])   * 100)
-            cy_list.append(str(years[i])) # 确保用作坐标轴的年份是纯文本型
+            cy_list.append(str(years[i])) # 确保年份作为纯文本轴标签铺开
 
         annotations = [
             dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
@@ -343,7 +344,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
             name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
 
-        # 关键更新：xaxis 显式声明为离散的类目轴 (category)，防止数字年份被 Plotly 压缩至一条线
+        # xaxis 显式声明为离散的类目轴 (category)，随不同年份横向正常延展
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -352,8 +353,8 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             margin=dict(l=10, r=60, t=10, b=10),
             annotations=annotations,
             xaxis=dict(
-                type="category",        # 显式声明为类目型，这行极其关键
-                autorange=True,         # 让坐标轴自动铺开宽度
+                type="category",
+                autorange=True,
                 showgrid=False, 
                 zeroline=False,
                 tickfont=dict(color="#64748b", size=11)
