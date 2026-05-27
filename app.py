@@ -13,14 +13,14 @@ st.set_page_config(
 )
 
 # =========================================================
-# API — 免费版 Key 限制单次 limit=5，我们通过多起点请求突破限制
+# API 核心配置
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 # =========================================================
-# CSS — 还原目标截图风格并优化可读性
+# CSS 样式完全留存
 # =========================================================
 
 st.markdown("""
@@ -173,7 +173,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# API函数 — 原始逻辑，不动
+# 工具函数
 # =========================================================
 
 def fetch(url):
@@ -192,7 +192,7 @@ def safe(x, k):
         return 0
 
 # =========================================================
-# 顶部：标题 + 输入框
+# 顶部控制流
 # =========================================================
 
 col_title, col_input = st.columns([5, 1])
@@ -215,68 +215,84 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 巧妙绕过 limit=5 限制：组合拉取最近5年 + 历史5年数据
+# 核心突围：通过混合拉取“年报接口”与“季报接口”突破 FMP 5条限制
 # =========================================================
 
-# 第一组：拉取最新的 5 年
-income_recent = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-cash_recent   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+# 1. 抓取标准年报 (包含最新5个财年)
+inc_annual = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+cash_annual = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
-# 第二组：定向拉取更早的历史数据（通过未限制的接口机制追加历史缓冲期）
-income_hist = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&year=2021&apikey={API_KEY}")
-cash_hist   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&year=2021&apikey={API_KEY}")
-
-# 数据完全合并
-income = []
-if isinstance(income_recent, list): income.extend(income_recent)
-if isinstance(income_hist, list): income.extend(income_hist)
-
-cash = []
-if isinstance(cash_recent, list): cash.extend(cash_recent)
-if isinstance(cash_hist, list): cash.extend(cash_hist)
+# 2. 抓取季报 (额外获得10-20个季度，用于向上融合成更早的完整财年)
+inc_quarterly = fetch(f"{BASE}/income-statement?symbol={symbol}&period=quarter&limit=20&apikey={API_KEY}")
+cash_quarterly = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&period=quarter&limit=20&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理与修复
+# 融合同步逻辑
 # =========================================================
 
-if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
+income_pool = {}
+cash_pool = {}
 
-    # 1. 用字典严格对齐相同日期的收入与资本开支数据（由于合并了多组，自然实现了去重）
-    cash_map = {item["date"]: item for item in cash if "date" in item}
-    
-    raw_list = []
-    for inc in income:
-        d_str = inc.get("date", "")
-        if d_str in cash_map:
-            csh = cash_map[d_str]
-            try:
-                y_val = int(inc.get("calendarYear", d_str[:4]))
-            except:
-                continue
-                
-            # 放开历史限制，拼接后允许更早的原始年份作为基期分母
-            raw_list.append({
-                "year": y_val,
-                "revenue": safe(inc, "revenue"),
-                "capex": abs(safe(csh, "capitalExpenditure"))
-            })
-            
-    # 2. 强行按年份数字从小到大（由远及近）排序并利用字典二次精准去重
-    raw_list.sort(key=lambda x: x["year"])
-    
-    final_timeline = []
-    seen_years = set()
-    for item in raw_list:
-        if item["year"] not in seen_years:
-            seen_years.add(item["year"])
-            final_timeline.append(item)
+# 塞入标准年报原始值
+if isinstance(inc_annual, list):
+    for item in inc_annual:
+        if "calendarYear" in item:
+            y = int(item["calendarYear"])
+            income_pool[y] = safe(item, "revenue")
 
-    # 3. 计算最新财年的增长率与增速差
+if isinstance(cash_annual, list):
+    for item in cash_annual:
+        if "calendarYear" in item:
+            y = int(item["calendarYear"])
+            cash_pool[y] = abs(safe(item, "capitalExpenditure"))
+
+# 提取季度数据融合成更久远的财年（补足年报接口死活拿不到的 2019, 2020 原始值）
+q_inc_map = {}
+if isinstance(inc_quarterly, list):
+    for item in inc_quarterly:
+        try:
+            y = int(item.get("calendarYear", item.get("date", "")[:4]))
+            q_inc_map[y] = q_inc_map.get(y, 0) + safe(item, "revenue")
+        except: pass
+
+q_csh_map = {}
+if isinstance(cash_quarterly, list):
+    for item in cash_quarterly:
+        try:
+            y = int(item.get("calendarYear", item.get("date", "")[:4]))
+            q_csh_map[y] = q_csh_map.get(y, 0) + abs(safe(item, "capitalExpenditure"))
+        except: pass
+
+# 如果年报缺失更早年份，用融合的季度总数补齐
+for y in q_inc_map:
+    if y not in income_pool:
+        income_pool[y] = q_inc_map[y]
+for y in q_csh_map:
+    if y not in cash_pool:
+        cash_pool[y] = q_csh_map[y]
+
+# 组装最终时间轴
+final_timeline = []
+for y in sorted(income_pool.keys()):
+    if y in cash_pool and income_pool[y] > 0 and cash_pool[y] > 0:
+        final_timeline.append({
+            "year": y,
+            "revenue": income_pool[y],
+            "capex": cash_pool[y]
+        })
+
+# =========================================================
+# 视图与看板渲染
+# =========================================================
+
+if len(final_timeline) >= 2:
+
+    # 计算最新财年的增长率与增速差
     rev_growth   = (final_timeline[-1]["revenue"] - final_timeline[-2]["revenue"]) / final_timeline[-2]["revenue"]
     capex_growth = (final_timeline[-1]["capex"] - final_timeline[-2]["capex"]) / final_timeline[-2]["capex"]
     diff         = capex_growth - rev_growth
 
-    # 状态判断 — 原始逻辑
+    # 状态判断
     if diff >= 0.2:
         status, sc, si = "过热预警", "yellow", "⚠️"
         status_desc  = "当前AI资本扩张已进入<br>高波动风险阶段。"
@@ -335,7 +351,6 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
   <div class="alert-text"><div class="alert-title">{alert_title}</div><div>{alert_body}</div></div>
 </div>""", unsafe_allow_html=True)
 
-    # ===== Alert =====
     # ===== 下方面板 =====
     lp, rp = st.columns([1, 1.5])
 
@@ -355,15 +370,15 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 </div>""", unsafe_allow_html=True)
 
     with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比</div>', unsafe_allow_html=True)
 
-        # 4. 计算多财年的横向趋势数据
+        # 核心趋势线组装
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 此时多获取了更早年份，使得 2021 年及以后的同比增长率全部能够被成功计算并完美展现！
+                # 限制图表起始轴为 2021 年，但因为有了多季度前置融合，2021年现在能顺利算出同比值！
                 if curr["year"] >= 2021:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
@@ -386,7 +401,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         else:
             annotations = []
 
-        # 5. 排布画布
+        # 画布自适应布局
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -412,7 +427,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 实时采集 · 当前标的：{symbol}</div>',
+    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 混合采集架构 · 当前标的：{symbol}</div>',
                 unsafe_allow_html=True)
 
 else:
