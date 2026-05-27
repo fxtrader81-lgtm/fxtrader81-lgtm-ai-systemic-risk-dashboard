@@ -360,19 +360,19 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
                 rev_val = rg_list[idx]
                 cap_val = cg_list[idx]
                 
-                # 判断是否为最新的一个点（最后一年）
+                # 判断是否为最新的一个点（最后一年，即2026年）
                 if idx == len(cy_list) - 1:
-                    # 调整1：最新2026年数据，移到右侧空白区，加粗放大（字号从 13px 放大到 15px）
+                    # 最新数据：移到右侧空白区，加粗放大到 size=20
                     annotations.append(
                         dict(x=year, y=rev_val, text=f"<b>{rev_val:.2f}%</b>",
-                             showarrow=False, xanchor="left", xshift=12, font=dict(color="#22c55e", size=15))
+                             showarrow=False, xanchor="left", xshift=14, font=dict(color="#22c55e", size=20))
                     )
                     annotations.append(
                         dict(x=year, y=cap_val, text=f"<b>{cap_val:.2f}%</b>",
-                             showarrow=False, xanchor="left", xshift=12, font=dict(color="#ef4444", size=15))
+                             showarrow=False, xanchor="left", xshift=14, font=dict(color="#ef4444", size=20))
                     )
                 else:
-                    # 调整2：过去历史节点（2023、2024、2025），直接标在数据点上方，字号缩小（11px）以防喧宾夺主
+                    # 历史节点（2023、2024、2025）：直观标在数据点上方，尺寸设为精致的 size=11
                     annotations.append(
                         dict(x=year, y=rev_val, text=f"{rev_val:.2f}%",
                              showarrow=False, yanchor="bottom", yshift=8, font=dict(color="#22c55e", size=11))
@@ -389,7 +389,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
             font=dict(color="#64748b", size=12),
             legend=dict(orientation="h", y=1.15, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=10, r=75, t=10, b=10), # 稍微加宽右边距，防止放大的最新数据溢出
+            margin=dict(l=10, r=95, t=10, b=10), # 完美放宽右边距至95，承托放大后的20字号
             annotations=annotations,
             xaxis=dict(
                 type="linear",
