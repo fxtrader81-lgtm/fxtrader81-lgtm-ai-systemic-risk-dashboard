@@ -48,7 +48,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     display: flex; align-items: center; gap: 10px;
 }
 
-/* 核心检测维度副标题：在原有13px基础上增加3个字号到16px，颜色调为清爽的灰白 */
+/* 核心检测维度副标题 */
 .sub-title { 
     font-size: 16px !important; 
     color: #cbd5e1 !important; 
@@ -88,7 +88,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 .metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
 .metric-arrow { font-size: 20px; font-weight: 700; }
 
-/* 卡片下方描述文字（AI需求仍维持高增长等）：从12px增加3个字号到15px，颜色为灰白色 */
+/* 卡片下方描述文字 */
 .metric-desc, .metric-desc p { 
     color: #cbd5e1 !important; 
     font-size: 15px !important; 
@@ -97,7 +97,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 
 .green { color: #22c55e; } .red { color: #ef4444; } .yellow { color: #fbbf24; }
 
-/* Alert */
+/* Alert 结论框 */
 .alert-box {
     margin: 18px 0; background: #120e00;
     border: 1px solid rgba(251,191,36,0.18);
@@ -105,8 +105,21 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     display: flex; gap: 18px; align-items: flex-start;
 }
 .alert-icon { font-size: 44px; flex-shrink: 0; line-height: 1; }
-.alert-title { font-size: 20px; font-weight: 700; color: #fbbf24; margin-bottom: 10px; }
-.alert-text { font-size: 14px; color: #94a3b8; line-height: 1.75; }
+
+/* 【修改】结论框标题：在原有 20px 基础上增加 3 个字号到 23px */
+.alert-title { 
+    font-size: 23px !important; 
+    font-weight: 700; 
+    color: #fbbf24; 
+    margin-bottom: 10px; 
+}
+
+/* 【修改】结论框正文描述：在原有 14px 基础上增加 3 个字号到 17px，颜色变更为高亮灰白色 */
+.alert-text, .alert-text p { 
+    font-size: 17px !important; 
+    color: #cbd5e1 !important; 
+    line-height: 1.75; 
+}
 
 /* Panel */
 .panel {
@@ -115,7 +128,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 .panel-title { font-size: 15px; font-weight: 700; margin-bottom: 20px; color: #e2e8f0; }
 
-/* 【修改】检测逻辑文本样式：增大3个字号从13px到16px，颜色调为清爽的灰白 */
+/* 检测逻辑文本样式 */
 .logic-step { display: flex; gap: 12px; margin-bottom: 13px; align-items: flex-start; }
 .step-num {
     width: 22px; height: 22px; min-width: 22px; border-radius: 50%;
@@ -136,7 +149,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 .t-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 
-/* 【修改】下层条件阈值说明文字：增大3个字号从12px到15px，颜色调为灰白 */
+/* 下层条件阈值说明文字 */
 .t-label, .threshold-row p { 
     font-size: 15px !important; 
     color: #cbd5e1 !important; 
@@ -279,7 +292,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     # ===== Alert =====
     st.markdown(f"""<div class="alert-box">
   <div class="alert-icon">⚠️</div>
-  <div><div class="alert-title">{alert_title}</div><div class="alert-text">{alert_body}</div></div>
+  <div class="alert-text"><div class="alert-title">{alert_title}</div><div>{alert_body}</div></div>
 </div>""", unsafe_allow_html=True)
 
     # ===== 下方面板 =====
