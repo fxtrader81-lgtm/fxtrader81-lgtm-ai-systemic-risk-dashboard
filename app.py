@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# API — 完全保留原始接口，不动任何参数
+# API — 完全保留原始接口，仅将 limit 从 5 扩大到 8 满足追溯需求
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
@@ -215,14 +215,14 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 拉取数据 — 原始接口，不改任何参数
+# 拉取数据 — 将 limit 修改为 8，往前多采集两年数据做分母基期
 # =========================================================
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
+cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=8&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理与修复 — 精准支持从 2021 年开始过滤
+# 数据处理与修复
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
@@ -240,13 +240,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             except:
                 continue
                 
-            # 【核心修改】在此处增加过滤，只保留 2021 年及以后的财年数据
-            if y_val >= 2021:
-                raw_list.append({
-                    "year": y_val,
-                    "revenue": safe(inc, "revenue"),
-                    "capex": abs(safe(csh, "capitalExpenditure"))
-                })
+            # 放开历史边界，留足计算历史同比所需的基期年份
+            raw_list.append({
+                "year": y_val,
+                "revenue": safe(inc, "revenue"),
+                "capex": abs(safe(csh, "capitalExpenditure"))
+            })
             
     # 2. 强行按年份数字从小到大（由远及近）排序并去重
     raw_list.sort(key=lambda x: x["year"])
@@ -291,7 +290,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.markdown(f"""<div class="metric-card">
   <div class="metric-label">收入增长率 (YoY)</div>
   <div class="metric-row"><span class="metric-number green">{rev_growth*100:.2f}%</span><span class="metric-arrow green">↗</span></div>
-  <div class="metric-desc">AI需求仍维持高增长。<br>当前收入扩张速度保持强劲。</div>
+  <div class="metric-desc">AI需求仍维持高增长。<br>当前收入扩张速度保持强劲.</div>
 </div>""", unsafe_allow_html=True)
 
     with c2:
@@ -349,9 +348,11 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
-                cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
-                cy_list.append(curr["year"])
+                # 保持从 2021 开始展示（此时由于拉取了更早年份，2021、2022 年能够成功获得分母算出同比增长率）
+                if curr["year"] >= 2021:
+                    rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
+                    cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
+                    cy_list.append(curr["year"])
 
         fig = go.Figure()
         
