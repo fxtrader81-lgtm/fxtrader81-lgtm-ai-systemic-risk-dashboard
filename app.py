@@ -3,7 +3,7 @@ import requests
 import plotly.graph_objects as go
 
 # =====================================================
-# PAGE
+# PAGE CONFIG
 # =====================================================
 
 st.set_page_config(
@@ -46,13 +46,12 @@ header {
     visibility: hidden;
 }
 
-/* ========================= */
+/* ========================================= */
 
 .title-main {
     font-size: 42px;
     font-weight: 800;
-    color: white;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .title-sub {
@@ -61,7 +60,7 @@ header {
     margin-bottom: 30px;
 }
 
-/* ========================= */
+/* ========================================= */
 
 .metric-card {
 
@@ -71,13 +70,13 @@ header {
         #0f172a 100%
     );
 
+    border: 1px solid rgba(255,255,255,0.06);
+
     border-radius: 22px;
 
     padding: 28px;
 
-    border: 1px solid rgba(255,255,255,0.06);
-
-    min-height: 240px;
+    min-height: 230px;
 
     box-shadow:
         0 0 40px rgba(0,0,0,0.35);
@@ -98,10 +97,10 @@ header {
 .metric-desc {
     color: #d1d5db;
     font-size: 14px;
-    line-height: 1.9;
+    line-height: 1.8;
 }
 
-/* ========================= */
+/* ========================================= */
 
 .green {
     color: #22c55e;
@@ -115,7 +114,7 @@ header {
     color: #fbbf24;
 }
 
-/* ========================= */
+/* ========================================= */
 
 .alert-box {
 
@@ -148,7 +147,7 @@ header {
     line-height: 2;
 }
 
-/* ========================= */
+/* ========================================= */
 
 .panel {
 
@@ -176,9 +175,11 @@ header {
 .logic-item {
     color: #e2e8f0;
     font-size: 15px;
-    line-height: 2.1;
+    line-height: 2;
     margin-bottom: 18px;
 }
+
+/* ========================================= */
 
 .footer {
     margin-top: 25px;
@@ -246,7 +247,7 @@ cash = fetch(
 )
 
 # =====================================================
-# CHECK
+# DATA CHECK
 # =====================================================
 
 if (
@@ -272,7 +273,9 @@ if (
         )
 
         capex.append(
-            abs(safe(cash[i], "capitalExpenditure"))
+            abs(
+                safe(cash[i], "capitalExpenditure")
+            )
         )
 
     years = years[::-1]
@@ -319,7 +322,6 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
-
             <div class="metric-label">
             收入增长率 (YoY)
             </div>
@@ -332,7 +334,6 @@ if (
             AI需求仍维持高增长。<br>
             当前收入扩张速度保持强劲。
             </div>
-
         </div>
         """, unsafe_allow_html=True)
 
@@ -340,7 +341,6 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
-
             <div class="metric-label">
             资本开支增长率 (YoY)
             </div>
@@ -353,7 +353,6 @@ if (
             企业正在加速AI基础设施投入。<br>
             CapEx扩张速度持续提升。
             </div>
-
         </div>
         """, unsafe_allow_html=True)
 
@@ -361,7 +360,6 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
-
             <div class="metric-label">
             增速差 (CapEx - Revenue)
             </div>
@@ -374,7 +372,6 @@ if (
             资本扩张速度已经开始超过<br>
             收入增长速度。
             </div>
-
         </div>
         """, unsafe_allow_html=True)
 
@@ -382,7 +379,6 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
-
             <div class="metric-label">
             状态判断
             </div>
@@ -394,7 +390,6 @@ if (
             <div class="metric-desc">
             {status_desc}
             </div>
-
         </div>
         """, unsafe_allow_html=True)
 
@@ -430,13 +425,13 @@ if (
     """, unsafe_allow_html=True)
 
     # =====================================================
-    # BOTTOM
+    # LOWER AREA
     # =====================================================
 
     left_panel, right_panel = st.columns([1, 1.5])
 
     # =====================================================
-    # LEFT
+    # LEFT PANEL
     # =====================================================
 
     with left_panel:
@@ -444,53 +439,53 @@ if (
         st.markdown("""
         <div class="panel">
 
-        <div class="panel-title">
-        ⚙️ 检测逻辑
-        </div>
+            <div class="panel-title">
+            ⚙️ 检测逻辑
+            </div>
 
-        <div class="logic-item">
-        ① 获取最近5年收入与资本开支数据
-        </div>
+            <div class="logic-item">
+            ① 获取最近5年收入与资本开支数据
+            </div>
 
-        <div class="logic-item">
-        ② 计算 Revenue YoY 增长率
-        </div>
+            <div class="logic-item">
+            ② 计算 Revenue YoY 增长率
+            </div>
 
-        <div class="logic-item">
-        ③ 计算 CapEx YoY 增长率
-        </div>
+            <div class="logic-item">
+            ③ 计算 CapEx YoY 增长率
+            </div>
 
-        <div class="logic-item">
-        ④ 计算增速差：<br>
-        CapEx Growth - Revenue Growth
-        </div>
+            <div class="logic-item">
+            ④ 计算增速差：<br>
+            CapEx Growth - Revenue Growth
+            </div>
 
-        <div class="logic-item">
+            <div class="logic-item">
 
-        ⑤ 风险阈值：
+            ⑤ 风险阈值：
 
-        <br><br>
+            <br><br>
 
-        增速差 ≥ 20%
-        → 过热预警
+            增速差 ≥ 20%
+            → 过热预警
 
-        <br><br>
+            <br><br>
 
-        0% ~ 20%
-        → 偏热
+            0% ~ 20%
+            → 偏热
 
-        <br><br>
+            <br><br>
 
-        小于 0%
-        → 健康
+            小于 0%
+            → 健康
 
-        </div>
+            </div>
 
         </div>
         """, unsafe_allow_html=True)
 
     # =====================================================
-    # RIGHT
+    # RIGHT PANEL
     # =====================================================
 
     with right_panel:
@@ -508,13 +503,13 @@ if (
         for i in range(1, len(revenue)):
 
             rg = (
-                (revenue[i] - revenue[i-1])
-                / revenue[i-1]
+                (revenue[i] - revenue[i - 1])
+                / revenue[i - 1]
             ) * 100
 
             cg = (
-                (capex[i] - capex[i-1])
-                / capex[i-1]
+                (capex[i] - capex[i - 1])
+                / capex[i - 1]
             ) * 100
 
             rev_growths.append(rg)
@@ -578,7 +573,9 @@ if (
             use_container_width=True
         )
 
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("""
+        </div>
+        """, unsafe_allow_html=True)
 
     # =====================================================
     # FOOTER
