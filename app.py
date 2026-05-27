@@ -127,7 +127,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     padding: 22px; border: 1px solid rgba(255,255,255,0.07);
 }
 
-/* 面板标题样式：增加5个字号到 20px */
+/* 面板标题样式 */
 .panel-title { 
     font-size: 20px !important; 
     font-weight: 700; 
@@ -222,35 +222,40 @@ income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY
 cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理与修复 — 彻底重构防堆叠机制
+# 数据处理与修复 — 彻底终结垂直竖线问题
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-    # 1. 建立基于具体日期的字典映射，确保收入与资本开支实现行对齐
+    # 1. 用字典严格对齐相同日期的收入与资本开支数据
     cash_map = {item["date"]: item for item in cash if "date" in item}
     
-    valid_data = []
+    raw_list = []
     for inc in income:
         d_str = inc.get("date", "")
         if d_str in cash_map:
             csh = cash_map[d_str]
-            valid_data.append({
-                "year": str(inc.get("calendarYear", d_str[:4])),
-                "date": d_str,
+            # 提取纯数字年份，丢弃可能干扰轴渲染的非标字符串
+            try:
+                y_val = int(inc.get("calendarYear", d_str[:4]))
+            except:
+                continue
+                
+            raw_list.append({
+                "year": y_val,
                 "revenue": safe(inc, "revenue"),
                 "capex": abs(safe(csh, "capitalExpenditure"))
             })
             
-    # 按时间由远到近排序 (例如 2020 -> 2023)
-    valid_data.sort(key=lambda x: x["date"])
-
-    # 2. 如果存在相同年份的不同报表数据，进行去重，只保留每年的最新的一条数据
-    unique_years = {}
-    for item in valid_data:
-        unique_years[item["year"]] = item
+    # 2. 强行按年份数字从小到大（由远及近）排序并去重
+    raw_list.sort(key=lambda x: x["year"])
     
-    final_timeline = sorted(list(unique_years.values()), key=lambda x: x["date"])
+    final_timeline = []
+    seen_years = set()
+    for item in raw_list:
+        if item["year"] not in seen_years:
+            seen_years.add(item["year"])
+            final_timeline.append(item)
 
     # 3. 计算最新财年的增长率与增速差
     rev_growth   = (final_timeline[-1]["revenue"] - final_timeline[-2]["revenue"]) / final_timeline[-2]["revenue"]
@@ -337,17 +342,15 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     with rp:
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
-        # 4. 生成多财年的横向趋势数据
+        # 4. 严格一对一计算多财年的横向趋势数据
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
             curr = final_timeline[i]
-            
-            # 严格按照对应的上期数据计算历史每一期的YoY增长率
             if prev["revenue"] > 0 and prev["capex"] > 0:
                 rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                 cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
-                cy_list.append(curr["year"])
+                cy_list.append(curr["year"]) # 这里是纯纯的整数型 list
 
         fig = go.Figure()
         
@@ -366,7 +369,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         else:
             annotations = []
 
-        # 5. 排布画布布局
+        # 5. 精准排布画布：废除 category 轴，采用线性整数轴并强制重绘刻度
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -375,8 +378,9 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             margin=dict(l=10, r=60, t=10, b=10),
             annotations=annotations,
             xaxis=dict(
-                type="category",
-                autorange=True,
+                type="linear",                    # 强制改为线性数轴
+                tickvals=cy_list,                 # 强行指定哪些数字位置显示刻度
+                ticktext=[str(y) for y in cy_list], # 刻度文字显示为对应的年份文本
                 showgrid=False, 
                 zeroline=False,
                 tickfont=dict(color="#64748b", size=11)
