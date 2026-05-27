@@ -106,7 +106,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 .alert-icon { font-size: 44px; flex-shrink: 0; line-height: 1; }
 
-/* 【修改】结论框标题：在原有 20px 基础上增加 3 个字号到 23px */
+/* 结论框标题 */
 .alert-title { 
     font-size: 23px !important; 
     font-weight: 700; 
@@ -114,7 +114,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     margin-bottom: 10px; 
 }
 
-/* 【修改】结论框正文描述：在原有 14px 基础上增加 3 个字号到 17px，颜色变更为高亮灰白色 */
+/* 结论框正文描述 */
 .alert-text, .alert-text p { 
     font-size: 17px !important; 
     color: #cbd5e1 !important; 
@@ -126,7 +126,14 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     background-color: #0b1120; border-radius: 14px;
     padding: 22px; border: 1px solid rgba(255,255,255,0.07);
 }
-.panel-title { font-size: 15px; font-weight: 700; margin-bottom: 20px; color: #e2e8f0; }
+
+/* 【修改】面板标题样式：由原来的 15px 增加 5 个字号到 20px */
+.panel-title { 
+    font-size: 20px !important; 
+    font-weight: 700; 
+    margin-bottom: 20px; 
+    color: #e2e8f0; 
+}
 
 /* 检测逻辑文本样式 */
 .logic-step { display: flex; gap: 12px; margin-bottom: 13px; align-items: flex-start; }
