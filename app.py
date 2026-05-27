@@ -20,7 +20,7 @@ API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 # =========================================================
-# CSS — 还原目标截图风格
+# CSS — 还原目标截图风格并优化可读性
 # =========================================================
 
 st.markdown("""
@@ -72,8 +72,9 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     border-radius: 14px; padding: 20px 22px 18px;
     height: 168px;
 }
+/* 【修改】放大 Label 字体，加粗，并调亮颜色，防止与暗色背景靠色 */
 .metric-label {
-    color: #64748b; font-size: 12px; font-weight: 500;
+    color: #cbd5e1; font-size: 15px; font-weight: 600;
     margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.4px;
 }
 .metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
@@ -174,7 +175,7 @@ income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY
 cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据处理 — 原始逻辑，不动
+# 数据处理 — 原始逻辑与修复
 # =========================================================
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
@@ -183,7 +184,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     n = min(len(income), len(cash))
 
     for i in range(n):
-        years.append(income[i]["date"][:4])
+        years.append(str(income[i]["date"][:4])) # 确保年份为标准字符串格式
         revenue.append(safe(income[i], "revenue"))
         capex.append(abs(safe(cash[i], "capitalExpenditure")))
 
@@ -230,95 +231,4 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.markdown(f"""<div class="metric-card">
   <div class="metric-label">资本开支增长率 (YoY)</div>
   <div class="metric-row"><span class="metric-number red">{capex_growth*100:.2f}%</span><span class="metric-arrow red">↗</span></div>
-  <div class="metric-desc">企业正在加速AI基础设施投入。<br>CapEx扩张速度持续提升。</div>
-</div>""", unsafe_allow_html=True)
-
-    with c3:
-        ds = "+" if diff >= 0 else ""
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">增速差 (CapEx - Revenue)</div>
-  <div class="metric-row"><span class="metric-number yellow">{ds}{diff*100:.2f}%</span></div>
-  <div class="metric-desc">资本扩张速度已开始超过<br>收入增长速度。</div>
-</div>""", unsafe_allow_html=True)
-
-    with c4:
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">状态判断</div>
-  <div class="metric-row"><span class="metric-number {sc}">{status}</span><span class="metric-arrow {sc}">{si}</span></div>
-  <div class="metric-desc">{status_desc}</div>
-</div>""", unsafe_allow_html=True)
-
-    # ===== Alert =====
-    st.markdown(f"""<div class="alert-box">
-  <div class="alert-icon">⚠️</div>
-  <div><div class="alert-title">{alert_title}</div><div class="alert-text">{alert_body}</div></div>
-</div>""", unsafe_allow_html=True)
-
-    # ===== 下方面板 =====
-    lp, rp = st.columns([1, 1.5])
-
-    with lp:
-        st.markdown("""<div class="panel">
-  <div class="panel-title">⚙️ 检测逻辑</div>
-  <div class="logic-step"><div class="step-num">1</div><div class="step-text">获取最新两个财年数据：收入、资本开支</div></div>
-  <div class="logic-step"><div class="step-num">2</div><div class="step-text">计算收入增长率 = (本期收入 - 上期收入) / 上期收入</div></div>
-  <div class="logic-step"><div class="step-num">3</div><div class="step-text">计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支</div></div>
-  <div class="logic-step"><div class="step-num">4</div><div class="step-text">计算增速差 = 资本开支增长率 - 收入增长率</div></div>
-  <div class="logic-step"><div class="step-num">5</div><div class="step-text">根据阈值判断状态：</div></div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">增速差 ≥ 20%</div><div class="t-arrow">→</div><div class="t-status red">过热预警（红色）</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">0% ≤ 增速差 &lt; 20%</div><div class="t-arrow">→</div><div class="t-status yellow">偏离预警（黄色）</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">增速差 &lt; 0%</div><div class="t-arrow">→</div><div class="t-status green">健康（绿色）</div></div>
-  </div>
-</div>""", unsafe_allow_html=True)
-
-    with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
-
-        # 图表计算 — 原始逻辑
-        rg_list, cg_list, cy_list = [], [], []
-        for i in range(1, len(revenue)):
-            rg_list.append(((revenue[i] - revenue[i-1]) / revenue[i-1]) * 100)
-            cg_list.append(((capex[i]   - capex[i-1])   / capex[i-1])   * 100)
-            cy_list.append(years[i])
-
-        annotations = [
-            dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
-                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)),
-            dict(x=cy_list[-1], y=cg_list[-1], text=f"<b>{cg_list[-1]:.2f}%</b>",
-                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)),
-        ]
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=cy_list, y=rg_list, mode="lines+markers",
-            name="收入增长率(%)", line=dict(color="#22c55e", width=2.5), marker=dict(size=7)))
-        fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
-            name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
-
-        fig.update_layout(
-            height=340,
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#64748b", size=12),
-            legend=dict(orientation="h", y=1.1, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
-            margin=dict(l=10, r=60, t=10, b=10),
-            annotations=annotations,
-            xaxis=dict(
-                type="category",   # 防止年份变小数
-                showgrid=False, zeroline=False,
-                tickfont=dict(color="#64748b", size=11)
-            ),
-            yaxis=dict(
-                title="增长率 (%)",
-                gridcolor="rgba(255,255,255,0.05)",
-                zeroline=True, zerolinecolor="rgba(255,255,255,0.08)",
-                tickfont=dict(color="#64748b"), title_font=dict(color="#64748b", size=11)
-            )
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 实时采集 · 当前标的：{symbol}</div>',
-                unsafe_allow_html=True)
-
-else:
-    st.error(f"API数据加载失败，请检查股票代码是否正确。")
+  <div class="metric-desc">企业正在加速AI基础设施投入。<br>Cap
