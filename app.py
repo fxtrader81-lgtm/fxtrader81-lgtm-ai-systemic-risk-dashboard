@@ -3,11 +3,11 @@ import requests
 import plotly.graph_objects as go
 
 # =====================================================
-# PAGE CONFIG
+# PAGE
 # =====================================================
 
 st.set_page_config(
-    page_title="AI Risk Terminal",
+    page_title="AI Risk Dashboard",
     layout="wide"
 )
 
@@ -16,7 +16,8 @@ st.set_page_config(
 # =====================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
-BASE = "https://financialmodelingprep.com/stable"
+
+BASE_URL = "https://financialmodelingprep.com/stable"
 
 # =====================================================
 # STYLE
@@ -25,166 +26,155 @@ BASE = "https://financialmodelingprep.com/stable"
 st.markdown("""
 <style>
 
-html, body, [class*="css"] {
-    background-color: #050816;
-    color: white;
-    font-family: Inter, sans-serif;
+html, body, [class*="css"]{
+    background-color:#050816;
+    color:white;
+    font-family:Arial;
 }
 
-.main {
-    background-color: #050816;
+.block-container{
+    max-width:1600px;
+    padding-top:30px;
 }
 
-.block-container {
-    padding-top: 2rem;
-    padding-left: 2rem;
-    padding-right: 2rem;
-    max-width: 1600px;
+/* ========================= */
+
+.main-title{
+    font-size:42px;
+    font-weight:800;
+    margin-bottom:8px;
 }
 
-header {
-    visibility: hidden;
+.sub-title{
+    color:#94a3b8;
+    font-size:15px;
+    margin-bottom:35px;
 }
 
-/* ========================================= */
+/* ========================= */
 
-.title-main {
-    font-size: 42px;
-    font-weight: 800;
-    margin-bottom: 6px;
-}
+.metric-card{
 
-.title-sub {
-    color: #94a3b8;
-    font-size: 16px;
-    margin-bottom: 30px;
-}
-
-/* ========================================= */
-
-.metric-card {
-
-    background: linear-gradient(
+    background:linear-gradient(
         180deg,
         #111827 0%,
         #0f172a 100%
     );
 
-    border: 1px solid rgba(255,255,255,0.06);
+    border-radius:22px;
 
-    border-radius: 22px;
+    padding:26px;
 
-    padding: 28px;
+    min-height:220px;
 
-    min-height: 230px;
+    border:1px solid rgba(255,255,255,0.06);
 
-    box-shadow:
-        0 0 40px rgba(0,0,0,0.35);
+    box-shadow:0 0 30px rgba(0,0,0,0.35);
 }
 
-.metric-label {
-    color: #94a3b8;
-    font-size: 13px;
-    margin-bottom: 18px;
+.metric-label{
+    color:#94a3b8;
+    font-size:13px;
+    margin-bottom:18px;
 }
 
-.metric-number {
-    font-size: 46px;
-    font-weight: 800;
-    margin-bottom: 20px;
+.metric-number{
+    font-size:44px;
+    font-weight:800;
+    margin-bottom:18px;
 }
 
-.metric-desc {
-    color: #d1d5db;
-    font-size: 14px;
-    line-height: 1.8;
+.metric-desc{
+    color:#d1d5db;
+    font-size:14px;
+    line-height:1.8;
 }
 
-/* ========================================= */
+/* ========================= */
 
-.green {
-    color: #22c55e;
+.green{
+    color:#22c55e;
 }
 
-.red {
-    color: #ef4444;
+.red{
+    color:#ef4444;
 }
 
-.yellow {
-    color: #fbbf24;
+.yellow{
+    color:#fbbf24;
 }
 
-/* ========================================= */
+/* ========================= */
 
-.alert-box {
+.alert-box{
 
-    margin-top: 30px;
-    margin-bottom: 30px;
+    margin-top:28px;
+    margin-bottom:28px;
 
-    background: linear-gradient(
+    background:linear-gradient(
         90deg,
         rgba(55,40,10,0.95),
         rgba(20,16,10,0.98)
     );
 
-    border-radius: 24px;
+    border-radius:24px;
 
-    padding: 32px;
+    padding:30px;
 
-    border: 1px solid rgba(251,191,36,0.2);
+    border:1px solid rgba(251,191,36,0.2);
 }
 
-.alert-title {
-    color: #fbbf24;
-    font-size: 30px;
-    font-weight: 800;
-    margin-bottom: 18px;
+.alert-title{
+    color:#fbbf24;
+    font-size:30px;
+    font-weight:800;
+    margin-bottom:16px;
 }
 
-.alert-text {
-    color: white;
-    font-size: 18px;
-    line-height: 2;
+.alert-text{
+    color:white;
+    font-size:17px;
+    line-height:2;
 }
 
-/* ========================================= */
+/* ========================= */
 
-.panel {
+.panel{
 
-    background: linear-gradient(
+    background:linear-gradient(
         180deg,
         #111827 0%,
         #0f172a 100%
     );
 
-    border-radius: 24px;
+    border-radius:22px;
 
-    padding: 28px;
+    padding:26px;
 
-    border: 1px solid rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.06);
 
-    min-height: 620px;
+    min-height:580px;
 }
 
-.panel-title {
-    font-size: 26px;
-    font-weight: 700;
-    margin-bottom: 26px;
+.panel-title{
+    font-size:24px;
+    font-weight:700;
+    margin-bottom:24px;
 }
 
-.logic-item {
-    color: #e2e8f0;
-    font-size: 15px;
-    line-height: 2;
-    margin-bottom: 18px;
+.logic-item{
+    color:#e2e8f0;
+    font-size:15px;
+    line-height:2;
+    margin-bottom:18px;
 }
 
-/* ========================================= */
+/* ========================= */
 
-.footer {
-    margin-top: 25px;
-    color: #64748b;
-    font-size: 13px;
+.footer{
+    margin-top:20px;
+    color:#64748b;
+    font-size:13px;
 }
 
 </style>
@@ -194,16 +184,16 @@ header {
 # HEADER
 # =====================================================
 
-left, right = st.columns([5, 1])
+left, right = st.columns([5,1])
 
 with left:
 
     st.markdown("""
-    <div class="title-main">
+    <div class="main-title">
     稻草一：AI资本开支循环检测
     </div>
 
-    <div class="title-sub">
+    <div class="sub-title">
     核心检测维度：资本开支扩张速度是否超过收入增长速度
     </div>
     """, unsafe_allow_html=True)
@@ -231,23 +221,23 @@ def fetch(url):
     except:
         return []
 
-def safe(x, k):
+def safe(x, key):
 
     try:
-        return float(x.get(k, 0))
+        return float(x.get(key, 0))
     except:
         return 0
 
 income = fetch(
-    f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
+    f"{BASE_URL}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
 
 cash = fetch(
-    f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
+    f"{BASE_URL}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
 
 # =====================================================
-# DATA CHECK
+# MAIN
 # =====================================================
 
 if (
@@ -265,7 +255,7 @@ if (
     for i in range(n):
 
         years.append(
-            income[i].get("date", "")[:4]
+            income[i].get("date","")[:4]
         )
 
         revenue.append(
@@ -282,9 +272,9 @@ if (
     revenue = revenue[::-1]
     capex = capex[::-1]
 
-    # =====================================================
+    # =========================
     # METRICS
-    # =====================================================
+    # =========================
 
     rev_growth = (
         (revenue[-1] - revenue[-2])
@@ -298,17 +288,17 @@ if (
 
     diff = capex_growth - rev_growth
 
-    status = "🟢 健康"
+    status = "健康"
     status_color = "green"
     status_desc = "收入增长仍能覆盖资本扩张。"
 
     if diff > 0:
-        status = "🟡 偏热"
+        status = "偏热"
         status_color = "yellow"
         status_desc = "资本扩张开始领先收入增长。"
 
     if diff >= 0.2:
-        status = "🔴 过热预警"
+        status = "过热预警"
         status_color = "red"
         status_desc = "AI资本扩张已经进入高波动风险阶段。"
 
@@ -322,6 +312,7 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             收入增长率 (YoY)
             </div>
@@ -334,6 +325,7 @@ if (
             AI需求仍维持高增长。<br>
             当前收入扩张速度保持强劲。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -341,6 +333,7 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             资本开支增长率 (YoY)
             </div>
@@ -353,6 +346,7 @@ if (
             企业正在加速AI基础设施投入。<br>
             CapEx扩张速度持续提升。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -360,18 +354,20 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             增速差 (CapEx - Revenue)
             </div>
 
             <div class="metric-number yellow">
-            +{diff*100:.2f}%
+            {diff*100:.2f}%
             </div>
 
             <div class="metric-desc">
             资本扩张速度已经开始超过<br>
             收入增长速度。
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -379,6 +375,7 @@ if (
 
         st.markdown(f"""
         <div class="metric-card">
+
             <div class="metric-label">
             状态判断
             </div>
@@ -390,6 +387,7 @@ if (
             <div class="metric-desc">
             {status_desc}
             </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -409,7 +407,7 @@ if (
         当前资本开支增速比收入增速高出
         <span class="yellow">
         {diff*100:.2f}%
-        </span>，
+        </span>
 
         企业AI基础设施投入已经开始超出
         现实需求支撑。
@@ -428,11 +426,11 @@ if (
     # LOWER AREA
     # =====================================================
 
-    left_panel, right_panel = st.columns([1, 1.5])
+    left_panel, right_panel = st.columns([1,1.5])
 
-    # =====================================================
-    # LEFT PANEL
-    # =====================================================
+    # =========================
+    # LEFT
+    # =========================
 
     with left_panel:
 
@@ -440,7 +438,7 @@ if (
         <div class="panel">
 
             <div class="panel-title">
-            ⚙️ 检测逻辑
+            检测逻辑
             </div>
 
             <div class="logic-item">
@@ -456,7 +454,7 @@ if (
             </div>
 
             <div class="logic-item">
-            ④ 计算增速差：<br>
+            ④ 计算增速差：
             CapEx Growth - Revenue Growth
             </div>
 
@@ -484,36 +482,36 @@ if (
         </div>
         """, unsafe_allow_html=True)
 
-    # =====================================================
-    # RIGHT PANEL
-    # =====================================================
+    # =========================
+    # RIGHT
+    # =========================
 
     with right_panel:
 
         st.markdown("""
         <div class="panel">
         <div class="panel-title">
-        📈 趋势对比（最近5年）
+        趋势对比（最近5年）
         </div>
         """, unsafe_allow_html=True)
 
         rev_growths = []
-        capex_growths = []
+        capex_growths_chart = []
 
         for i in range(1, len(revenue)):
 
             rg = (
-                (revenue[i] - revenue[i - 1])
-                / revenue[i - 1]
+                (revenue[i] - revenue[i-1])
+                / revenue[i-1]
             ) * 100
 
             cg = (
-                (capex[i] - capex[i - 1])
-                / capex[i - 1]
+                (capex[i] - capex[i-1])
+                / capex[i-1]
             ) * 100
 
             rev_growths.append(rg)
-            capex_growths.append(cg)
+            capex_growths_chart.append(cg)
 
         chart_years = years[1:]
 
@@ -532,7 +530,7 @@ if (
 
         fig.add_trace(go.Scatter(
             x=chart_years,
-            y=capex_growths,
+            y=capex_growths_chart,
             mode="lines+markers",
             name="资本开支增长率",
             line=dict(
@@ -543,19 +541,17 @@ if (
 
         fig.update_layout(
 
-            height=520,
+            height=500,
 
             paper_bgcolor="#111827",
             plot_bgcolor="#111827",
 
             font=dict(
-                color="white",
-                size=14
+                color="white"
             ),
 
             legend=dict(
-                orientation="h",
-                y=1.02
+                orientation="h"
             ),
 
             xaxis=dict(
@@ -570,7 +566,7 @@ if (
 
         st.plotly_chart(
             fig,
-            use_container_width=True
+            width="stretch"
         )
 
         st.markdown("""
