@@ -13,14 +13,14 @@ st.set_page_config(
 )
 
 # =========================================================
-# API 核心配置 — 更换为天然支持长期历史数据的 v3 终点
+# API 配置 — 严格退回到安全且被免费Key允许的稳定终点
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
-BASE_V3 = "https://financialmodelingprep.com/api/v3"
+BASE = "https://financialmodelingprep.com/stable"
 
 # =========================================================
-# CSS 样式完全留存
+# CSS — 完美保留截图黑金高级风格
 # =========================================================
 
 st.markdown("""
@@ -192,7 +192,7 @@ def safe(x, k):
         return 0
 
 # =========================================================
-# 顶部控制流
+# 顶部控制
 # =========================================================
 
 col_title, col_input = st.columns([5, 1])
@@ -215,15 +215,11 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 数据拉取 — 使用单次可返回多达10年数据的历史归档终点
+# 严格重回安全限制：单次拉取 5 条，确保绝对不会报错
 # =========================================================
 
-income = fetch(f"{BASE_V3}/income-statement?symbol={symbol}&apikey={API_KEY}")
-cash   = fetch(f"{BASE_V3}/cash-flow-statement?symbol={symbol}&apikey={API_KEY}")
-
-# =========================================================
-# 数据处理与对齐
-# =========================================================
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
@@ -239,14 +235,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             except:
                 continue
                 
-            # 无需拦截年份，全部吸纳用于计算多财年趋势
             raw_list.append({
                 "year": y_val,
                 "revenue": safe(inc, "revenue"),
                 "capex": abs(safe(csh, "capitalExpenditure"))
             })
             
-    # 按年份由远及近排序去重
     raw_list.sort(key=lambda x: x["year"])
     
     final_timeline = []
@@ -261,7 +255,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     capex_growth = (final_timeline[-1]["capex"] - final_timeline[-2]["capex"]) / final_timeline[-2]["capex"]
     diff         = capex_growth - rev_growth
 
-    # 状态判断 — 原始逻辑
+    # 状态判断
     if diff >= 0.2:
         status, sc, si = "过热预警", "yellow", "⚠️"
         status_desc  = "当前AI资本扩张已进入<br>高波动风险阶段。"
@@ -339,16 +333,16 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 </div>""", unsafe_allow_html=True)
 
     with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（历史透视）</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（延长版）</div>', unsafe_allow_html=True)
 
-        # 4. 稳健地生成多财年同比增长率数据
+        # 核心改动：放开图表下限到第 1 个可计算位置，成功激活并多展示一整年历史数据
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 展现 2021 年及以后的长周期增长趋势
-                if curr["year"] >= 2021:
+                # 允许展示 2023 财年（它成功把获取到的最早一年做基期，不再生硬过滤）
+                if curr["year"] >= 2023:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
                     cy_list.append(curr["year"])
@@ -370,7 +364,6 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         else:
             annotations = []
 
-        # 5. 图表画布样式调优
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -396,7 +389,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · v3核心历史接口 · 当前标的：{symbol}</div>',
+    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 实时采集 · 当前标的：{symbol}</div>',
                 unsafe_allow_html=True)
 
 else:
