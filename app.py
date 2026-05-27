@@ -3,7 +3,7 @@ import requests
 import plotly.graph_objects as go
 
 # =========================================================
-# PAGE CONFIG
+# 页面配置
 # =========================================================
 
 st.set_page_config(
@@ -12,124 +12,91 @@ st.set_page_config(
 )
 
 # =========================================================
-# API CONFIG
+# API
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 BASE = "https://financialmodelingprep.com/stable"
 
 # =========================================================
-# GLOBAL CSS
+# CSS 样式（Bloomberg 风格）
 # =========================================================
 
 st.markdown("""
 <style>
 
-/* =========================================================
-BACKGROUND
-========================================================= */
-
-html, body, [class*="css"]  {
-    background-color: #050816;
+html, body, [class*="css"] {
+    background-color: #060b16;
     color: white;
     font-family: Inter, sans-serif;
 }
 
 .main {
-    background-color: #050816;
+    background-color: #060b16;
 }
 
 .block-container {
-    padding-top: 2rem;
+    padding-top: 1.5rem;
     padding-left: 2rem;
     padding-right: 2rem;
-    max-width: 1600px;
+    max-width: 1500px;
 }
 
-/* =========================================================
-HEADER
-========================================================= */
+/* 标题 */
 
 .main-title {
-    font-size: 44px;
+    font-size: 40px;
     font-weight: 800;
     color: white;
     margin-bottom: 8px;
-    letter-spacing: -1px;
 }
 
 .sub-title {
     color: #94a3b8;
-    font-size: 18px;
-    margin-bottom: 36px;
+    font-size: 15px;
+    margin-bottom: 30px;
 }
 
-/* =========================================================
-INPUT
-========================================================= */
+/* 输入框 */
 
 .stTextInput input {
-
-    background-color: #111827 !important;
-
+    background: #111827 !important;
     color: white !important;
-
     border-radius: 12px !important;
-
     border: 1px solid rgba(255,255,255,0.08) !important;
-
-    padding: 10px !important;
 }
 
-/* =========================================================
-CARD
-========================================================= */
+/* 卡片 */
 
 .metric-card {
-
-    background:
-        linear-gradient(
-            180deg,
-            rgba(17,24,39,0.98) 0%,
-            rgba(15,23,42,0.98) 100%
-        );
-
+    background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
     border: 1px solid rgba(255,255,255,0.06);
-
-    border-radius: 24px;
-
-    padding: 28px;
-
-    min-height: 260px;
-
-    box-shadow:
-        0 0 40px rgba(0,0,0,0.35);
-
-    margin-bottom: 18px;
+    border-radius: 20px;
+    padding: 24px;
+    min-height: 220px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.35);
 }
 
 .metric-label {
     color: #94a3b8;
-    font-size: 15px;
+    font-size: 13px;
     margin-bottom: 18px;
 }
 
 .metric-number {
-    font-size: 50px;
+    font-size: 42px;
     font-weight: 800;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
     line-height: 1;
 }
 
 .metric-desc {
     color: #d1d5db;
-    font-size: 15px;
-    line-height: 1.9;
+    font-size: 14px;
+    line-height: 1.8;
 }
 
-/* =========================================================
-COLORS
-========================================================= */
+/* 颜色 */
 
 .green {
     color: #22c55e;
@@ -143,121 +110,69 @@ COLORS
     color: #fbbf24;
 }
 
-/* =========================================================
-ALERT BOX
-========================================================= */
+/* Alert */
 
 .alert-box {
-
-    background:
-        linear-gradient(
-            90deg,
-            rgba(70,50,0,0.96),
-            rgba(25,18,5,0.98)
-        );
-
-    border: 1px solid rgba(251,191,36,0.25);
-
-    border-radius: 24px;
-
-    padding: 34px;
-
-    margin-top: 10px;
-
-    margin-bottom: 32px;
-
-    box-shadow:
-        0 0 50px rgba(251,191,36,0.08);
+    margin-top: 26px;
+    margin-bottom: 26px;
+    background: linear-gradient(90deg, rgba(60,45,10,0.95), rgba(20,16,10,0.98));
+    border: 1px solid rgba(251,191,36,0.22);
+    border-radius: 22px;
+    padding: 28px;
 }
 
 .alert-title {
-
-    font-size: 34px;
-
-    font-weight: 800;
-
     color: #fbbf24;
-
-    margin-bottom: 18px;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 14px;
 }
 
 .alert-text {
-
-    font-size: 19px;
-
-    line-height: 2;
-
     color: white;
+    font-size: 17px;
+    line-height: 1.9;
 }
 
-/* =========================================================
-SECTION CARD
-========================================================= */
+/* 下方面板 */
 
-.section-card {
-
-    background:
-        linear-gradient(
-            180deg,
-            rgba(17,24,39,0.98) 0%,
-            rgba(15,23,42,0.98) 100%
-        );
-
+.panel {
+    background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
     border: 1px solid rgba(255,255,255,0.06);
-
-    border-radius: 24px;
-
-    padding: 28px;
-
+    border-radius: 20px;
+    padding: 24px;
     min-height: 620px;
-
-    box-shadow:
-        0 0 40px rgba(0,0,0,0.35);
 }
 
-.section-title {
-
-    font-size: 30px;
-
+.panel-title {
+    font-size: 24px;
     font-weight: 700;
-
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
 .logic-item {
-
-    font-size: 17px;
-
-    line-height: 2;
-
     color: #e2e8f0;
-
-    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 2;
+    margin-bottom: 12px;
 }
 
-/* =========================================================
-FOOTER
-========================================================= */
-
 .footer {
-
-    margin-top: 28px;
-
+    margin-top: 20px;
     color: #64748b;
-
-    font-size: 14px;
+    font-size: 13px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# HEADER
+# 顶部标题
 # =========================================================
 
-left_header, right_header = st.columns([5, 1])
+left, right = st.columns([5, 1])
 
-with left_header:
+with left:
 
     st.markdown("""
     <div class="main-title">
@@ -269,15 +184,12 @@ with left_header:
     </div>
     """, unsafe_allow_html=True)
 
-with right_header:
+with right:
 
-    symbol = st.text_input(
-        "股票代码",
-        "NVDA"
-    )
+    symbol = st.text_input("股票代码", "NVDA")
 
 # =========================================================
-# FETCH FUNCTION
+# 获取数据
 # =========================================================
 
 @st.cache_data(ttl=300)
@@ -285,10 +197,7 @@ def fetch(url):
 
     try:
 
-        r = requests.get(
-            url,
-            timeout=10
-        )
+        r = requests.get(url, timeout=10)
 
         if r.status_code != 200:
             return []
@@ -298,20 +207,12 @@ def fetch(url):
     except:
         return []
 
-# =========================================================
-# SAFE GET
-# =========================================================
-
-def safe(x, key):
+def safe(x, k):
 
     try:
-        return float(x.get(key, 0))
+        return float(x.get(k, 0))
     except:
         return 0
-
-# =========================================================
-# API DATA
-# =========================================================
 
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
@@ -322,7 +223,7 @@ cash = fetch(
 )
 
 # =========================================================
-# VALIDATION
+# 数据检测
 # =========================================================
 
 if (
@@ -349,9 +250,7 @@ if (
         )
 
         capex.append(
-            abs(
-                safe(cash[i], "capitalExpenditure")
-            )
+            abs(safe(cash[i], "capitalExpenditure"))
         )
 
     years = years[::-1]
@@ -359,7 +258,7 @@ if (
     capex = capex[::-1]
 
     # =========================================================
-    # METRICS
+    # 计算
     # =========================================================
 
     rev_growth = (
@@ -376,27 +275,27 @@ if (
 
     status = "🟢 健康"
     status_color = "green"
-    status_desc = "当前收入增长仍能覆盖资本扩张。"
+    status_desc = "收入增长仍能覆盖资本扩张。"
 
     if diff > 0:
         status = "🟡 偏热"
         status_color = "yellow"
-        status_desc = "资本扩张已经开始领先收入增长。"
+        status_desc = "资本扩张开始领先收入增长。"
 
     if diff >= 0.2:
-        status = "🟡 过热预警"
-        status_color = "yellow"
-        status_desc = "当前AI资本扩张已经进入高波动风险阶段。"
+        status = "🔴 过热预警"
+        status_color = "red"
+        status_desc = "AI资本扩张已经进入高波动风险阶段。"
 
     # =========================================================
-    # KPI CARDS
+    # 顶部卡片
     # =========================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
 
-        card1 = f"""
+        st.markdown(f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -413,16 +312,11 @@ if (
             </div>
 
         </div>
-        """
-
-        st.markdown(
-            card1,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     with c2:
 
-        card2 = f"""
+        st.markdown(f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -439,16 +333,11 @@ if (
             </div>
 
         </div>
-        """
-
-        st.markdown(
-            card2,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     with c3:
 
-        card3 = f"""
+        st.markdown(f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -465,16 +354,11 @@ if (
             </div>
 
         </div>
-        """
-
-        st.markdown(
-            card3,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     with c4:
 
-        card4 = f"""
+        st.markdown(f"""
         <div class="metric-card">
 
             <div class="metric-label">
@@ -490,18 +374,13 @@ if (
             </div>
 
         </div>
-        """
-
-        st.markdown(
-            card4,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     # =========================================================
-    # ALERT BOX
+    # 结论区
     # =========================================================
 
-    alert_html = f"""
+    st.markdown(f"""
     <div class="alert-box">
 
         <div class="alert-title">
@@ -526,29 +405,24 @@ if (
         </div>
 
     </div>
-    """
-
-    st.markdown(
-        alert_html,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
     # =========================================================
-    # LOWER LAYOUT
+    # 下方布局
     # =========================================================
 
-    left_panel, right_panel = st.columns(2)
+    left_panel, right_panel = st.columns([1, 1.4])
 
     # =========================================================
-    # LOGIC PANEL
+    # 检测逻辑
     # =========================================================
 
     with left_panel:
 
-        logic_html = """
-        <div class="section-card">
+        st.markdown("""
+        <div class="panel">
 
-            <div class="section-title">
+            <div class="panel-title">
             ⚙️ 检测逻辑
             </div>
 
@@ -570,6 +444,7 @@ if (
             </div>
 
             <div class="logic-item">
+
             ⑤ 风险阈值：
 
             <br><br>
@@ -590,30 +465,20 @@ if (
             </div>
 
         </div>
-        """
-
-        st.markdown(
-            logic_html,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     # =========================================================
-    # CHART PANEL
+    # 趋势图
     # =========================================================
 
     with right_panel:
 
-        chart_card_open = """
-        <div class="section-card">
-            <div class="section-title">
-            📈 趋势对比（最近5年）
-            </div>
-        """
-
-        st.markdown(
-            chart_card_open,
-            unsafe_allow_html=True
-        )
+        st.markdown("""
+        <div class="panel">
+        <div class="panel-title">
+        📈 趋势对比（最近5年）
+        </div>
+        """, unsafe_allow_html=True)
 
         rev_growths = []
         capex_growths = []
@@ -621,13 +486,13 @@ if (
         for i in range(1, len(revenue)):
 
             rg = (
-                (revenue[i] - revenue[i - 1])
-                / revenue[i - 1]
+                (revenue[i] - revenue[i-1])
+                / revenue[i-1]
             ) * 100
 
             cg = (
-                (capex[i] - capex[i - 1])
-                / capex[i - 1]
+                (capex[i] - capex[i-1])
+                / capex[i-1]
             ) * 100
 
             rev_growths.append(rg)
@@ -637,58 +502,22 @@ if (
 
         fig = go.Figure()
 
-        # Revenue Line
         fig.add_trace(go.Scatter(
-
             x=chart_years,
             y=rev_growths,
-
-            mode="lines+markers+text",
-
+            mode="lines+markers",
             name="收入增长率",
-
-            text=[
-                f"{x:.1f}%"
-                for x in rev_growths
-            ],
-
-            textposition="top center",
-
-            line=dict(
-                color="#22c55e",
-                width=5
-            ),
-
-            marker=dict(
-                size=10
-            )
+            line=dict(color="#22c55e", width=5),
+            marker=dict(size=10)
         ))
 
-        # CapEx Line
         fig.add_trace(go.Scatter(
-
             x=chart_years,
             y=capex_growths,
-
-            mode="lines+markers+text",
-
+            mode="lines+markers",
             name="资本开支增长率",
-
-            text=[
-                f"{x:.1f}%"
-                for x in capex_growths
-            ],
-
-            textposition="bottom center",
-
-            line=dict(
-                color="#ef4444",
-                width=5
-            ),
-
-            marker=dict(
-                size=10
-            )
+            line=dict(color="#ef4444", width=5),
+            marker=dict(size=10)
         ))
 
         fig.update_layout(
@@ -696,54 +525,37 @@ if (
             height=520,
 
             paper_bgcolor="#111827",
-
             plot_bgcolor="#111827",
-
-            hovermode="x unified",
 
             font=dict(
                 color="white",
-                size=15
+                size=14
             ),
 
             margin=dict(
-                l=20,
-                r=20,
-                t=20,
-                b=20
+                l=10,
+                r=10,
+                t=10,
+                b=10
             ),
 
+            hovermode="x unified",
+
             legend=dict(
-
                 orientation="h",
-
                 yanchor="bottom",
                 y=1.02,
-
                 xanchor="right",
-                x=1,
-
-                font=dict(
-                    size=14
-                )
+                x=1
             ),
 
             xaxis=dict(
-
-                showgrid=False,
-
-                tickfont=dict(
-                    size=14
-                )
+                showgrid=False
             ),
 
             yaxis=dict(
-
                 title="增长率 (%)",
-
-                gridcolor="rgba(255,255,255,0.08)",
-
-                zerolinecolor="rgba(255,255,255,0.2)"
+                gridcolor="rgba(255,255,255,0.08)"
             )
         )
 
@@ -752,31 +564,19 @@ if (
             use_container_width=True
         )
 
-        chart_card_close = """
+        st.markdown("""
         </div>
-        """
-
-        st.markdown(
-            chart_card_close,
-            unsafe_allow_html=True
-        )
+        """, unsafe_allow_html=True)
 
     # =========================================================
-    # FOOTER
+    # 页脚
     # =========================================================
 
-    footer_html = """
+    st.markdown("""
     <div class="footer">
-    数据来源：Financial Modeling Prep（FMP）
-    ｜ 单位：USD
-    ｜ 更新频率：实时
+    数据来源：Financial Modeling Prep（FMP） ｜ 单位：USD ｜ 更新频率：实时
     </div>
-    """
-
-    st.markdown(
-        footer_html,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
 else:
 
