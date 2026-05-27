@@ -8,7 +8,7 @@ from datetime import datetime
 # =========================================================
 
 st.set_page_config(
-    page_title="AI Risk Terminal",
+    page_title="AI Capital Risk Dashboard",
     layout="wide"
 )
 
@@ -26,35 +26,35 @@ BASE = "https://financialmodelingprep.com/stable"
 st.markdown("""
 <style>
 
-html, body, [class*="css"]  {
+html, body, [class*="css"] {
     background-color: #050b16;
     color: white;
     font-family: Inter, sans-serif;
 }
 
-/* 整体 */
+/* Streamlit */
+#MainMenu {visibility:hidden;}
+footer {visibility:hidden;}
+header {visibility:hidden;}
+
 .main .block-container{
-    padding-top: 1.2rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
     max-width: 1600px;
+    padding-top: 1.2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-bottom: 2rem;
 }
 
-/* 隐藏streamlit元素 */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-
-/* 顶部 */
+/* Hero */
 .hero-box{
     background:
-        radial-gradient(circle at top left, rgba(29,78,216,0.22), transparent 35%),
-        linear-gradient(135deg,#07111f 0%, #020617 100%);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 24px;
-    padding: 28px 34px;
-    margin-bottom: 22px;
-    box-shadow: 0 0 40px rgba(0,0,0,0.55);
+    radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 35%),
+    linear-gradient(135deg,#07111f 0%, #040816 100%);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:26px;
+    padding:28px 34px;
+    margin-bottom:24px;
+    box-shadow:0 0 40px rgba(0,0,0,0.45);
 }
 
 .hero-top{
@@ -64,16 +64,15 @@ header {visibility: hidden;}
 }
 
 .hero-title{
-    font-size:56px;
+    font-size:42px;
     font-weight:800;
+    margin-bottom:8px;
     letter-spacing:-1px;
-    margin-bottom:10px;
 }
 
 .hero-sub{
-    font-size:18px;
     color:#94a3b8;
-    margin-top:6px;
+    font-size:17px;
 }
 
 .hero-right{
@@ -81,51 +80,51 @@ header {visibility: hidden;}
 }
 
 .hero-time{
-    color:#9ca3af;
-    font-size:15px;
-    margin-bottom:14px;
+    color:#94a3b8;
+    font-size:14px;
+    margin-bottom:10px;
 }
 
 .hero-symbol{
-    background: rgba(255,255,255,0.06);
+    background:rgba(255,255,255,0.06);
     border:1px solid rgba(255,255,255,0.08);
-    padding:10px 20px;
     border-radius:14px;
+    padding:10px 18px;
     display:inline-block;
-    font-size:28px;
+    font-size:22px;
     font-weight:700;
 }
 
-/* 指标卡 */
+/* Cards */
 .metric-card{
     background:
-        radial-gradient(circle at top left, rgba(30,64,175,0.16), transparent 30%),
-        linear-gradient(180deg,#07101f 0%, #050b16 100%);
+    radial-gradient(circle at top left, rgba(37,99,235,0.14), transparent 35%),
+    linear-gradient(180deg,#08101f 0%, #050b16 100%);
     border:1px solid rgba(255,255,255,0.08);
     border-radius:22px;
-    padding:24px;
-    min-height:190px;
-    box-shadow:0 0 22px rgba(0,0,0,0.35);
+    padding:22px;
+    min-height:170px;
+    box-shadow:0 0 24px rgba(0,0,0,0.35);
 }
 
 .metric-label{
-    color:#cbd5e1;
-    font-size:18px;
+    color:#d1d5db;
+    font-size:16px;
     font-weight:600;
-    margin-bottom:28px;
+    margin-bottom:22px;
 }
 
 .metric-number{
-    font-size:54px;
+    font-size:44px;
     font-weight:800;
     line-height:1;
-    margin-bottom:18px;
+    margin-bottom:16px;
     letter-spacing:-1px;
 }
 
 .metric-desc{
     color:#94a3b8;
-    font-size:15px;
+    font-size:14px;
     line-height:1.7;
 }
 
@@ -141,78 +140,76 @@ header {visibility: hidden;}
     color:#fbbf24;
 }
 
-/* alert */
+/* Alert */
 .alert-box{
     margin-top:22px;
     background:
-        radial-gradient(circle at left, rgba(251,191,36,0.18), transparent 25%),
-        linear-gradient(135deg,#161005 0%, #090909 100%);
+    radial-gradient(circle at left, rgba(251,191,36,0.18), transparent 28%),
+    linear-gradient(135deg,#1a1205 0%, #090909 100%);
     border:1px solid rgba(251,191,36,0.35);
     border-radius:24px;
-    padding:34px;
+    padding:30px;
     display:flex;
-    gap:28px;
+    gap:24px;
     align-items:flex-start;
 }
 
 .alert-icon{
-    font-size:72px;
+    font-size:62px;
     line-height:1;
 }
 
 .alert-title{
     color:#fbbf24;
-    font-size:42px;
+    font-size:32px;
     font-weight:800;
-    margin-bottom:14px;
-    line-height:1.2;
+    margin-bottom:12px;
+    line-height:1.3;
 }
 
 .alert-text{
     color:#d1d5db;
-    font-size:22px;
+    font-size:18px;
     line-height:1.9;
 }
 
-/* panel */
+/* Panels */
 .panel{
     margin-top:24px;
     background:
-        radial-gradient(circle at top left, rgba(29,78,216,0.16), transparent 30%),
-        linear-gradient(180deg,#07101f 0%, #050b16 100%);
+    radial-gradient(circle at top left, rgba(37,99,235,0.12), transparent 35%),
+    linear-gradient(180deg,#08101f 0%, #050b16 100%);
     border:1px solid rgba(255,255,255,0.08);
     border-radius:24px;
-    padding:28px;
-    min-height:620px;
+    padding:26px;
+    min-height:580px;
 }
 
 .panel-title{
-    font-size:34px;
+    font-size:28px;
     font-weight:800;
-    margin-bottom:24px;
+    margin-bottom:22px;
 }
 
-/* logic */
 .logic-item{
     color:#d1d5db;
-    font-size:22px;
+    font-size:18px;
     line-height:2;
-    margin-bottom:10px;
+    margin-bottom:6px;
 }
 
 .logic-sub{
     color:#94a3b8;
-    margin-left:22px;
-    font-size:19px;
+    font-size:16px;
+    margin-left:18px;
+    line-height:2;
 }
 
-/* footer */
 .footer{
     margin-top:24px;
-    color:#6b7280;
-    font-size:14px;
     text-align:center;
-    padding-bottom:12px;
+    color:#6b7280;
+    font-size:13px;
 }
 
 </style>
@@ -222,18 +219,15 @@ header {visibility: hidden;}
 # INPUT
 # =========================================================
 
-symbol = st.text_input(
-    "股票代码",
-    "NVDA"
-)
+symbol = st.text_input("股票代码", "NVDA")
 
 # =========================================================
-# FETCH
+# FUNCTIONS
 # =========================================================
 
 def fetch(url):
     try:
-        r = requests.get(url, timeout=20)
+        r = requests.get(url, timeout=15)
         return r.json()
     except:
         return []
@@ -244,6 +238,10 @@ def safe(x, k):
     except:
         return 0
 
+# =========================================================
+# API DATA
+# =========================================================
+
 income = fetch(
     f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}"
 )
@@ -253,7 +251,7 @@ cash = fetch(
 )
 
 # =========================================================
-# DATA
+# MAIN
 # =========================================================
 
 if (
@@ -305,12 +303,11 @@ if (
 
     rev_growth = rev_growths[-1]
     capex_growth = capex_growths[-1]
-
     diff = capex_growth - rev_growth
 
-    # =========================================================
+    # =====================================================
     # STATUS
-    # =========================================================
+    # =====================================================
 
     if diff >= 20:
         status = "过热预警"
@@ -327,9 +324,9 @@ if (
         status_color = "green"
         status_desc = "收入增长仍高于资本扩张速度。"
 
-    # =========================================================
+    # =====================================================
     # HERO
-    # =========================================================
+    # =====================================================
 
     st.markdown(f"""
     <div class="hero-box">
@@ -365,9 +362,9 @@ if (
     </div>
     """, unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # METRICS
-    # =========================================================
+    # =====================================================
 
     c1, c2, c3, c4 = st.columns(4)
 
@@ -454,9 +451,9 @@ if (
         </div>
         """, unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # ALERT
-    # =========================================================
+    # =====================================================
 
     st.markdown(f"""
     <div class="alert-box">
@@ -474,9 +471,7 @@ if (
             <div class="alert-text">
 
             当前资本开支增速比收入增速高出
-            <span class="yellow">
-            {diff:.2f}%
-            </span>，
+            <span class="yellow">{diff:.2f}%</span>，
 
             显示企业在AI基础设施上的投入扩张已经超出
             现实需求支撑。
@@ -494,15 +489,15 @@ if (
     </div>
     """, unsafe_allow_html=True)
 
-    # =========================================================
-    # LOWER
-    # =========================================================
+    # =====================================================
+    # LOWER PANELS
+    # =====================================================
 
-    left_panel, right_panel = st.columns([1, 1.35])
+    left_panel, right_panel = st.columns([1, 1.4])
 
-    # =========================================================
+    # =====================================================
     # LEFT
-    # =========================================================
+    # =====================================================
 
     with left_panel:
 
@@ -530,7 +525,7 @@ if (
             </div>
 
             <div class="logic-item">
-            ⑤ 根据阈值判断状态：
+            ⑤ 根据阈值判断系统风险：
             </div>
 
             <div class="logic-sub">
@@ -538,19 +533,19 @@ if (
             </div>
 
             <div class="logic-sub">
-            🟡 0% ≤ 增速差 &lt; 20% → 偏热
+            🟡 0% ≤ 增速差 ＜ 20% → 偏热
             </div>
 
             <div class="logic-sub">
-            🟢 增速差 &lt; 0% → 健康
+            🟢 增速差 ＜ 0% → 健康
             </div>
 
         </div>
         """, unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # RIGHT
-    # =========================================================
+    # =====================================================
 
     with right_panel:
 
@@ -566,60 +561,48 @@ if (
         fig.add_trace(go.Scatter(
             x=years[1:],
             y=rev_growths,
-            mode="lines+markers+text",
-            name="收入增长率(%)",
-            text=[f"{x:.1f}%" for x in rev_growths],
-            textposition="top center",
+            mode="lines+markers",
+            name="收入增长率 (%)",
             line=dict(
                 color="#22c55e",
-                width=5
+                width=4
             ),
             marker=dict(
-                size=12
-            ),
-            textfont=dict(
-                size=16,
-                color="#22c55e"
+                size=9
             )
         ))
 
         fig.add_trace(go.Scatter(
             x=years[1:],
             y=capex_growths,
-            mode="lines+markers+text",
-            name="资本开支增长率(%)",
-            text=[f"{x:.1f}%" for x in capex_growths],
-            textposition="top center",
+            mode="lines+markers",
+            name="资本开支增长率 (%)",
             line=dict(
                 color="#ef4444",
-                width=5
+                width=4
             ),
             marker=dict(
-                size=12
-            ),
-            textfont=dict(
-                size=16,
-                color="#ef4444"
+                size=9
             )
         ))
 
         fig.update_layout(
 
-            height=520,
+            height=470,
 
             paper_bgcolor="#050b16",
             plot_bgcolor="#050b16",
 
             margin=dict(
-                l=20,
-                r=20,
+                l=10,
+                r=10,
                 t=20,
-                b=20
+                b=10
             ),
 
             font=dict(
                 color="white",
-                size=16
+                size=14
             ),
 
             legend=dict(
@@ -628,35 +611,35 @@ if (
                 y=1.02,
                 xanchor="right",
                 x=1,
-                font=dict(size=16)
+                font=dict(size=14)
             ),
+
+            hovermode="x unified",
 
             xaxis=dict(
                 showgrid=False,
-                tickfont=dict(size=16)
+                tickfont=dict(size=14)
             ),
 
             yaxis=dict(
                 title="增长率 (%)",
-                title_font=dict(size=18),
-                gridcolor="rgba(255,255,255,0.08)",
-                zerolinecolor="rgba(255,255,255,0.15)",
-                tickfont=dict(size=15)
-            ),
-
-            hovermode="x unified"
+                title_font=dict(size=15),
+                gridcolor="rgba(255,255,255,0.06)",
+                zerolinecolor="rgba(255,255,255,0.1)",
+                tickfont=dict(size=13)
+            )
         )
 
         st.plotly_chart(
             fig,
-            width='stretch'
+            width="stretch"
         )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # =========================================================
+    # =====================================================
     # FOOTER
-    # =========================================================
+    # =====================================================
 
     st.markdown("""
     <div class="footer">
@@ -666,4 +649,4 @@ if (
 
 else:
 
-    st.error("API数据加载失败")
+    st.error("API数据加载失败，请检查 API KEY 或接口权限")
