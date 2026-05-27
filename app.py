@@ -32,9 +32,10 @@ html, body, [class*="css"] {
 }
 
 .block-container {
-    padding-top: 2rem;
-    padding-left: 3rem;
-    padding-right: 3rem;
+    padding-top: 1.5rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    max-width: 1600px;
 }
 
 /* =========================
@@ -42,16 +43,29 @@ html, body, [class*="css"] {
 ========================= */
 
 .main-title {
-    font-size: 56px;
+    font-size: 34px;
     font-weight: 800;
     color: white;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
+    letter-spacing: -1px;
 }
 
 .sub-title {
-    font-size: 24px;
+    font-size: 15px;
     color: #94a3b8;
-    margin-bottom: 40px;
+    margin-bottom: 24px;
+}
+
+/* =========================
+输入框
+========================= */
+
+.stTextInput input {
+    background-color: #111827;
+    color: white;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 15px;
 }
 
 /* =========================
@@ -60,29 +74,31 @@ Metric Card
 
 .metric-card {
     background: linear-gradient(145deg,#07122b,#020817);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 24px;
-    padding: 28px;
-    height: 260px;
-    box-shadow: 0 0 40px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 20px;
+    height: 180px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.25);
 }
 
 .metric-label {
     color: #94a3b8;
-    font-size: 18px;
-    margin-bottom: 20px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    font-weight: 500;
 }
 
 .metric-number {
-    font-size: 52px;
-    font-weight: 800;
-    margin-bottom: 18px;
+    font-size: 34px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    line-height: 1;
 }
 
 .metric-desc {
     color: #cbd5e1;
-    font-size: 18px;
-    line-height: 1.7;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 .green {
@@ -102,25 +118,25 @@ Alert
 ========================= */
 
 .alert-box {
-    margin-top: 30px;
-    margin-bottom: 30px;
+    margin-top: 22px;
+    margin-bottom: 22px;
     background: linear-gradient(90deg,#3b2a00,#0f0f0f);
-    border: 1px solid rgba(251,191,36,0.35);
-    border-radius: 24px;
-    padding: 35px;
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 18px;
+    padding: 24px;
 }
 
 .alert-title {
-    font-size: 42px;
-    font-weight: 800;
+    font-size: 24px;
+    font-weight: 700;
     color: #fbbf24;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .alert-text {
-    font-size: 24px;
-    color: #e5e7eb;
-    line-height: 1.9;
+    font-size: 15px;
+    color: #d1d5db;
+    line-height: 1.7;
 }
 
 /* =========================
@@ -129,24 +145,24 @@ Panel
 
 .panel {
     background: linear-gradient(145deg,#07122b,#020817);
-    border-radius: 24px;
-    padding: 28px;
-    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid rgba(255,255,255,0.06);
     height: 100%;
 }
 
 .panel-title {
-    font-size: 28px;
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 25px;
+    margin-bottom: 18px;
     color: white;
 }
 
 .logic-item {
-    font-size: 20px;
+    font-size: 14px;
     color: #cbd5e1;
-    margin-bottom: 18px;
-    line-height: 1.8;
+    margin-bottom: 12px;
+    line-height: 1.6;
 }
 
 /* =========================
@@ -154,9 +170,25 @@ Footer
 ========================= */
 
 .footer {
-    margin-top: 25px;
+    margin-top: 18px;
     color: #64748b;
-    font-size: 16px;
+    font-size: 12px;
+}
+
+/* =========================
+隐藏streamlit默认元素
+========================= */
+
+#MainMenu {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+
+header {
+    visibility: hidden;
 }
 
 </style>
@@ -166,9 +198,9 @@ Footer
 # 标题
 # =========================================================
 
-col_title, col_input = st.columns([4,1])
+left_title, right_input = st.columns([5,1])
 
-with col_title:
+with left_title:
 
     st.markdown("""
 <div class="main-title">
@@ -180,17 +212,21 @@ with col_title:
 </div>
 """, unsafe_allow_html=True)
 
-with col_input:
+with right_input:
 
-    symbol = st.text_input("股票代码", "NVDA")
+    symbol = st.text_input(
+        "股票代码",
+        "NVDA"
+    )
 
 # =========================================================
-# 请求函数
+# API函数
 # =========================================================
 
 def fetch(url):
 
     try:
+
         r = requests.get(url)
 
         if r.status_code != 200:
@@ -210,7 +246,7 @@ def safe(x, k):
         return 0
 
 # =========================================================
-# API
+# 拉取数据
 # =========================================================
 
 income = fetch(
@@ -235,7 +271,9 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
     for i in range(n):
 
-        years.append(income[i]["date"][:4])
+        years.append(
+            income[i]["date"][:4]
+        )
 
         revenue.append(
             safe(income[i], "revenue")
@@ -262,7 +300,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     diff = capex_growth - rev_growth
 
     # =========================================================
-    # 状态
+    # 状态判断
     # =========================================================
 
     if diff >= 0.2:
@@ -296,7 +334,7 @@ AI需求尚能支撑投资。
 """
 
     # =========================================================
-    # 顶部4卡
+    # 顶部卡片
     # =========================================================
 
     c1, c2, c3, c4 = st.columns(4)
@@ -385,7 +423,7 @@ CapEx扩张速度持续提升。
 """, unsafe_allow_html=True)
 
     # =========================================================
-    # 结论
+    # 中间结论
     # =========================================================
 
     st.markdown(f"""
@@ -419,13 +457,13 @@ CapEx扩张速度持续提升。
     # 下方布局
     # =========================================================
 
-    left, right = st.columns([1,1.5])
+    left_panel, right_panel = st.columns([1,1.5])
 
     # =========================================================
     # 左侧逻辑
     # =========================================================
 
-    with left:
+    with left_panel:
 
         st.markdown("""
 <div class="panel">
@@ -476,10 +514,10 @@ CapEx Growth - Revenue Growth
 """, unsafe_allow_html=True)
 
     # =========================================================
-    # 图表
+    # 右侧图表
     # =========================================================
 
-    with right:
+    with right_panel:
 
         st.markdown("""
 <div class="panel">
@@ -515,14 +553,12 @@ CapEx Growth - Revenue Growth
             y=rev_growths,
             mode="lines+markers",
             name="收入增长率",
-
             line=dict(
                 color="#22c55e",
-                width=5
+                width=3
             ),
-
             marker=dict(
-                size=10
+                size=7
             )
         ))
 
@@ -531,48 +567,48 @@ CapEx Growth - Revenue Growth
             y=capex_growths,
             mode="lines+markers",
             name="资本开支增长率",
-
             line=dict(
                 color="#ef4444",
-                width=5
+                width=3
             ),
-
             marker=dict(
-                size=10
+                size=7
             )
         ))
 
         fig.update_layout(
 
-            height=500,
+            height=360,
 
             paper_bgcolor="#07122b",
             plot_bgcolor="#07122b",
 
             font=dict(
                 color="white",
-                size=16
+                size=13
             ),
 
             legend=dict(
                 orientation="h",
-                y=1.1
+                y=1.08
             ),
 
             margin=dict(
-                l=20,
-                r=20,
-                t=20,
-                b=20
+                l=10,
+                r=10,
+                t=10,
+                b=10
             ),
 
             xaxis=dict(
-                showgrid=False
+                showgrid=False,
+                zeroline=False
             ),
 
             yaxis=dict(
                 title="增长率 (%)",
-                gridcolor="rgba(255,255,255,0.08)"
+                gridcolor="rgba(255,255,255,0.06)",
+                zeroline=False
             )
         )
 
