@@ -48,7 +48,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     display: flex; align-items: center; gap: 10px;
 }
 
-/* 【修改】核心检测维度副标题：在原有13px基础上增加3个字号到16px，颜色调为清爽的灰白 */
+/* 核心检测维度副标题：在原有13px基础上增加3个字号到16px，颜色调为清爽的灰白 */
 .sub-title { 
     font-size: 16px !important; 
     color: #cbd5e1 !important; 
@@ -88,8 +88,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 .metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
 .metric-arrow { font-size: 20px; font-weight: 700; }
 
-/* 【修改】卡片下方描述文字（AI需求仍维持高增长等）：
-   从原版的12px增加3个字号到15px。颜色变更为灰白色（#cbd5e1），增加 !important 彻底击穿底层干扰 */
+/* 卡片下方描述文字（AI需求仍维持高增长等）：从12px增加3个字号到15px，颜色为灰白色 */
 .metric-desc, .metric-desc p { 
     color: #cbd5e1 !important; 
     font-size: 15px !important; 
@@ -115,23 +114,36 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     padding: 22px; border: 1px solid rgba(255,255,255,0.07);
 }
 .panel-title { font-size: 15px; font-weight: 700; margin-bottom: 20px; color: #e2e8f0; }
+
+/* 【修改】检测逻辑文本样式：增大3个字号从13px到16px，颜色调为清爽的灰白 */
 .logic-step { display: flex; gap: 12px; margin-bottom: 13px; align-items: flex-start; }
 .step-num {
-    width: 20px; height: 20px; min-width: 20px; border-radius: 50%;
-    background: #1e3a5f; color: #60a5fa; font-size: 11px; font-weight: 700;
+    width: 22px; height: 22px; min-width: 22px; border-radius: 50%;
+    background: #1e3a5f; color: #60a5fa; font-size: 12px; font-weight: 700;
     display: flex; align-items: center; justify-content: center; margin-top: 2px;
 }
-.step-text { font-size: 13px; color: #94a3b8; line-height: 1.6; }
-.threshold-block { margin-left: 32px; margin-top: 8px; }
+.step-text, .logic-step p { 
+    font-size: 16px !important; 
+    color: #cbd5e1 !important; 
+    line-height: 1.6; 
+}
+
+.threshold-block { margin-left: 34px; margin-top: 8px; }
 .threshold-row {
     display: flex; align-items: center; gap: 8px;
-    padding: 7px 10px; border-radius: 7px; margin-bottom: 5px;
+    padding: 7px 12px; border-radius: 7px; margin-bottom: 6px;
     background: rgba(255,255,255,0.02);
 }
 .t-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.t-label { font-size: 12px; color: #475569; flex: 1; }
-.t-arrow { font-size: 11px; color: #475569; }
-.t-status { font-size: 12px; font-weight: 600; }
+
+/* 【修改】下层条件阈值说明文字：增大3个字号从12px到15px，颜色调为灰白 */
+.t-label, .threshold-row p { 
+    font-size: 15px !important; 
+    color: #cbd5e1 !important; 
+    flex: 1; 
+}
+.t-arrow { font-size: 13px; color: #475569; }
+.t-status { font-size: 15px !important; font-weight: 600; }
 
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
 #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
