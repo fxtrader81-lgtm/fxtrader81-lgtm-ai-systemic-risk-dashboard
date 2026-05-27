@@ -47,7 +47,14 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     margin: 0 0 6px 0; letter-spacing: -0.5px;
     display: flex; align-items: center; gap: 10px;
 }
-.sub-title { font-size: 13px; color: #475569; margin: 0; }
+
+/* 【修改】核心检测维度副标题：在原有13px基础上增加3个字号到16px，颜色调为清爽的灰白 */
+.sub-title { 
+    font-size: 16px !important; 
+    color: #cbd5e1 !important; 
+    margin: 0; 
+}
+
 .timestamp-text { font-size: 13px; color: #475569; margin-bottom: 8px; display: block; }
 .symbol-badge {
     display: inline-block;
@@ -72,15 +79,23 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     border-radius: 14px; padding: 20px 22px 18px;
     height: 168px;
 }
-/* 【修改】放大 Label 字体，加粗，并调亮颜色，防止与暗色背景靠色 */
+
 .metric-label {
-    color: #cbd5e1; font-size: 15px; font-weight: 600;
+    color: #ffffff; font-size: 15px; font-weight: 600;
     margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.4px;
 }
 .metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
 .metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
 .metric-arrow { font-size: 20px; font-weight: 700; }
-.metric-desc { color: #64748b; font-size: 12px; line-height: 1.65; }
+
+/* 【修改】卡片下方描述文字（AI需求仍维持高增长等）：
+   从原版的12px增加3个字号到15px。颜色变更为灰白色（#cbd5e1），增加 !important 彻底击穿底层干扰 */
+.metric-desc, .metric-desc p { 
+    color: #cbd5e1 !important; 
+    font-size: 15px !important; 
+    line-height: 1.6; 
+}
+
 .green { color: #22c55e; } .red { color: #ef4444; } .yellow { color: #fbbf24; }
 
 /* Alert */
@@ -296,7 +311,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
             name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
 
-        # 【修复】关键更新：xaxis 显式声明为离散的类目轴 (category)，防止数字年份被 Plotly 压缩至一条线
+        # 关键更新：xaxis 显式声明为离散的类目轴 (category)，防止数字年份被 Plotly 压缩至一条线
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
