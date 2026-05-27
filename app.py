@@ -3,12 +3,29 @@ import requests
 import plotly.graph_objects as go
 from datetime import datetime
 
-st.set_page_config(page_title="AI资本开支风险系统", layout="wide")
+# =========================================================
+# 页面配置
+# =========================================================
+
+st.set_page_config(
+    page_title="AI资本开支风险系统",
+    layout="wide"
+)
+
+# =========================================================
+# API — 完全保留原始接口，不动任何参数
+# =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+BASE = "https://financialmodelingprep.com/stable"
+
+# =========================================================
+# CSS — 还原目标截图风格
+# =========================================================
 
 st.markdown("""
 <style>
+
 html, body, [class*="css"] {
     background-color: #050816 !important;
     color: white;
@@ -23,10 +40,12 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     max-width: 1600px;
     background-color: #050816 !important;
 }
+
+/* 标题 */
 .main-title {
     font-size: 32px; font-weight: 800; color: #ffffff;
     margin: 0 0 6px 0; letter-spacing: -0.5px;
-    display: flex; align-items: center; gap: 10px; line-height: 1.2;
+    display: flex; align-items: center; gap: 10px;
 }
 .sub-title { font-size: 13px; color: #475569; margin: 0; }
 .timestamp-text { font-size: 13px; color: #475569; margin-bottom: 8px; display: block; }
@@ -37,17 +56,21 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     border-radius: 8px; padding: 3px 16px;
     font-size: 13px; font-weight: 600; color: #94a3b8; letter-spacing: 1px;
 }
+
+/* 输入框 */
 .stTextInput input {
     background-color: #0f172a !important; color: white !important;
     border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1) !important;
     font-size: 14px !important;
 }
 .stTextInput label { color: #94a3b8 !important; font-size: 13px !important; }
+
+/* Metric 卡片 */
 .metric-card {
     background-color: #0b1120;
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 14px; padding: 20px 22px 18px;
-    height: 168px; position: relative; overflow: hidden;
+    height: 168px;
 }
 .metric-label {
     color: #64748b; font-size: 12px; font-weight: 500;
@@ -55,9 +78,11 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 .metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
 .metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
-.metric-arrow { font-size: 20px; font-weight: 700; line-height: 1; }
+.metric-arrow { font-size: 20px; font-weight: 700; }
 .metric-desc { color: #64748b; font-size: 12px; line-height: 1.65; }
 .green { color: #22c55e; } .red { color: #ef4444; } .yellow { color: #fbbf24; }
+
+/* Alert */
 .alert-box {
     margin: 18px 0; background: #120e00;
     border: 1px solid rgba(251,191,36,0.18);
@@ -65,8 +90,10 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     display: flex; gap: 18px; align-items: flex-start;
 }
 .alert-icon { font-size: 44px; flex-shrink: 0; line-height: 1; }
-.alert-title { font-size: 20px; font-weight: 700; color: #fbbf24; margin-bottom: 10px; line-height: 1.3; }
+.alert-title { font-size: 20px; font-weight: 700; color: #fbbf24; margin-bottom: 10px; }
 .alert-text { font-size: 14px; color: #94a3b8; line-height: 1.75; }
+
+/* Panel */
 .panel {
     background-color: #0b1120; border-radius: 14px;
     padding: 22px; border: 1px solid rgba(255,255,255,0.07);
@@ -89,64 +116,41 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 .t-label { font-size: 12px; color: #475569; flex: 1; }
 .t-arrow { font-size: 11px; color: #475569; }
 .t-status { font-size: 12px; font-weight: 600; }
+
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
 #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
 .modebar { display: none !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 工具函数
+# API函数 — 原始逻辑，不动
 # =========================================================
 
 def fetch(url):
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url)
         if r.status_code != 200:
-            return None, f"HTTP {r.status_code}"
-        data = r.json()
-        # FMP 有时返回 {"error": "..."} 或 {"message": "..."}
-        if isinstance(data, dict):
-            msg = data.get("error") or data.get("message") or str(data)
-            return None, msg
-        return data, None
-    except Exception as e:
-        return None, str(e)
+            return []
+        return r.json()
+    except:
+        return []
 
 def safe(x, k):
     try:
-        return float(x.get(k) or 0)
+        return float(x.get(k, 0))
     except:
-        return 0.0
-
-def dedup_annual(records):
-    """
-    FMP stable 接口返回的是最新数据，可能混入季度记录。
-    用 fiscalDateEnding 或 date 字段的年份去重，每年只保留最新一条（通常是年报）。
-    同时过滤掉 period != 'FY' 的季报条目（如果有该字段）。
-    """
-    seen = {}
-    for rec in records:
-        # 优先用 calendarYear，其次取 date 前4位
-        year = str(rec.get("calendarYear", "") or rec.get("date", "")[:4])
-        if not year.isdigit():
-            continue
-        period = rec.get("period", "FY")
-        # 跳过明确标注为季报的条目
-        if period and period.upper() not in ("FY", "TTM", ""):
-            continue
-        if year not in seen:
-            seen[year] = rec
-    # 按年份升序返回
-    return [seen[y] for y in sorted(seen.keys())]
+        return 0
 
 # =========================================================
-# 顶部布局
+# 顶部：标题 + 输入框
 # =========================================================
 
 col_title, col_input = st.columns([5, 1])
+
 with col_input:
-    symbol = st.text_input("股票代码", "NVDA").upper().strip()
+    symbol = st.text_input("股票代码", "NVDA")
 
 with col_title:
     st.markdown(f"""
@@ -163,71 +167,35 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 拉取数据 — 同时尝试 stable 和 v3 两套接口
+# 拉取数据 — 原始接口，不改任何参数
 # =========================================================
 
-# 优先用 stable（原代码接口），如失败回退 v3
-URLS = {
-    "income_stable": f"https://financialmodelingprep.com/stable/income-statement?symbol={symbol}&limit=7&apikey={API_KEY}",
-    "cash_stable":   f"https://financialmodelingprep.com/stable/cash-flow-statement?symbol={symbol}&limit=7&apikey={API_KEY}",
-    "income_v3":     f"https://financialmodelingprep.com/api/v3/income-statement/{symbol}?limit=7&apikey={API_KEY}",
-    "cash_v3":       f"https://financialmodelingprep.com/api/v3/cash-flow-statement/{symbol}?limit=7&apikey={API_KEY}",
-}
-
-income_raw, err_i = fetch(URLS["income_stable"])
-cash_raw,   err_c = fetch(URLS["cash_stable"])
-
-# 如果 stable 失败，回退 v3
-if income_raw is None:
-    income_raw, err_i = fetch(URLS["income_v3"])
-if cash_raw is None:
-    cash_raw, err_c = fetch(URLS["cash_v3"])
+income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
 
 # =========================================================
-# 数据清洗：去重保留年度数据
+# 数据处理 — 原始逻辑，不动
 # =========================================================
 
-income = dedup_annual(income_raw) if income_raw else []
-cash   = dedup_annual(cash_raw)   if cash_raw   else []
-
-# =========================================================
-# 调试面板（开发期可开启，上线时注释掉）
-# =========================================================
-# with st.expander("🔧 调试信息"):
-#     st.write("income条数:", len(income), "| cash条数:", len(cash))
-#     if income: st.write("income年份:", [r.get("calendarYear") or r.get("date","")[:4] for r in income])
-#     if cash:   st.write("cash年份:",   [r.get("calendarYear") or r.get("date","")[:4] for r in cash])
-#     st.write("income_err:", err_i, "| cash_err:", err_c)
-
-# =========================================================
-# 数据处理
-# =========================================================
-
-if len(income) >= 2 and len(cash) >= 2:
-
-    # 对齐年份（取交集）
-    income_dict = {str(r.get("calendarYear") or r.get("date","")[:4]): r for r in income}
-    cash_dict   = {str(r.get("calendarYear") or r.get("date","")[:4]): r for r in cash}
-    common_years = sorted(set(income_dict.keys()) & set(cash_dict.keys()))
+if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
     years, revenue, capex = [], [], []
-    for y in common_years:
-        rev = safe(income_dict[y], "revenue")
-        cap = abs(safe(cash_dict[y],   "capitalExpenditure"))
-        if rev > 0:   # 过滤掉无效行
-            years.append(y)
-            revenue.append(rev)
-            capex.append(cap)
+    n = min(len(income), len(cash))
 
-    if len(revenue) < 2:
-        st.error(f"有效年度数据不足（仅 {len(revenue)} 年），无法计算增长率。请确认 {symbol} 是否已上市超过2年。")
-        st.stop()
+    for i in range(n):
+        years.append(income[i]["date"][:4])
+        revenue.append(safe(income[i], "revenue"))
+        capex.append(abs(safe(cash[i], "capitalExpenditure")))
+
+    years.reverse()
+    revenue.reverse()
+    capex.reverse()
 
     rev_growth   = (revenue[-1] - revenue[-2]) / revenue[-2]
     capex_growth = (capex[-1]   - capex[-2])   / capex[-2]
     diff         = capex_growth - rev_growth
 
-    # ===== 状态判断 =====
+    # 状态判断 — 原始逻辑
     if diff >= 0.2:
         status, sc, si = "过热预警", "yellow", "⚠️"
         status_desc  = "当前AI资本扩张已进入<br>高波动风险阶段。"
@@ -250,6 +218,7 @@ if len(income) >= 2 and len(cash) >= 2:
 
     # ===== 四张卡片 =====
     c1, c2, c3, c4 = st.columns(4)
+
     with c1:
         st.markdown(f"""<div class="metric-card">
   <div class="metric-label">收入增长率 (YoY)</div>
@@ -306,28 +275,26 @@ if len(income) >= 2 and len(cash) >= 2:
     with rp:
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
+        # 图表计算 — 原始逻辑
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(revenue)):
-            if revenue[i-1] > 0 and capex[i-1] > 0:
-                rg_list.append(((revenue[i] - revenue[i-1]) / revenue[i-1]) * 100)
-                cg_list.append(((capex[i]   - capex[i-1])   / capex[i-1])   * 100)
-                cy_list.append(years[i])
+            rg_list.append(((revenue[i] - revenue[i-1]) / revenue[i-1]) * 100)
+            cg_list.append(((capex[i]   - capex[i-1])   / capex[i-1])   * 100)
+            cy_list.append(years[i])
 
-        annotations = []
-        if rg_list:
-            annotations.append(dict(x=cy_list[-1], y=rg_list[-1],
-                text=f"<b>{rg_list[-1]:.2f}%</b>", showarrow=False,
-                xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)))
-        if cg_list:
-            annotations.append(dict(x=cy_list[-1], y=cg_list[-1],
-                text=f"<b>{cg_list[-1]:.2f}%</b>", showarrow=False,
-                xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)))
+        annotations = [
+            dict(x=cy_list[-1], y=rg_list[-1], text=f"<b>{rg_list[-1]:.2f}%</b>",
+                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#22c55e", size=13)),
+            dict(x=cy_list[-1], y=cg_list[-1], text=f"<b>{cg_list[-1]:.2f}%</b>",
+                 showarrow=False, xanchor="left", xshift=10, font=dict(color="#ef4444", size=13)),
+        ]
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=cy_list, y=rg_list, mode="lines+markers",
             name="收入增长率(%)", line=dict(color="#22c55e", width=2.5), marker=dict(size=7)))
         fig.add_trace(go.Scatter(x=cy_list, y=cg_list, mode="lines+markers",
             name="资本开支增长率(%)", line=dict(color="#ef4444", width=2.5), marker=dict(size=7)))
+
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -335,28 +302,23 @@ if len(income) >= 2 and len(cash) >= 2:
             legend=dict(orientation="h", y=1.1, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
             margin=dict(l=10, r=60, t=10, b=10),
             annotations=annotations,
-            xaxis=dict(type="category", showgrid=False, zeroline=False, tickfont=dict(color="#64748b", size=11)),
-            yaxis=dict(title="增长率 (%)", gridcolor="rgba(255,255,255,0.05)",
+            xaxis=dict(
+                type="category",   # 防止年份变小数
+                showgrid=False, zeroline=False,
+                tickfont=dict(color="#64748b", size=11)
+            ),
+            yaxis=dict(
+                title="增长率 (%)",
+                gridcolor="rgba(255,255,255,0.05)",
                 zeroline=True, zerolinecolor="rgba(255,255,255,0.08)",
-                tickfont=dict(color="#64748b"), title_font=dict(color="#64748b", size=11))
+                tickfont=dict(color="#64748b"), title_font=dict(color="#64748b", size=11)
+            )
         )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 年度财报 · 实时采集 · {symbol}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 实时采集 · 当前标的：{symbol}</div>',
+                unsafe_allow_html=True)
 
 else:
-    # ===== 详细错误诊断 =====
-    st.error(f"⚠️ 无法获取 **{symbol}** 的年度财报数据")
-    with st.expander("🔧 点击查看诊断信息"):
-        st.write(f"- income 原始条数: `{len(income_raw) if income_raw else 0}`")
-        st.write(f"- cash 原始条数:   `{len(cash_raw) if cash_raw else 0}`")
-        st.write(f"- 清洗后 income 年度条数: `{len(income)}`")
-        st.write(f"- 清洗后 cash 年度条数:   `{len(cash)}`")
-        st.write(f"- income 错误: `{err_i}`")
-        st.write(f"- cash 错误:   `{err_c}`")
-        if income_raw:
-            st.write("income 原始前3条：", income_raw[:3])
-        if cash_raw:
-            st.write("cash 原始前3条：", cash_raw[:3])
-    st.info("💡 如果诊断信息显示有原始数据，说明是年份去重逻辑的问题，可把诊断信息截图发我。")
+    st.error(f"API数据加载失败，请检查股票代码是否正确。")
