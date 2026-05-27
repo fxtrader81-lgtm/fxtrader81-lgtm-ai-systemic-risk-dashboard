@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# API 配置 — 严格退回到安全且被免费Key允许的稳定终点
+# API 配置 — 保持最稳定的原始限制模式
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
@@ -215,7 +215,7 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 严格重回安全限制：单次拉取 5 条，确保绝对不会报错
+# 稳定获取：硬性 limit=5
 # =========================================================
 
 income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
@@ -333,15 +333,15 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 </div>""", unsafe_allow_html=True)
 
     with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（延长版）</div>', unsafe_allow_html=True)
+        # 恢复经典的“最近5年”标题
+        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
-        # 核心改动：放开图表下限到第 1 个可计算位置，成功激活并多展示一整年历史数据
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 允许展示 2023 财年（它成功把获取到的最早一年做基期，不再生硬过滤）
+                # 恢复经典过滤条件：按最安稳的边界过滤出可渲染的点
                 if curr["year"] >= 2023:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
@@ -394,3 +394,4 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
 else:
     st.error(f"API数据加载失败，请检查股票代码是否正确。")
+    
