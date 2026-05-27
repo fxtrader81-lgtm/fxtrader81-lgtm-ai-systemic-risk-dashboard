@@ -13,11 +13,11 @@ st.set_page_config(
 )
 
 # =========================================================
-# API 核心配置
+# API 核心配置 — 更换为天然支持长期历史数据的 v3 终点
 # =========================================================
 
 API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
-BASE = "https://financialmodelingprep.com/stable"
+BASE_V3 = "https://financialmodelingprep.com/api/v3"
 
 # =========================================================
 # CSS 样式完全留存
@@ -215,84 +215,53 @@ with col_title:
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 核心突围：通过混合拉取“年报接口”与“季报接口”突破 FMP 5条限制
+# 数据拉取 — 使用单次可返回多达10年数据的历史归档终点
 # =========================================================
 
-# 1. 抓取标准年报 (包含最新5个财年)
-inc_annual = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-cash_annual = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-
-# 2. 抓取季报 (额外获得10-20个季度，用于向上融合成更早的完整财年)
-inc_quarterly = fetch(f"{BASE}/income-statement?symbol={symbol}&period=quarter&limit=20&apikey={API_KEY}")
-cash_quarterly = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&period=quarter&limit=20&apikey={API_KEY}")
+income = fetch(f"{BASE_V3}/income-statement?symbol={symbol}&apikey={API_KEY}")
+cash   = fetch(f"{BASE_V3}/cash-flow-statement?symbol={symbol}&apikey={API_KEY}")
 
 # =========================================================
-# 融合同步逻辑
+# 数据处理与对齐
 # =========================================================
 
-income_pool = {}
-cash_pool = {}
+if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
-# 塞入标准年报原始值
-if isinstance(inc_annual, list):
-    for item in inc_annual:
-        if "calendarYear" in item:
-            y = int(item["calendarYear"])
-            income_pool[y] = safe(item, "revenue")
-
-if isinstance(cash_annual, list):
-    for item in cash_annual:
-        if "calendarYear" in item:
-            y = int(item["calendarYear"])
-            cash_pool[y] = abs(safe(item, "capitalExpenditure"))
-
-# 提取季度数据融合成更久远的财年（补足年报接口死活拿不到的 2019, 2020 原始值）
-q_inc_map = {}
-if isinstance(inc_quarterly, list):
-    for item in inc_quarterly:
-        try:
-            y = int(item.get("calendarYear", item.get("date", "")[:4]))
-            q_inc_map[y] = q_inc_map.get(y, 0) + safe(item, "revenue")
-        except: pass
-
-q_csh_map = {}
-if isinstance(cash_quarterly, list):
-    for item in cash_quarterly:
-        try:
-            y = int(item.get("calendarYear", item.get("date", "")[:4]))
-            q_csh_map[y] = q_csh_map.get(y, 0) + abs(safe(item, "capitalExpenditure"))
-        except: pass
-
-# 如果年报缺失更早年份，用融合的季度总数补齐
-for y in q_inc_map:
-    if y not in income_pool:
-        income_pool[y] = q_inc_map[y]
-for y in q_csh_map:
-    if y not in cash_pool:
-        cash_pool[y] = q_csh_map[y]
-
-# 组装最终时间轴
-final_timeline = []
-for y in sorted(income_pool.keys()):
-    if y in cash_pool and income_pool[y] > 0 and cash_pool[y] > 0:
-        final_timeline.append({
-            "year": y,
-            "revenue": income_pool[y],
-            "capex": cash_pool[y]
-        })
-
-# =========================================================
-# 视图与看板渲染
-# =========================================================
-
-if len(final_timeline) >= 2:
+    cash_map = {item["date"]: item for item in cash if "date" in item}
+    
+    raw_list = []
+    for inc in income:
+        d_str = inc.get("date", "")
+        if d_str in cash_map:
+            csh = cash_map[d_str]
+            try:
+                y_val = int(inc.get("calendarYear", d_str[:4]))
+            except:
+                continue
+                
+            # 无需拦截年份，全部吸纳用于计算多财年趋势
+            raw_list.append({
+                "year": y_val,
+                "revenue": safe(inc, "revenue"),
+                "capex": abs(safe(csh, "capitalExpenditure"))
+            })
+            
+    # 按年份由远及近排序去重
+    raw_list.sort(key=lambda x: x["year"])
+    
+    final_timeline = []
+    seen_years = set()
+    for item in raw_list:
+        if item["year"] not in seen_years:
+            seen_years.add(item["year"])
+            final_timeline.append(item)
 
     # 计算最新财年的增长率与增速差
     rev_growth   = (final_timeline[-1]["revenue"] - final_timeline[-2]["revenue"]) / final_timeline[-2]["revenue"]
     capex_growth = (final_timeline[-1]["capex"] - final_timeline[-2]["capex"]) / final_timeline[-2]["capex"]
     diff         = capex_growth - rev_growth
 
-    # 状态判断
+    # 状态判断 — 原始逻辑
     if diff >= 0.2:
         status, sc, si = "过热预警", "yellow", "⚠️"
         status_desc  = "当前AI资本扩张已进入<br>高波动风险阶段。"
@@ -370,15 +339,15 @@ if len(final_timeline) >= 2:
 </div>""", unsafe_allow_html=True)
 
     with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比</div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（历史透视）</div>', unsafe_allow_html=True)
 
-        # 核心趋势线组装
+        # 4. 稳健地生成多财年同比增长率数据
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
             prev = final_timeline[i-1]
             curr = final_timeline[i]
             if prev["revenue"] > 0 and prev["capex"] > 0:
-                # 限制图表起始轴为 2021 年，但因为有了多季度前置融合，2021年现在能顺利算出同比值！
+                # 展现 2021 年及以后的长周期增长趋势
                 if curr["year"] >= 2021:
                     rg_list.append(((curr["revenue"] - prev["revenue"]) / prev["revenue"]) * 100)
                     cg_list.append(((curr["capex"] - prev["capex"]) / prev["capex"]) * 100)
@@ -401,7 +370,7 @@ if len(final_timeline) >= 2:
         else:
             annotations = []
 
-        # 画布自适应布局
+        # 5. 图表画布样式调优
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -427,7 +396,7 @@ if len(final_timeline) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 混合采集架构 · 当前标的：{symbol}</div>',
+    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · v3核心历史接口 · 当前标的：{symbol}</div>',
                 unsafe_allow_html=True)
 
 else:
