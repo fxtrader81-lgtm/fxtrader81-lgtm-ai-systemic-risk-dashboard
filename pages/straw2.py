@@ -346,42 +346,51 @@ def get_hf_downloads():
 
 def compute_osci(cap_gap_pct, price_compression_pct, deploy_growth_pct, os_velocity_score):
     """
-    OSCI = 0.30 × 能力代差压缩 + 0.30 × 价格压缩 + 0.25 × 部署动能 + 0.15 × 生态速度
-    各分项标准化到 0-100，越高代表风险越大
+    OSCI = 0.20 x cap + 0.35 x price + 0.30 x deploy + 0.15 x velocity
+    各分项标准化到 0-100，越高代表开源对闭源商业侵蚀风险越大
+
+    权重逻辑：
+    能力代差降至0.20：benchmark追平是技术事实，商业传导滞后12-18个月
+    价格压缩升至0.35：最直接的商业信号，定价权松动立即影响营收
+    部署动能升至0.30：企业真正开始动脚才是商业侵蚀的实质证据
+    生态速度保持0.15：领先指标，辅助验证
+
+    商业粘性缓冲（关键）：
+    能力代差即使归零，分项上限压至60而非100
+    原因：SOC2/HIPAA/SLA/多区域部署/企业支持等商业壁垒
+    不会因benchmark追平而立即消失
     """
 
-    # 能力代差：gap越小风险越高
-    # gap > 25% → 0分；gap < 2% → 100分
-    cap_score = max(0, min(100, (25 - cap_gap_pct) / 23 * 100))
+    # 能力代差：上限60分（商业粘性缓冲）
+    # gap > 25% -> 0分; gap <= 0% -> 60分
+    cap_score = max(0, min(60, (25 - cap_gap_pct) / 25 * 60))
 
-    # 价格压缩：90日降幅越大风险越高
-    # 降幅 < 10% → 0分；降幅 > 60% → 100分
+    # 价格压缩：压缩幅度越大风险越高
+    # 压缩 < 10% -> 0分; 压缩 > 60% -> 100分
     price_score = max(0, min(100, (price_compression_pct - 10) / 50 * 100))
 
-    # 部署增长：年增长率越高风险越高
-    # 增长 < 20% → 0分；增长 > 200% → 100分
+    # 部署动能：stars总量映射
+    # 增长 < 20% -> 0分; 增长 > 200% -> 100分
     deploy_score = max(0, min(100, (deploy_growth_pct - 20) / 180 * 100))
 
     # 生态速度：直接传入 0-100
     os_score = max(0, min(100, os_velocity_score))
 
-    osci = (0.30 * cap_score + 0.30 * price_score +
-            0.25 * deploy_score + 0.15 * os_score)
+    osci = (0.20 * cap_score + 0.35 * price_score +
+            0.30 * deploy_score + 0.15 * os_score)
 
     return round(osci, 1), cap_score, price_score, deploy_score, os_score
 
 
 def get_state(osci):
     if osci < 25:
-        return "SAFE", "green", "22c55e", "Intelligence premium stable", "闭源垄断稳固，技术代差明显，价格溢价成立。"
+        return "SAFE", "green", "22c55e", "Closed-source premium intact", "闭源护城河稳固，技术代差明显，商业溢价成立。"
     elif osci < 45:
-        return "WATCH", "yellow", "fbbf24", "Open-source convergence emerging", "开源开始压缩闭源代差，中小企业迁移信号出现。"
+        return "WATCH", "yellow", "fbbf24", "Open-source convergence accelerating", "开源追赶加速，中小企业和个人开发者迁移信号出现，大客户尚未动摇。"
     elif osci < 65:
-        return "WARNING", "orange", "f97316", "Monetization stress detected", "Token定价权松动，企业本地化部署加速，云厂商续签率承压。"
-    elif osci < 85:
-        return "CRITICAL", "red", "ef4444", "Intelligence commoditization underway", "智能商品化进行中，闭源高毛利模式面临系统性瓦解。"
+        return "WARNING", "orange", "f97316", "Commercial moat under pressure", "商业护城河受压：API降价、本地部署增加、中小客户流失加速。"
     else:
-        return "CASCADE", "red", "ef4444", "Financial contagion spreading", "AI次贷阶段：GPU订单取消、数据中心减值、ABS风险扩散。"
+        return "CRITICAL", "red", "ef4444", "Monetization compression detected", "货币化能力开始恶化：开始监控云厂商 inference margin 与大客户续签率。"
 
 
 # =========================================================
@@ -556,8 +565,8 @@ st.markdown(f"""
     <div class="osci-state {state_color}">{state}</div>
     <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_eng}</div>
     <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      能力代差 ×0.30 · 价格压缩 ×0.30<br>
-      部署动能 ×0.25 · 生态速度 ×0.15
+      能力代差 ×0.20 · 价格压缩 ×0.35<br>
+      部署动能 ×0.30 · 生态速度 ×0.15
     </div>
   </div>
 </div>
@@ -571,14 +580,14 @@ c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">能力代差 <span class="source-tag-gray">手动维护</span></div>
+  <div class="metric-label">能力代差 <span class="source-tag-gray">⚠ 静态基准</span></div>
   <div class="metric-row">
     <span class="metric-number {cap_color}">{cap_gap_pct:+.1f}%</span>
     <span class="metric-arrow {cap_color}">{cap_arrow}</span>
   </div>
   <div class="metric-desc">
-    闭源均分 {closed_avg:.1f} vs 开源均分 {open_avg:.1f}<br>
-    基于 MMLU / HumanEval / MATH 均值
+    {BENCHMARK_DATA["closed"]["name"]} vs {BENCHMARK_DATA["open"]["name"]}<br>
+    均分 {closed_avg:.1f} vs {open_avg:.1f} · 数据期 {BENCHMARK_DATA["closed"]["updated"]}
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -639,36 +648,29 @@ alert_map = {
         "box_class": "alert-box-green",
         "icon": "✅",
         "title_color": "#22c55e",
-        "title": "结论：AI智力税体系稳固，闭源垄断溢价仍然成立",
-        "body": f'当前开源压缩指数 OSCI = <span class="green"><b>{osci}</b></span>，处于安全区间。闭源模型在能力、价格和生态上仍具明显优势，企业大规模迁移至开源的经济动因尚不充分。建议持续监控能力代差变化。'
+        "title": "结论：闭源护城河稳固，AI商业溢价仍然成立",
+        "body": f'当前 OSCI = <span class="green"><b>{osci}</b></span>，处于安全区间。闭源模型在能力、定价和企业服务上仍具明显优势，大规模商业迁移的经济动因不足。建议持续追踪价格压缩速度。'
     },
     "WATCH": {
         "box_class": "alert-box",
         "icon": "👁",
         "title_color": "#fbbf24",
-        "title": "结论：开源压缩信号出现，智力税开始承压",
-        "body": f'当前 OSCI = <span class="yellow"><b>{osci}</b></span>，进入观察区间。开源模型能力收窄、价格优势扩大，中小企业和个人开发者开始转向开源体系。建议关注闭源大客户续签率与企业技术栈迁移动态。'
+        "title": "结论：开源收敛加速，商业护城河出现早期压力",
+        "body": f'当前 OSCI = <span class="yellow"><b>{osci}</b></span>，进入观察区间。开源模型技术追赶加速、价格剪刀差扩大，中小企业和个人开发者开始流向开源体系。大型企业迁移尚未启动，闭源财务数据仍健康。建议关注云厂商下季度 inference margin 变化。'
     },
     "WARNING": {
         "box_class": "alert-box",
         "icon": "⚠️",
         "title_color": "#f97316",
-        "title": "结论：Token定价权松动，企业本地化迁移加速",
-        "body": f'当前 OSCI = <span class="orange"><b>{osci}</b></span>，进入高危区间。开源托管成本已大幅低于闭源API，企业自建推理基础设施的盈亏平衡周期显著缩短。建议对纯API驱动的AI公司进行估值减记，向基础设施资产侧收拢。'
+        "title": "结论：商业护城河受压，开始出现可量化的货币化侵蚀",
+        "body": f'当前 OSCI = <span class="orange"><b>{osci}</b></span>，进入高危区间。API降价幅度超过防御性阈值，本地部署生态快速扩张，中小客户流失加速。注意：这是商业侵蚀信号，尚未构成金融传导事件。建议对纯 API 订阅驱动的 AI 公司开始估值减记。'
     },
     "CRITICAL": {
         "box_class": "alert-box-red",
         "icon": "🔴",
         "title_color": "#ef4444",
-        "title": "结论：智能开始商品化，闭源高毛利模式面临系统性瓦解",
-        "body": f'当前 OSCI = <span class="red"><b>{osci}</b></span>，进入危机区间。开源模型能力全面逼近闭源，大型企业启动本地化迁移，云厂商B端大单续签率急剧承压。建议做空过度依赖高毛利API订阅的科技股，买入本地化私有云集成商。'
-    },
-    "CASCADE": {
-        "box_class": "alert-box-red",
-        "icon": "🔴",
-        "title_color": "#ef4444",
-        "title": "结论：AI次贷危机爆发，金融传染扩散",
-        "body": f'当前 OSCI = <span class="red"><b>{osci}</b></span>，系统崩塌阶段。智力税体系彻底解体，算力商品化导致巨头超级CapEx无法回笼，高杠杆数据中心资产开始暴雷。建议全面撤出AI概念高溢价权益资产，现金流向电力与实体产业。'
+        "title": "结论：货币化能力恶化，需联动 Straw 1 财务数据确认传导",
+        "body": f'当前 OSCI = <span class="red"><b>{osci}</b></span>，进入危机区间。开源对闭源的商业侵蚀已可量化。注意：Straw 2 只监控开源压缩，CASCADE 事件（GPU订单取消/数据中心减值/ABS风险）需要 Straw 1 资本开支异常同步触发才能确认。当前建议：监控云厂商下一份财报的 AI 服务收入增速与 inference gross margin。'
     }
 }
 
@@ -693,7 +695,7 @@ with lp:
     st.markdown(f"""<div class="panel">
   <div class="panel-title">⚙️ 检测逻辑</div>
 
-  <div class="logic-step"><div class="step-num">1</div><div class="step-text"><b>能力代差（×0.30）</b>：对比闭源与开源顶级模型在 MMLU、HumanEval、MATH 三项 benchmark 的均值差距</div></div>
+  <div class="logic-step"><div class="step-num">1</div><div class="step-text"><b>能力代差（×0.20）</b>：对比闭源与开源顶级模型在 MMLU、HumanEval、MATH 三项 benchmark 的均值差距</div></div>
   <div class="threshold-block">
     <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">代差 &gt; 12%</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
     <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">代差 6–12%</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
@@ -701,7 +703,7 @@ with lp:
     <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">代差 &lt; 2%</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
   </div>
 
-  <div class="logic-step" style="margin-top:14px;"><div class="step-num">2</div><div class="step-text"><b>价格压缩（×0.30）</b>：OpenRouter 实时价格，计算开源托管均价占闭源均价的比例</div></div>
+  <div class="logic-step" style="margin-top:14px;"><div class="step-num">2</div><div class="step-text"><b>价格压缩（×0.35）</b>：OpenRouter 实时价格，计算开源托管均价占闭源均价的比例</div></div>
   <div class="threshold-block">
     <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">开源价格 &gt; 70% 闭源</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
     <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">开源价格 45–70% 闭源</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
@@ -709,7 +711,7 @@ with lp:
     <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">开源价格 &lt; 25% 闭源</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
   </div>
 
-  <div class="logic-step" style="margin-top:14px;"><div class="step-num">3</div><div class="step-text"><b>部署动能（×0.25）</b>：GitHub stars 总量作为企业本地化迁移意图的领先指标</div></div>
+  <div class="logic-step" style="margin-top:14px;"><div class="step-num">3</div><div class="step-text"><b>部署动能（×0.30）</b>：GitHub stars 总量作为企业本地化迁移意图的领先指标</div></div>
   <div class="logic-step" style="margin-top:6px;"><div class="step-num">4</div><div class="step-text"><b>生态速度（×0.15）</b>：HuggingFace 顶级开源模型下载量，反映市场渗透加速度</div></div>
 
 </div>""", unsafe_allow_html=True)
@@ -719,7 +721,7 @@ with rp:
 
     categories = ["能力代差", "价格压缩", "部署动能", "生态速度"]
     scores     = [cap_s, price_s, deploy_s, vel_s]
-    weights    = [0.30, 0.30, 0.25, 0.15]
+    weights    = [0.20, 0.35, 0.30, 0.15]
     colors_bar = []
     for s in scores:
         if s < 25:
@@ -801,7 +803,32 @@ with rp:
 # 页脚
 # =========================================================
 
+# =========================================================
+# 底部注释：静态基准数据说明
+# =========================================================
+
+st.markdown(f"""
+<div style="margin-top: 28px; padding: 18px 22px; background: #0a0f1e;
+     border: 1px solid rgba(251,191,36,0.15); border-radius: 10px;
+     border-left: 3px solid #fbbf24;">
+  <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px; letter-spacing:0.5px;">
+    ⚠ 静态基准数据说明（能力代差指标）
+  </div>
+  <div style="font-size:13px; color:#64748b; line-height:1.9;">
+    <b style="color:#94a3b8;">当前数据：</b>
+    闭源基准 = {BENCHMARK_DATA["closed"]["name"]}（MMLU {BENCHMARK_DATA["closed"]["mmlu"]} / HumanEval {BENCHMARK_DATA["closed"]["humaneval"]} / MATH {BENCHMARK_DATA["closed"]["math"]}）<br>
+    <b style="color:#94a3b8;">对比模型：</b>
+    开源基准 = {BENCHMARK_DATA["open"]["name"]}（MMLU {BENCHMARK_DATA["open"]["mmlu"]} / HumanEval {BENCHMARK_DATA["open"]["humaneval"]} / MATH {BENCHMARK_DATA["open"]["math"]}）<br>
+    <b style="color:#94a3b8;">录入时间：</b>{BENCHMARK_DATA["closed"]["updated"]} &nbsp;·&nbsp;
+    <b style="color:#94a3b8;">建议更新频率：</b>每季度一次，或主要新模型发布后 &nbsp;·&nbsp;
+    <b style="color:#94a3b8;">更新位置：</b>代码顶部 BENCHMARK_DATA 字典<br>
+    <b style="color:#94a3b8;">权重说明：</b>能力代差仅占 OSCI 权重的 20%，且上限压至 60 分（商业粘性缓冲）。
+    Benchmark 追平不等于商业崩塌，企业迁移滞后周期约 12–18 个月。
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown(
-    f'<div class="footer-text">数据来源：OpenRouter API · GitHub REST API · HuggingFace API · Benchmark 手动维护 · 当前时间：{datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
+    f'<div class="footer-text">实时数据：OpenRouter API · GitHub REST API · HuggingFace API &nbsp;|&nbsp; 静态数据：Benchmark 手动维护（{BENCHMARK_DATA["closed"]["updated"]}）&nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
     unsafe_allow_html=True
 )
