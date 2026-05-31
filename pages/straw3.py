@@ -287,36 +287,32 @@ def get_reit_data():
     获取数据中心 REIT 估值压力数据
     EQIX = Equinix（全球最大数据中心REIT）
     DLR  = Digital Realty（第二大数据中心REIT）
+    使用 income-statement 获取营收数据，通过营收增速和毛利率判断压力
     """
     results = {}
     for ticker in ["EQIX", "DLR"]:
-        quote = fetch(f"{BASE}/quote/{ticker}?apikey={API_KEY}")
-        profile = fetch(f"{BASE}/profile/{ticker}?apikey={API_KEY}")
+        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
+        cashflow = fetch(f"{BASE}/cash-flow-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
 
-        if isinstance(quote, list) and quote:
-            q = quote[0]
-        elif isinstance(quote, dict):
-            q = quote
-        else:
+        if not isinstance(income, list) or len(income) < 2:
             continue
 
-        if isinstance(profile, list) and profile:
-            p = profile[0]
-        elif isinstance(profile, dict):
-            p = profile
-        else:
-            p = {}
+        rev_now    = safe(income[0], "revenue")
+        rev_prev   = safe(income[1], "revenue")
+        ebitda_now = safe(income[0], "ebitda")
+        capex_now  = abs(safe(cashflow[0], "capitalExpenditure")) if isinstance(cashflow, list) and cashflow else 0
+        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else 0
+        # 毛利率
+        gross_margin = safe(income[0], "grossProfitRatio") * 100
 
         results[ticker] = {
-            "price":        safe(q, "price"),
-            "change_pct":   safe(q, "changesPercentage"),
-            "year_high":    safe(q, "yearHigh"),
-            "year_low":     safe(q, "yearLow"),
-            "mkt_cap":      safe(q, "marketCap"),
-            "pe":           safe(q, "pe"),
-            "price_to_book": safe(p, "priceToBookRatio"),
-            "beta":         safe(p, "beta"),
-            "name":         q.get("name", ticker),
+            "rev_now":     rev_now,
+            "rev_growth":  rev_growth,
+            "gross_margin": gross_margin,
+            "ebitda":      ebitda_now,
+            "capex":       capex_now,
+            "period":      income[0].get("date", ""),
+            "name":        ticker,
         }
     return results if results else None
 
@@ -330,30 +326,22 @@ def get_liquid_cooling_data():
     """
     results = {}
     for ticker in ["VRT", "SMCI"]:
-        quote = fetch(f"{BASE}/quote/{ticker}?apikey={API_KEY}")
-        income = fetch(f"{BASE}/income-statement/{ticker}?limit=4&apikey={API_KEY}")
+        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
 
-        if isinstance(quote, list) and quote:
-            q = quote[0]
-        elif isinstance(quote, dict):
-            q = quote
-        else:
+        if not isinstance(income, list) or len(income) < 2:
             continue
 
-        rev_growth = None
-        if isinstance(income, list) and len(income) >= 2:
-            rev_now  = safe(income[0], "revenue")
-            rev_prev = safe(income[1], "revenue")
-            if rev_prev > 0:
-                rev_growth = (rev_now - rev_prev) / rev_prev * 100
+        rev_now  = safe(income[0], "revenue")
+        rev_prev = safe(income[1], "revenue")
+        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else None
+        gross_margin = safe(income[0], "grossProfitRatio") * 100
 
         results[ticker] = {
-            "price":      safe(q, "price"),
-            "change_pct": safe(q, "changesPercentage"),
-            "year_high":  safe(q, "yearHigh"),
-            "year_low":   safe(q, "yearLow"),
-            "rev_growth": rev_growth,
-            "name":       q.get("name", ticker),
+            "rev_growth":   rev_growth,
+            "gross_margin": gross_margin,
+            "rev_now":      rev_now,
+            "period":       income[0].get("date", ""),
+            "name":         ticker,
         }
     return results if results else None
 
@@ -363,25 +351,27 @@ def get_power_data():
     """
     获取电力基础设施数据
     NEE = NextEra Energy（最大可再生能源电力公司，数据中心重要供电方）
-    XLU = 电力公用事业ETF（整体板块信号）
+    SO  = Southern Company（另一大电力供应商）
+    用营收增速代理数据中心用电需求
     """
     results = {}
-    for ticker in ["NEE", "XLU"]:
-        quote = fetch(f"{BASE}/quote/{ticker}?apikey={API_KEY}")
+    for ticker in ["NEE", "SO"]:
+        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
 
-        if isinstance(quote, list) and quote:
-            q = quote[0]
-        elif isinstance(quote, dict):
-            q = quote
-        else:
+        if not isinstance(income, list) or len(income) < 2:
             continue
 
+        rev_now  = safe(income[0], "revenue")
+        rev_prev = safe(income[1], "revenue")
+        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else 0
+        op_margin = safe(income[0], "operatingIncomeRatio") * 100
+
         results[ticker] = {
-            "price":      safe(q, "price"),
-            "change_pct": safe(q, "changesPercentage"),
-            "year_high":  safe(q, "yearHigh"),
-            "year_low":   safe(q, "yearLow"),
-            "name":       q.get("name", ticker),
+            "rev_growth": rev_growth,
+            "op_margin":  op_margin,
+            "rev_now":    rev_now,
+            "period":     income[0].get("date", ""),
+            "name":       ticker,
         }
     return results if results else None
 
@@ -443,33 +433,41 @@ def score_aof(aof):
 
 def score_reit(reit_data):
     """
-    REIT压力评分：基于EQIX和DLR的综合信号
-    - 股价相对52周高点的跌幅
-    - 市净率水平
-    - 近期涨跌幅
+    REIT财务压力评分：基于EQIX/DLR的营收增速和毛利率
+    营收增速放缓 + 毛利率下降 = 底层资产变现能力恶化
+    这是数据中心资产重新定价的财务端信号
     """
     if not reit_data:
         return 50, "gray", "—", "N/A"
 
     scores = []
     for ticker, d in reit_data.items():
-        if d["year_high"] > 0:
-            from_high = (d["year_high"] - d["price"]) / d["year_high"] * 100
-        else:
-            from_high = 0
+        g = d.get("rev_growth", 0)
+        gm = d.get("gross_margin", 50)
 
-        # 偏离52周高点越大，风险越高
-        if from_high < 5:
-            s = 10
-        elif from_high < 15:
-            s = 30
-        elif from_high < 25:
-            s = 55
-        elif from_high < 35:
-            s = 75
+        # 营收增速越低风险越高
+        if g > 15:
+            gs = 10
+        elif g > 8:
+            gs = 30
+        elif g > 3:
+            gs = 55
+        elif g > 0:
+            gs = 70
         else:
-            s = 90
-        scores.append(s)
+            gs = 90
+
+        # 毛利率越低风险越高（REIT毛利率通常50-60%）
+        if gm > 55:
+            ms = 10
+        elif gm > 45:
+            ms = 30
+        elif gm > 35:
+            ms = 55
+        else:
+            ms = 80
+
+        scores.append(gs * 0.6 + ms * 0.4)
 
     avg = sum(scores) / len(scores) if scores else 50
 
@@ -525,35 +523,38 @@ def score_liquid(lc_data):
 
 def score_power(power_data):
     """
-    电力压力评分：基于NEE和XLU相对52周高点的位置
-    电力股强势 = 数据中心用电需求旺盛 = 功率密度压力真实存在
+    电力压力评分：基于NEE/SO的营收增速
+    电力公司收入增速加快 = 数据中心用电需求旺盛 = 功率密度危机的物理证据
     """
     if not power_data:
         return 30, "gray", "—", "N/A"
 
-    # 电力股越接近52周高点，说明数据中心用电需求越旺盛
-    # 这里是正向信号：电力股强势是功率密度压力的物理证据
     scores = []
     for ticker, d in power_data.items():
-        if d["year_high"] > 0 and d["year_low"] > 0:
-            rng = d["year_high"] - d["year_low"]
-            if rng > 0:
-                pos = (d["price"] - d["year_low"]) / rng * 100
-                scores.append(pos)
+        g = d.get("rev_growth", 0)
+        if g < 3:
+            s = 15
+        elif g < 8:
+            s = 35
+        elif g < 15:
+            s = 60
+        else:
+            s = 80
+        scores.append(s)
 
     if not scores:
         return 30, "gray", "—", "N/A"
 
     avg = sum(scores) / len(scores)
 
-    if avg < 30:
-        return round(avg * 0.5), "green", "↗", "SAFE"
-    elif avg < 60:
-        return round(avg * 0.6), "yellow", "→", "WATCH"
-    elif avg < 80:
-        return round(avg * 0.7), "orange", "↘", "WARNING"
+    if avg < 25:
+        return round(avg), "green", "↗", "SAFE"
+    elif avg < 45:
+        return round(avg), "yellow", "→", "WATCH"
+    elif avg < 65:
+        return round(avg), "orange", "↘", "WARNING"
     else:
-        return round(min(100, avg * 0.8)), "red", "↓", "CRITICAL"
+        return round(avg), "red", "↓", "CRITICAL"
 
 
 # =========================================================
@@ -653,15 +654,16 @@ with c1:
   </div>
 </div>""", unsafe_allow_html=True)
 
-# 卡片2：REIT 估值压力
+# 卡片2：REIT 财务压力
 with c2:
     if reit_data:
         eqix = reit_data.get("EQIX", {})
         dlr  = reit_data.get("DLR",  {})
-        eqix_from_high = round((eqix.get("year_high",0) - eqix.get("price",0)) / eqix.get("year_high",1) * 100, 1) if eqix.get("year_high",0) > 0 else 0
-        dlr_from_high  = round((dlr.get("year_high",0)  - dlr.get("price",0))  / dlr.get("year_high",1)  * 100, 1) if dlr.get("year_high",0) > 0 else 0
-        desc2 = f"EQIX 距52周高点 -{eqix_from_high:.1f}% · DLR 距高点 -{dlr_from_high:.1f}%<br>REIT折价幅度反映市场对底层资产的重新定价"
-        display2 = f"-{round((eqix_from_high+dlr_from_high)/2,1)}%"
+        eqix_g = eqix.get("rev_growth", 0)
+        dlr_g  = dlr.get("rev_growth",  0)
+        avg_g  = (eqix_g + dlr_g) / 2
+        desc2  = f"EQIX营收增速 {eqix_g:.1f}% · DLR增速 {dlr_g:.1f}%<br>增速放缓 = 底层资产变现能力恶化"
+        display2 = f"{avg_g:+.1f}%"
     else:
         desc2 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
         display2 = "N/A"
@@ -681,11 +683,11 @@ with c3:
         smci = lc_data.get("SMCI", {})
         vrt_g  = vrt.get("rev_growth")
         smci_g = smci.get("rev_growth")
-        vrt_str  = f"{vrt_g:.1f}%"  if vrt_g  is not None else "N/A"
-        smci_str = f"{smci_g:.1f}%" if smci_g is not None else "N/A"
-        desc3 = f"Vertiv营收增速 {vrt_str} · SMCI增速 {smci_str}<br>液冷厂商加速 = 风冷资产淘汰加速"
+        vrt_str  = f"{vrt_g:+.1f}%"  if vrt_g  is not None else "N/A"
+        smci_str = f"{smci_g:+.1f}%" if smci_g is not None else "N/A"
+        desc3 = f"Vertiv营收增速 {vrt_str} · SMCI增速 {smci_str}<br>液冷厂商爆发 = 风冷资产加速淘汰"
         avg_g = [x for x in [vrt_g, smci_g] if x is not None]
-        display3 = f"+{sum(avg_g)/len(avg_g):.1f}%" if avg_g else "N/A"
+        display3 = f"{sum(avg_g)/len(avg_g):+.1f}%" if avg_g else "N/A"
     else:
         desc3 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
         display3 = "N/A"
@@ -702,11 +704,12 @@ with c3:
 with c4:
     if power_data:
         nee = power_data.get("NEE", {})
-        xlu = power_data.get("XLU", {})
-        nee_chg = nee.get("change_pct", 0)
-        xlu_chg = xlu.get("change_pct", 0)
-        desc4 = f"NEE 今日 {nee_chg:+.2f}% · XLU 今日 {xlu_chg:+.2f}%<br>电力需求旺盛是数据中心功耗压力的物理证据"
-        display4 = f"{nee_chg:+.1f}%"
+        so  = power_data.get("SO",  {})
+        nee_g = nee.get("rev_growth", 0)
+        so_g  = so.get("rev_growth",  0)
+        avg_pg = (nee_g + so_g) / 2
+        desc4 = f"NEE营收增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>电力需求增速反映数据中心用电压力"
+        display4 = f"{avg_pg:+.1f}%"
     else:
         desc4 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"
@@ -900,8 +903,8 @@ with rp:
 """, unsafe_allow_html=True)
 
     # 数据来源标签
-    vrt_rev  = f"VRT营收增速: {lc_data['VRT']['rev_growth']:.1f}%"   if lc_data and 'VRT'  in lc_data and lc_data['VRT']['rev_growth']  is not None else "VRT: N/A"
-    smci_rev = f"SMCI营收增速: {lc_data['SMCI']['rev_growth']:.1f}%" if lc_data and 'SMCI' in lc_data and lc_data['SMCI']['rev_growth'] is not None else "SMCI: N/A"
+    vrt_rev  = f"VRT: {lc_data['VRT']['rev_growth']:+.1f}% YoY"   if lc_data and 'VRT'  in lc_data and lc_data['VRT']['rev_growth']  is not None else "VRT: N/A"
+    smci_rev = f"SMCI: {lc_data['SMCI']['rev_growth']:+.1f}% YoY" if lc_data and 'SMCI' in lc_data and lc_data['SMCI']['rev_growth'] is not None else "SMCI: N/A"
 
     st.markdown(f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
