@@ -4,6 +4,31 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # =========================================================
+# 全局基准参数（原代码缺失，此处补全）
+# =========================================================
+
+# 老机房风冷设计上限（kW/机柜）
+LEGACY_RACK_LIMIT_KW   = 20
+# 改造后风冷上限
+UPGRADED_RACK_LIMIT_KW = 40
+# 当前主流部署 GPU 型号
+CURRENT_DEPLOY_GPU     = "H100/H200"
+# 当前主流 GPU 机柜典型功率（kW）
+CURRENT_RACK_KW        = 80
+# AOF = 当前机柜功率 / 老机房上限
+AOF = round(CURRENT_RACK_KW / LEGACY_RACK_LIMIT_KW, 2)   # → 4.0x
+
+# GPU 代际功率密度数据
+GPU_GENERATIONS = [
+    {"gen": "V100\n(2017)",   "year": 2017, "rack_kw_min": 10,  "rack_kw_max": 20,  "status": "legacy"},
+    {"gen": "A100\n(2020)",   "year": 2020, "rack_kw_min": 20,  "rack_kw_max": 35,  "status": "legacy"},
+    {"gen": "H100\n(2022)",   "year": 2022, "rack_kw_min": 60,  "rack_kw_max": 100, "status": "active"},
+    {"gen": "H200\n(2024)",   "year": 2024, "rack_kw_min": 70,  "rack_kw_max": 120, "status": "current"},
+    {"gen": "B200\n(2025)",   "year": 2025, "rack_kw_min": 100, "rack_kw_max": 150, "status": "next"},
+    {"gen": "B300\n(2026e)",  "year": 2026, "rack_kw_min": 120, "rack_kw_max": 200, "status": "next"},
+]
+
+# =========================================================
 # 页面配置
 # =========================================================
 
@@ -13,7 +38,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# CSS — 与稻草一/二完全一致的黑金风格
+# CSS — 黑金风格
 # =========================================================
 
 st.markdown("""
@@ -200,20 +225,13 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     margin-left: 8px;
 }
 
-/* AOF 功率密度表格 */
-.gpu-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-.gpu-table th {
-    font-size: 12px; color: #475569; text-transform: uppercase;
-    letter-spacing: 0.5px; padding: 8px 12px; text-align: left;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+/* GPU 功率密度图例 */
+.legend-row {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    margin-top: 10px; padding: 10px 4px;
 }
-.gpu-table td {
-    font-size: 14px; color: #cbd5e1; padding: 9px 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
-}
-.gpu-table tr:last-child td { border-bottom: none; }
-.gpu-gen-active { color: #fbbf24; font-weight: 700; }
-.gpu-gen-danger { color: #ef4444; font-weight: 700; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
 #MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
@@ -223,8 +241,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# 数据获取配置 — Yahoo Finance（免费，无需API Key，支持所有股票）
-# 替代FMP原因：FMP免费套餐不支持EQIX/VRT/NEE等非科技股
+# 数据获取配置 — Yahoo Finance（免费，无需 API Key）
 # =========================================================
 
 YF_HEADERS = {
@@ -246,7 +263,6 @@ def fetch_yf_summary(ticker):
         result = data.get("quoteSummary", {}).get("result", [])
         if not result:
             return None
-        # 合并所有模块
         merged = {}
         for module in result[0].values():
             if isinstance(module, dict):
@@ -257,7 +273,7 @@ def fetch_yf_summary(ticker):
 
 
 def fetch_yf_chart(ticker):
-    """从 Yahoo Finance chart API 获取52周价格数据"""
+    """从 Yahoo Finance chart API 获取 52 周价格数据"""
     url = (
         f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}"
         f"?interval=1wk&range=1y"
@@ -269,17 +285,17 @@ def fetch_yf_chart(ticker):
         data = r.json()
         meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
         return {
-            "current_price":   meta.get("regularMarketPrice", 0),
-            "week52_high":     meta.get("fiftyTwoWeekHigh", 0),
-            "week52_low":      meta.get("fiftyTwoWeekLow", 0),
-            "prev_close":      meta.get("chartPreviousClose", 0),
+            "current_price": meta.get("regularMarketPrice", 0),
+            "week52_high":   meta.get("fiftyTwoWeekHigh", 0),
+            "week52_low":    meta.get("fiftyTwoWeekLow", 0),
+            "prev_close":    meta.get("chartPreviousClose", 0),
         }
     except Exception:
         return None
 
 
 def safe_raw(d, key, default=0):
-    """从Yahoo Finance的rawValue结构安全提取数值"""
+    """从 Yahoo Finance 的 rawValue 结构安全提取数值"""
     try:
         v = d.get(key, {})
         if isinstance(v, dict):
@@ -295,11 +311,7 @@ def safe_raw(d, key, default=0):
 
 @st.cache_data(ttl=3600)
 def get_reit_data():
-    """
-    数据中心REIT财务压力
-    EQIX = Equinix · DLR = Digital Realty
-    指标：营收增速、毛利率、债务覆盖率
-    """
+    """数据中心 REIT 财务压力：EQIX / DLR"""
     results = {}
     for ticker in ["EQIX", "DLR"]:
         summary = fetch_yf_summary(ticker)
@@ -307,9 +319,9 @@ def get_reit_data():
         if not summary and not chart:
             continue
 
-        rev_growth   = safe_raw(summary or {}, "revenueGrowth")    * 100 if summary else 0
-        gross_margin = safe_raw(summary or {}, "grossMargins")     * 100 if summary else 0
-        debt_equity  = safe_raw(summary or {}, "debtToEquity")             if summary else 0
+        rev_growth   = safe_raw(summary or {}, "revenueGrowth") * 100 if summary else 0
+        gross_margin = safe_raw(summary or {}, "grossMargins")  * 100 if summary else 0
+        debt_equity  = safe_raw(summary or {}, "debtToEquity")         if summary else 0
         current_p    = (chart or {}).get("current_price", 0)
         week52_high  = (chart or {}).get("week52_high",   0)
         week52_low   = (chart or {}).get("week52_low",    0)
@@ -331,11 +343,7 @@ def get_reit_data():
 
 @st.cache_data(ttl=3600)
 def get_liquid_cooling_data():
-    """
-    液冷设备厂商加速信号
-    VRT = Vertiv · SMCI = Super Micro Computer
-    指标：营收增速、毛利率、股价动能
-    """
+    """液冷设备厂商加速信号：VRT / SMCI"""
     results = {}
     for ticker in ["VRT", "SMCI"]:
         summary = fetch_yf_summary(ticker)
@@ -349,16 +357,15 @@ def get_liquid_cooling_data():
         week52_high  = (chart or {}).get("week52_high",   0)
         week52_low   = (chart or {}).get("week52_low",    0)
 
-        # 股价在52周区间的位置（越靠近高点说明市场越看好液冷）
         price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
                      if week52_high > week52_low else 50)
 
         results[ticker] = {
-            "rev_growth":   rev_growth,
-            "gross_margin": gross_margin,
+            "rev_growth":    rev_growth,
+            "gross_margin":  gross_margin,
             "current_price": current_p,
-            "week52_high":  week52_high,
-            "week52_low":   week52_low,
+            "week52_high":   week52_high,
+            "week52_low":    week52_low,
             "price_pos_pct": price_pos,
         }
     return results if results else None
@@ -366,11 +373,7 @@ def get_liquid_cooling_data():
 
 @st.cache_data(ttl=3600)
 def get_power_data():
-    """
-    电力基础设施压力信号
-    NEE = NextEra Energy · SO = Southern Company
-    指标：营收增速、股价动能
-    """
+    """电力基础设施压力信号：NEE / SO"""
     results = {}
     for ticker in ["NEE", "SO"]:
         summary = fetch_yf_summary(ticker)
@@ -378,11 +381,11 @@ def get_power_data():
         if not summary and not chart:
             continue
 
-        rev_growth  = safe_raw(summary or {}, "revenueGrowth") * 100 if summary else 0
-        op_margin   = safe_raw(summary or {}, "operatingMargins") * 100 if summary else 0
-        current_p   = (chart or {}).get("current_price", 0)
-        week52_high = (chart or {}).get("week52_high",   0)
-        week52_low  = (chart or {}).get("week52_low",    0)
+        rev_growth = safe_raw(summary or {}, "revenueGrowth")    * 100 if summary else 0
+        op_margin  = safe_raw(summary or {}, "operatingMargins") * 100 if summary else 0
+        current_p  = (chart or {}).get("current_price", 0)
+        week52_high = (chart or {}).get("week52_high",  0)
+        week52_low  = (chart or {}).get("week52_low",   0)
 
         price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
                      if week52_high > week52_low else 50)
@@ -397,19 +400,15 @@ def get_power_data():
         }
     return results if results else None
 
+
+# =========================================================
 # DCOI 评分计算
 # =========================================================
 
 def compute_dcoi(aof_score, reit_stress_score, liquid_signal_score, power_stress_score):
     """
-    DCOI = 0.25 x AOF功率压力 + 0.35 x REIT估值压力 + 0.25 x 液冷信号 + 0.15 x 电力压力
+    DCOI = 0.25×AOF功率压力 + 0.35×REIT估值压力 + 0.25×液冷信号 + 0.15×电力压力
     各分项 0-100，越高代表资产减值风险越大
-
-    权重逻辑：
-    REIT估值最重(0.35)：市场对底层资产的直接定价，最权威
-    AOF功率压力(0.25)：危机的物理根源，但传导有滞后
-    液冷信号(0.25)：市场用真金白银投票风冷时代结束
-    电力压力(0.15)：物理约束量化，辅助验证
     """
     dcoi = (0.25 * aof_score +
             0.35 * reit_stress_score +
@@ -434,10 +433,6 @@ def get_state(dcoi):
 # =========================================================
 
 def score_aof(aof):
-    """
-    AOF = 当前主流机柜功率 / 老机房设计上限
-    AOF < 1.5 -> SAFE(0分); AOF > 4.0 -> CRITICAL(100分)
-    """
     if aof < 1.5:
         return 0, "green", "↗", "SAFE"
     elif aof < 2.5:
@@ -452,11 +447,6 @@ def score_aof(aof):
 
 
 def score_reit(reit_data):
-    """
-    REIT压力评分：结合股价距52周高点跌幅 + 营收增速
-    跌幅越大 = 市场对底层资产重新定价越激进
-    营收增速越低 = 变现能力恶化
-    """
     if not reit_data:
         return 50, "gray", "—", "N/A"
 
@@ -465,7 +455,6 @@ def score_reit(reit_data):
         from_high = d.get("from_high_pct", 0)
         rev_g     = d.get("rev_growth", 5)
 
-        # 距52周高点跌幅越大风险越高
         if from_high < 5:
             ps = 10
         elif from_high < 15:
@@ -477,7 +466,6 @@ def score_reit(reit_data):
         else:
             ps = 95
 
-        # 营收增速越低风险越高
         if rev_g > 12:
             gs = 10
         elif rev_g > 6:
@@ -502,11 +490,6 @@ def score_reit(reit_data):
 
 
 def score_liquid(lc_data):
-    """
-    液冷信号评分：营收增速 + 股价在52周区间的位置
-    营收增速越高 = 液冷需求爆发 = 风冷淘汰加速
-    股价越接近高位 = 市场越看好液冷赛道
-    """
     if not lc_data:
         return 50, "gray", "—", "N/A"
 
@@ -515,7 +498,6 @@ def score_liquid(lc_data):
         g         = d.get("rev_growth", 0) or 0
         price_pos = d.get("price_pos_pct", 50)
 
-        # 营收增速越高风险越高（对旧资产而言）
         if g < 10:
             gs = 10
         elif g < 30:
@@ -527,7 +509,6 @@ def score_liquid(lc_data):
         else:
             gs = 90
 
-        # 股价越接近52周高点，液冷赛道热度越高
         if price_pos > 80:
             ps = 80
         elif price_pos > 60:
@@ -555,11 +536,6 @@ def score_liquid(lc_data):
 
 
 def score_power(power_data):
-    """
-    电力压力评分：营收增速 + 股价位置
-    电力公司营收加速 = 数据中心用电需求旺盛 = 功率密度危机物理证据
-    股价强势 = 市场对电力稀缺性定价
-    """
     if not power_data:
         return 30, "gray", "—", "N/A"
 
@@ -624,7 +600,7 @@ st.markdown(f"""
 # 数据加载
 # =========================================================
 
-with st.spinner("正在从 FMP API 拉取 REIT · 液冷厂商 · 电力数据..."):
+with st.spinner("正在从 Yahoo Finance 拉取 REIT · 液冷厂商 · 电力数据..."):
     reit_data  = get_reit_data()
     lc_data    = get_liquid_cooling_data()
     power_data = get_power_data()
@@ -710,13 +686,13 @@ with c2:
         avg_h  = (eqix_h + dlr_h) / 2
         eqix_g = eqix.get("rev_growth", 0)
         dlr_g  = dlr.get("rev_growth", 0)
-        desc2  = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {eqix_g:+.1f}% · DLR {dlr_g:+.1f}%"
+        desc2    = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {eqix_g:+.1f}% · DLR {dlr_g:+.1f}%"
         display2 = f"-{avg_h:.1f}%"
     else:
-        desc2 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
+        desc2    = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display2 = "N/A"
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">REIT 估值压力 <span class="source-tag">FMP</span></div>
+  <div class="metric-label">REIT 估值压力 <span class="source-tag">YF</span></div>
   <div class="metric-row">
     <span class="metric-number {reit_color}">{display2}</span>
     <span class="metric-arrow {reit_color}">{reit_arrow}</span>
@@ -729,19 +705,19 @@ with c3:
     if lc_data:
         vrt  = lc_data.get("VRT",  {})
         smci = lc_data.get("SMCI", {})
-        vrt_g  = vrt.get("rev_growth", 0)
-        smci_g = smci.get("rev_growth", 0)
+        vrt_g    = vrt.get("rev_growth", 0)
+        smci_g   = smci.get("rev_growth", 0)
         vrt_pos  = vrt.get("price_pos_pct", 50)
         smci_pos = smci.get("price_pos_pct", 50)
-        avg_g = (vrt_g + smci_g) / 2
-        desc3 = (f"Vertiv营收增速 {vrt_g:+.1f}% · SMCI {smci_g:+.1f}%<br>"
-                 f"股价位置 VRT {vrt_pos:.0f}% · SMCI {smci_pos:.0f}% (52周区间)")
+        avg_g    = (vrt_g + smci_g) / 2
+        desc3    = (f"Vertiv营收增速 {vrt_g:+.1f}% · SMCI {smci_g:+.1f}%<br>"
+                    f"股价位置 VRT {vrt_pos:.0f}% · SMCI {smci_pos:.0f}% (52周区间)")
         display3 = f"{avg_g:+.1f}%"
     else:
-        desc3 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
+        desc3    = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display3 = "N/A"
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">液冷加速信号 <span class="source-tag">FMP</span></div>
+  <div class="metric-label">液冷加速信号 <span class="source-tag">YF</span></div>
   <div class="metric-row">
     <span class="metric-number {lc_color}">{display3}</span>
     <span class="metric-arrow {lc_color}">{lc_arrow}</span>
@@ -759,14 +735,14 @@ with c4:
         nee_pos = nee.get("price_pos_pct", 50)
         so_pos  = so.get("price_pos_pct",  50)
         avg_pg  = (nee_g + so_g) / 2
-        desc4 = (f"NEE增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>"
-                 f"股价位置 NEE {nee_pos:.0f}% · SO {so_pos:.0f}% (52周区间)")
+        desc4   = (f"NEE增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>"
+                   f"股价位置 NEE {nee_pos:.0f}% · SO {so_pos:.0f}% (52周区间)")
         display4 = f"{avg_pg:+.1f}%"
     else:
-        desc4 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
+        desc4    = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">电力基础设施 <span class="source-tag">FMP</span></div>
+  <div class="metric-label">电力基础设施 <span class="source-tag">YF</span></div>
   <div class="metric-row">
     <span class="metric-number {power_color}">{display4}</span>
     <span class="metric-arrow {power_color}">{power_arrow}</span>
@@ -858,7 +834,7 @@ with lp:
   </div>
   <div class="logic-step" style="margin-top:6px;">
     <div class="step-num">4</div>
-    <div class="step-text"><b>电力压力（×0.15）</b>：NEE/XLU 相对强弱，电力需求旺盛是功率密度危机的物理证据</div>
+    <div class="step-text"><b>电力压力（×0.15）</b>：NEE/SO 相对强弱，电力需求旺盛是功率密度危机的物理证据</div>
   </div>
 
 </div>""", unsafe_allow_html=True)
@@ -866,12 +842,12 @@ with lp:
 with rp:
     st.markdown('<div class="panel"><div class="panel-title">⚡ GPU 功率密度代际跃迁（单机柜 kW）</div>', unsafe_allow_html=True)
 
-    gens        = [g["gen"]          for g in GPU_GENERATIONS]
-    rack_mid    = [(g["rack_kw_min"] + g["rack_kw_max"]) / 2 for g in GPU_GENERATIONS]
-    rack_min    = [g["rack_kw_min"]  for g in GPU_GENERATIONS]
-    rack_max    = [g["rack_kw_max"]  for g in GPU_GENERATIONS]
-    years       = [g["year"]         for g in GPU_GENERATIONS]
-    statuses    = [g["status"]       for g in GPU_GENERATIONS]
+    gens     = [g["gen"]          for g in GPU_GENERATIONS]
+    rack_mid = [(g["rack_kw_min"] + g["rack_kw_max"]) / 2 for g in GPU_GENERATIONS]
+    rack_min = [g["rack_kw_min"]  for g in GPU_GENERATIONS]
+    rack_max = [g["rack_kw_max"]  for g in GPU_GENERATIONS]
+    years    = [g["year"]         for g in GPU_GENERATIONS]
+    statuses = [g["status"]       for g in GPU_GENERATIONS]
 
     bar_colors = []
     for s in statuses:
@@ -881,24 +857,24 @@ with rp:
             bar_colors.append("#f97316")
         elif s == "current":
             bar_colors.append("#ef4444")
-        else:
+        else:                          # next
             bar_colors.append("#7c3aed")
 
     fig = go.Figure()
 
     # 风冷上限参考线
-    fig.add_shape(type="line", x0=-0.5, x1=5.5,
+    fig.add_shape(type="line", x0=-0.5, x1=len(gens) - 0.5,
                   y0=LEGACY_RACK_LIMIT_KW, y1=LEGACY_RACK_LIMIT_KW,
                   line=dict(color="#22c55e", width=1.5, dash="dash"))
-    fig.add_annotation(x=5.3, y=LEGACY_RACK_LIMIT_KW + 6,
+    fig.add_annotation(x=len(gens) - 0.6, y=LEGACY_RACK_LIMIT_KW + 6,
                        text=f"传统风冷上限 {LEGACY_RACK_LIMIT_KW}kW",
                        showarrow=False, font=dict(color="#22c55e", size=11), xanchor="right")
 
     # 改造后风冷上限
-    fig.add_shape(type="line", x0=-0.5, x1=5.5,
+    fig.add_shape(type="line", x0=-0.5, x1=len(gens) - 0.5,
                   y0=UPGRADED_RACK_LIMIT_KW, y1=UPGRADED_RACK_LIMIT_KW,
                   line=dict(color="#fbbf24", width=1.5, dash="dot"))
-    fig.add_annotation(x=5.3, y=UPGRADED_RACK_LIMIT_KW + 6,
+    fig.add_annotation(x=len(gens) - 0.6, y=UPGRADED_RACK_LIMIT_KW + 6,
                        text=f"改造风冷上限 {UPGRADED_RACK_LIMIT_KW}kW",
                        showarrow=False, font=dict(color="#fbbf24", size=11), xanchor="right")
 
@@ -946,60 +922,21 @@ with rp:
 
     # 图例说明
     st.markdown("""
-<div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:2px; padding: 0 4px;">
-  <span style="font-size:12px; color:#334155;">■ <span style="color:#94a3b8;">Legacy（已淘汰）</span></span>
-  <span style="font-size:12px; color:#f97316;">■ <span style="color:#94a3b8;">Active（主流在用）</span></span>
-  <span style="font-size:12px; color:#ef4444;">■ <span style="color:#94a3b8;">Current（最新部署）</span></span>
-  <span style="font-size:12px; color:#7c3aed;">■ <span style="color:#94a3b8;">Upcoming（路线图）</span></span>
+<div class="legend-row">
+  <div class="legend-item"><div class="legend-dot" style="background:#334155;"></div>历史世代（已淘汰）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div>当前主力部署</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div>最新一代（在售）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7c3aed;"></div>下一代（路线图）</div>
+</div>
 </div>
 """, unsafe_allow_html=True)
-
-    # 数据来源标签
-    vrt_rev  = f"VRT: {lc_data['VRT'].get('rev_growth',0):+.1f}% YoY"   if lc_data and 'VRT'  in lc_data else "VRT: N/A"
-    smci_rev = f"SMCI: {lc_data['SMCI'].get('rev_growth',0):+.1f}% YoY" if lc_data and 'SMCI' in lc_data else "SMCI: N/A"
-
-    st.markdown(f"""
-<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-  <span class="source-tag">Yahoo Finance ✓</span>
-  <span class="source-tag-warn">GPU规格 静态维护</span>
-  <span class="source-tag-gray">{vrt_rev}</span>
-  <span class="source-tag-gray">{smci_rev}</span>
-  <span class="source-tag-gray">AOF={AOF}x · 基准期 {AOF_UPDATED}</span>
-</div>
-""", unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================================================
-# 底部注释：静态基准数据说明
+# 页脚
 # =========================================================
 
 st.markdown(f"""
-<div style="margin-top: 28px; padding: 18px 22px; background: #0a0f1e;
-     border: 1px solid rgba(251,191,36,0.15); border-radius: 10px;
-     border-left: 3px solid #fbbf24;">
-  <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px; letter-spacing:0.5px;">
-    ⚠ 静态基准数据说明（AOF 资产淘汰系数）
-  </div>
-  <div style="font-size:13px; color:#64748b; line-height:1.9;">
-    <b style="color:#94a3b8;">当前基准：</b>
-    主流部署 GPU = {CURRENT_DEPLOY_GPU}，典型机柜功率 = {CURRENT_RACK_KW}kW &nbsp;·&nbsp;
-    传统风冷机房设计上限 = {LEGACY_RACK_LIMIT_KW}kW（行业公认工程标准）<br>
-    <b style="color:#94a3b8;">AOF计算：</b>
-    {CURRENT_RACK_KW}kW ÷ {LEGACY_RACK_LIMIT_KW}kW = <b style="color:#fbbf24;">{AOF}x</b> &nbsp;·&nbsp;
-    含义：老机房需要改造才能运行当前主流 GPU，改造成本接近新建时 AOF ≥ 4x<br>
-    <b style="color:#94a3b8;">数据来源：</b>NVIDIA 官方规格表 &nbsp;·&nbsp;
-    <b style="color:#94a3b8;">录入时间：</b>{AOF_UPDATED} &nbsp;·&nbsp;
-    <b style="color:#94a3b8;">建议更新频率：</b>每次 NVIDIA 发布新架构后更新（约每年 1-2 次）<br>
-    <b style="color:#94a3b8;">更新位置：</b>代码顶部 GPU_GENERATIONS 列表 和 CURRENT_DEPLOY_GPU / CURRENT_RACK_KW 变量<br>
-    <b style="color:#94a3b8;">无法自动获取的数据：</b>
-    CMBS/ABS信用利差（需Bloomberg终端）· 液冷渗透率（Uptime Institute付费报告）·
-    改造成本per MW（工程报价，无公开API）。以上三项用 REIT市场定价 + 液冷厂商营收 作为代理指标。
-  </div>
+<div class="footer-text">
+  数据来源：Yahoo Finance · 更新频率：每小时 · AOF 基准参数需人工校准 · 本页面仅供研究参考，不构成投资建议
 </div>
 """, unsafe_allow_html=True)
-
-st.markdown(
-    f'<div class="footer-text">实时数据：Yahoo Finance（EQIX · DLR · VRT · SMCI · NEE · SO）&nbsp;|&nbsp; 静态数据：NVIDIA GPU规格（{AOF_UPDATED}）&nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
-    unsafe_allow_html=True
-)
