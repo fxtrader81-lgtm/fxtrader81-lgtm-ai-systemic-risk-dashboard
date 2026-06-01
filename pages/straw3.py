@@ -583,6 +583,20 @@ with st.spinner("正在从 FMP API 拉取 REIT · 液冷厂商 · 电力数据..
     lc_data    = get_liquid_cooling_data()
     power_data = get_power_data()
 
+# 调试面板（临时）— 确认数据后删除
+with st.expander("🔧 调试：API原始返回", expanded=True):
+    st.write("**REIT data:**", reit_data)
+    st.write("**Liquid cooling data:**", lc_data)
+    st.write("**Power data:**", power_data)
+    import requests as _req
+    for _ticker in ["EQIX", "VRT", "NEE"]:
+        _url = f"{BASE}/income-statement?symbol={_ticker}&limit=2&apikey={API_KEY}"
+        try:
+            _r = _req.get(_url, timeout=10)
+            st.write(f"**{_ticker}:** status={_r.status_code} | {_r.text[:300]}")
+        except Exception as _e:
+            st.write(f"**{_ticker} error:** {_e}")
+
 # =========================================================
 # 各分项评分
 # =========================================================
