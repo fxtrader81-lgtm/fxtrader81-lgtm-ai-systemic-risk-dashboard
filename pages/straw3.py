@@ -223,96 +223,108 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 """, unsafe_allow_html=True)
 
 # =========================================================
-# FMP API 配置（与稻草一相同）
+# 数据获取配置 — Yahoo Finance（免费，无需API Key，支持所有股票）
+# 替代FMP原因：FMP免费套餐不支持EQIX/VRT/NEE等非科技股
 # =========================================================
 
-API_KEY = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
-BASE    = "https://financialmodelingprep.com/stable"
+YF_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "application/json",
+}
 
-# =========================================================
-# 静态基准数据（手动维护）
-# GPU 功率密度代际表 — 数据来自 NVIDIA 官方规格
-# 更新频率：每次 NVIDIA 发布新架构后更新，约每年 1-2 次
-# =========================================================
-
-GPU_GENERATIONS = [
-    {"gen": "V100",    "tdp_w": 300,  "rack_kw_min": 10, "rack_kw_max": 20,  "year": 2017, "status": "legacy"},
-    {"gen": "A100",    "tdp_w": 400,  "rack_kw_min": 20, "rack_kw_max": 30,  "year": 2020, "status": "legacy"},
-    {"gen": "H100",    "tdp_w": 700,  "rack_kw_min": 40, "rack_kw_max": 80,  "year": 2022, "status": "active"},
-    {"gen": "H200",    "tdp_w": 1000, "rack_kw_min": 60, "rack_kw_max": 100, "year": 2024, "status": "active"},
-    {"gen": "B200",    "tdp_w": 1200, "rack_kw_min": 100,"rack_kw_max": 140, "year": 2024, "status": "current"},
-    {"gen": "Rubin",   "tdp_w": 1400, "rack_kw_min": 180,"rack_kw_max": 220, "year": 2026, "status": "upcoming"},
-]
-
-# 传统风冷机房设计功率上限（行业公认工程标准）
-LEGACY_RACK_LIMIT_KW = 25   # 传统风冷机房单机柜上限（kW）
-UPGRADED_RACK_LIMIT_KW = 50 # 改造后风冷机房单机柜上限（kW）
-LIQUID_RACK_LIMIT_KW   = 200 # 液冷机房单机柜上限（kW）
-
-# 当前主流部署 GPU（用于计算 AOF）
-CURRENT_DEPLOY_GPU = "H100"
-CURRENT_RACK_KW    = 60   # H100 典型部署机柜功率
-
-# AOF 计算：当前主流部署功率 ÷ 老机房设计上限
-AOF = round(CURRENT_RACK_KW / LEGACY_RACK_LIMIT_KW, 1)
-AOF_UPDATED = "2025-01"
-
-# =========================================================
-# 工具函数
-# =========================================================
-
-def fetch(url):
+def fetch_yf_summary(ticker):
+    """从 Yahoo Finance quoteSummary 获取股票关键财务指标"""
+    url = (
+        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+        f"?modules=financialData,defaultKeyStatistics,summaryDetail,price"
+    )
     try:
-        r = requests.get(url, timeout=10)
-        if r.status_code == 200:
-            return r.json()
-        return None
-    except:
+        r = requests.get(url, headers=YF_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        result = data.get("quoteSummary", {}).get("result", [])
+        if not result:
+            return None
+        # 合并所有模块
+        merged = {}
+        for module in result[0].values():
+            if isinstance(module, dict):
+                merged.update(module)
+        return merged
+    except Exception:
         return None
 
-def safe(x, k, default=0):
+
+def fetch_yf_chart(ticker):
+    """从 Yahoo Finance chart API 获取52周价格数据"""
+    url = (
+        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}"
+        f"?interval=1wk&range=1y"
+    )
     try:
-        v = x.get(k, default)
+        r = requests.get(url, headers=YF_HEADERS, timeout=10)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+        return {
+            "current_price":   meta.get("regularMarketPrice", 0),
+            "week52_high":     meta.get("fiftyTwoWeekHigh", 0),
+            "week52_low":      meta.get("fiftyTwoWeekLow", 0),
+            "prev_close":      meta.get("chartPreviousClose", 0),
+        }
+    except Exception:
+        return None
+
+
+def safe_raw(d, key, default=0):
+    """从Yahoo Finance的rawValue结构安全提取数值"""
+    try:
+        v = d.get(key, {})
+        if isinstance(v, dict):
+            return float(v.get("raw", default))
         return float(v) if v is not None else default
-    except:
+    except Exception:
         return default
 
+
 # =========================================================
-# 数据获取函数
+# 三大指标数据获取函数
 # =========================================================
 
 @st.cache_data(ttl=3600)
 def get_reit_data():
     """
-    获取数据中心 REIT 估值压力数据
-    EQIX = Equinix（全球最大数据中心REIT）
-    DLR  = Digital Realty（第二大数据中心REIT）
-    使用 income-statement 获取营收数据，通过营收增速和毛利率判断压力
+    数据中心REIT财务压力
+    EQIX = Equinix · DLR = Digital Realty
+    指标：营收增速、毛利率、债务覆盖率
     """
     results = {}
     for ticker in ["EQIX", "DLR"]:
-        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
-        cashflow = fetch(f"{BASE}/cash-flow-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
-
-        if not isinstance(income, list) or len(income) < 2:
+        summary = fetch_yf_summary(ticker)
+        chart   = fetch_yf_chart(ticker)
+        if not summary and not chart:
             continue
 
-        rev_now    = safe(income[0], "revenue")
-        rev_prev   = safe(income[1], "revenue")
-        ebitda_now = safe(income[0], "ebitda")
-        capex_now  = abs(safe(cashflow[0], "capitalExpenditure")) if isinstance(cashflow, list) and cashflow else 0
-        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else 0
-        # 毛利率
-        gross_margin = safe(income[0], "grossProfitRatio") * 100
+        rev_growth   = safe_raw(summary or {}, "revenueGrowth")    * 100 if summary else 0
+        gross_margin = safe_raw(summary or {}, "grossMargins")     * 100 if summary else 0
+        debt_equity  = safe_raw(summary or {}, "debtToEquity")             if summary else 0
+        current_p    = (chart or {}).get("current_price", 0)
+        week52_high  = (chart or {}).get("week52_high",   0)
+        week52_low   = (chart or {}).get("week52_low",    0)
+
+        from_high = ((week52_high - current_p) / week52_high * 100
+                     if week52_high > 0 else 0)
 
         results[ticker] = {
-            "rev_now":     rev_now,
-            "rev_growth":  rev_growth,
-            "gross_margin": gross_margin,
-            "ebitda":      ebitda_now,
-            "capex":       capex_now,
-            "period":      income[0].get("date", ""),
-            "name":        ticker,
+            "rev_growth":    rev_growth,
+            "gross_margin":  gross_margin,
+            "debt_equity":   debt_equity,
+            "current_price": current_p,
+            "week52_high":   week52_high,
+            "week52_low":    week52_low,
+            "from_high_pct": from_high,
         }
     return results if results else None
 
@@ -320,28 +332,34 @@ def get_reit_data():
 @st.cache_data(ttl=3600)
 def get_liquid_cooling_data():
     """
-    获取液冷设备厂商财务数据
-    VRT  = Vertiv（全球最大液冷基础设施供应商）
-    SMCI = Super Micro Computer（液冷服务器领先厂商）
+    液冷设备厂商加速信号
+    VRT = Vertiv · SMCI = Super Micro Computer
+    指标：营收增速、毛利率、股价动能
     """
     results = {}
     for ticker in ["VRT", "SMCI"]:
-        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
-
-        if not isinstance(income, list) or len(income) < 2:
+        summary = fetch_yf_summary(ticker)
+        chart   = fetch_yf_chart(ticker)
+        if not summary and not chart:
             continue
 
-        rev_now  = safe(income[0], "revenue")
-        rev_prev = safe(income[1], "revenue")
-        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else None
-        gross_margin = safe(income[0], "grossProfitRatio") * 100
+        rev_growth   = safe_raw(summary or {}, "revenueGrowth") * 100 if summary else 0
+        gross_margin = safe_raw(summary or {}, "grossMargins")  * 100 if summary else 0
+        current_p    = (chart or {}).get("current_price", 0)
+        week52_high  = (chart or {}).get("week52_high",   0)
+        week52_low   = (chart or {}).get("week52_low",    0)
+
+        # 股价在52周区间的位置（越靠近高点说明市场越看好液冷）
+        price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
+                     if week52_high > week52_low else 50)
 
         results[ticker] = {
             "rev_growth":   rev_growth,
             "gross_margin": gross_margin,
-            "rev_now":      rev_now,
-            "period":       income[0].get("date", ""),
-            "name":         ticker,
+            "current_price": current_p,
+            "week52_high":  week52_high,
+            "week52_low":   week52_low,
+            "price_pos_pct": price_pos,
         }
     return results if results else None
 
@@ -349,34 +367,36 @@ def get_liquid_cooling_data():
 @st.cache_data(ttl=3600)
 def get_power_data():
     """
-    获取电力基础设施数据
-    NEE = NextEra Energy（最大可再生能源电力公司，数据中心重要供电方）
-    SO  = Southern Company（另一大电力供应商）
-    用营收增速代理数据中心用电需求
+    电力基础设施压力信号
+    NEE = NextEra Energy · SO = Southern Company
+    指标：营收增速、股价动能
     """
     results = {}
     for ticker in ["NEE", "SO"]:
-        income = fetch(f"{BASE}/income-statement?symbol={ticker}&limit=4&apikey={API_KEY}")
-
-        if not isinstance(income, list) or len(income) < 2:
+        summary = fetch_yf_summary(ticker)
+        chart   = fetch_yf_chart(ticker)
+        if not summary and not chart:
             continue
 
-        rev_now  = safe(income[0], "revenue")
-        rev_prev = safe(income[1], "revenue")
-        rev_growth = (rev_now - rev_prev) / rev_prev * 100 if rev_prev > 0 else 0
-        op_margin = safe(income[0], "operatingIncomeRatio") * 100
+        rev_growth  = safe_raw(summary or {}, "revenueGrowth") * 100 if summary else 0
+        op_margin   = safe_raw(summary or {}, "operatingMargins") * 100 if summary else 0
+        current_p   = (chart or {}).get("current_price", 0)
+        week52_high = (chart or {}).get("week52_high",   0)
+        week52_low  = (chart or {}).get("week52_low",    0)
+
+        price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
+                     if week52_high > week52_low else 50)
 
         results[ticker] = {
-            "rev_growth": rev_growth,
-            "op_margin":  op_margin,
-            "rev_now":    rev_now,
-            "period":     income[0].get("date", ""),
-            "name":       ticker,
+            "rev_growth":    rev_growth,
+            "op_margin":     op_margin,
+            "current_price": current_p,
+            "week52_high":   week52_high,
+            "week52_low":    week52_low,
+            "price_pos_pct": price_pos,
         }
     return results if results else None
 
-
-# =========================================================
 # DCOI 评分计算
 # =========================================================
 
@@ -433,41 +453,41 @@ def score_aof(aof):
 
 def score_reit(reit_data):
     """
-    REIT财务压力评分：基于EQIX/DLR的营收增速和毛利率
-    营收增速放缓 + 毛利率下降 = 底层资产变现能力恶化
-    这是数据中心资产重新定价的财务端信号
+    REIT压力评分：结合股价距52周高点跌幅 + 营收增速
+    跌幅越大 = 市场对底层资产重新定价越激进
+    营收增速越低 = 变现能力恶化
     """
     if not reit_data:
         return 50, "gray", "—", "N/A"
 
     scores = []
     for ticker, d in reit_data.items():
-        g = d.get("rev_growth", 0)
-        gm = d.get("gross_margin", 50)
+        from_high = d.get("from_high_pct", 0)
+        rev_g     = d.get("rev_growth", 5)
+
+        # 距52周高点跌幅越大风险越高
+        if from_high < 5:
+            ps = 10
+        elif from_high < 15:
+            ps = 35
+        elif from_high < 25:
+            ps = 60
+        elif from_high < 40:
+            ps = 80
+        else:
+            ps = 95
 
         # 营收增速越低风险越高
-        if g > 15:
+        if rev_g > 12:
             gs = 10
-        elif g > 8:
+        elif rev_g > 6:
             gs = 30
-        elif g > 3:
+        elif rev_g > 0:
             gs = 55
-        elif g > 0:
-            gs = 70
         else:
-            gs = 90
+            gs = 80
 
-        # 毛利率越低风险越高（REIT毛利率通常50-60%）
-        if gm > 55:
-            ms = 10
-        elif gm > 45:
-            ms = 30
-        elif gm > 35:
-            ms = 55
-        else:
-            ms = 80
-
-        scores.append(gs * 0.6 + ms * 0.4)
+        scores.append(ps * 0.65 + gs * 0.35)
 
     avg = sum(scores) / len(scores) if scores else 50
 
@@ -483,33 +503,46 @@ def score_reit(reit_data):
 
 def score_liquid(lc_data):
     """
-    液冷信号评分：基于Vertiv和SMCI的营收增速与价格动能
-    营收增速越高 = 液冷需求越爆发 = 风冷淘汰越快
+    液冷信号评分：营收增速 + 股价在52周区间的位置
+    营收增速越高 = 液冷需求爆发 = 风冷淘汰加速
+    股价越接近高位 = 市场越看好液冷赛道
     """
     if not lc_data:
         return 50, "gray", "—", "N/A"
 
-    growth_scores = []
+    scores = []
     for ticker, d in lc_data.items():
-        if d["rev_growth"] is None:
-            continue
-        g = d["rev_growth"]
-        if g < 10:
-            s = 10
-        elif g < 30:
-            s = 30
-        elif g < 60:
-            s = 55
-        elif g < 100:
-            s = 75
-        else:
-            s = 90
-        growth_scores.append(s)
+        g         = d.get("rev_growth", 0) or 0
+        price_pos = d.get("price_pos_pct", 50)
 
-    if not growth_scores:
+        # 营收增速越高风险越高（对旧资产而言）
+        if g < 10:
+            gs = 10
+        elif g < 30:
+            gs = 30
+        elif g < 60:
+            gs = 55
+        elif g < 100:
+            gs = 75
+        else:
+            gs = 90
+
+        # 股价越接近52周高点，液冷赛道热度越高
+        if price_pos > 80:
+            ps = 80
+        elif price_pos > 60:
+            ps = 60
+        elif price_pos > 40:
+            ps = 40
+        else:
+            ps = 20
+
+        scores.append(gs * 0.65 + ps * 0.35)
+
+    if not scores:
         return 50, "gray", "—", "N/A"
 
-    avg = sum(growth_scores) / len(growth_scores)
+    avg = sum(scores) / len(scores)
 
     if avg < 25:
         return round(avg), "green", "↗", "SAFE"
@@ -523,24 +556,37 @@ def score_liquid(lc_data):
 
 def score_power(power_data):
     """
-    电力压力评分：基于NEE/SO的营收增速
-    电力公司收入增速加快 = 数据中心用电需求旺盛 = 功率密度危机的物理证据
+    电力压力评分：营收增速 + 股价位置
+    电力公司营收加速 = 数据中心用电需求旺盛 = 功率密度危机物理证据
+    股价强势 = 市场对电力稀缺性定价
     """
     if not power_data:
         return 30, "gray", "—", "N/A"
 
     scores = []
     for ticker, d in power_data.items():
-        g = d.get("rev_growth", 0)
+        g         = d.get("rev_growth", 0) or 0
+        price_pos = d.get("price_pos_pct", 50)
+
         if g < 3:
-            s = 15
+            gs = 15
         elif g < 8:
-            s = 35
+            gs = 35
         elif g < 15:
-            s = 60
+            gs = 60
         else:
-            s = 80
-        scores.append(s)
+            gs = 80
+
+        if price_pos > 75:
+            ps = 70
+        elif price_pos > 50:
+            ps = 50
+        elif price_pos > 25:
+            ps = 30
+        else:
+            ps = 15
+
+        scores.append(gs * 0.6 + ps * 0.4)
 
     if not scores:
         return 30, "gray", "—", "N/A"
@@ -582,20 +628,6 @@ with st.spinner("正在从 FMP API 拉取 REIT · 液冷厂商 · 电力数据..
     reit_data  = get_reit_data()
     lc_data    = get_liquid_cooling_data()
     power_data = get_power_data()
-
-# 调试面板（临时）— 确认数据后删除
-with st.expander("🔧 调试：API原始返回", expanded=True):
-    st.write("**REIT data:**", reit_data)
-    st.write("**Liquid cooling data:**", lc_data)
-    st.write("**Power data:**", power_data)
-    import requests as _req
-    for _ticker in ["EQIX", "VRT", "NEE"]:
-        _url = f"{BASE}/income-statement?symbol={_ticker}&limit=2&apikey={API_KEY}"
-        try:
-            _r = _req.get(_url, timeout=10)
-            st.write(f"**{_ticker}:** status={_r.status_code} | {_r.text[:300]}")
-        except Exception as _e:
-            st.write(f"**{_ticker} error:** {_e}")
 
 # =========================================================
 # 各分项评分
@@ -668,18 +700,20 @@ with c1:
   </div>
 </div>""", unsafe_allow_html=True)
 
-# 卡片2：REIT 财务压力
+# 卡片2：REIT 价格压力
 with c2:
     if reit_data:
         eqix = reit_data.get("EQIX", {})
         dlr  = reit_data.get("DLR",  {})
+        eqix_h = eqix.get("from_high_pct", 0)
+        dlr_h  = dlr.get("from_high_pct",  0)
+        avg_h  = (eqix_h + dlr_h) / 2
         eqix_g = eqix.get("rev_growth", 0)
-        dlr_g  = dlr.get("rev_growth",  0)
-        avg_g  = (eqix_g + dlr_g) / 2
-        desc2  = f"EQIX营收增速 {eqix_g:.1f}% · DLR增速 {dlr_g:.1f}%<br>增速放缓 = 底层资产变现能力恶化"
-        display2 = f"{avg_g:+.1f}%"
+        dlr_g  = dlr.get("rev_growth", 0)
+        desc2  = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {eqix_g:+.1f}% · DLR {dlr_g:+.1f}%"
+        display2 = f"-{avg_h:.1f}%"
     else:
-        desc2 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
+        desc2 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display2 = "N/A"
     st.markdown(f"""<div class="metric-card">
   <div class="metric-label">REIT 估值压力 <span class="source-tag">FMP</span></div>
@@ -695,15 +729,16 @@ with c3:
     if lc_data:
         vrt  = lc_data.get("VRT",  {})
         smci = lc_data.get("SMCI", {})
-        vrt_g  = vrt.get("rev_growth")
-        smci_g = smci.get("rev_growth")
-        vrt_str  = f"{vrt_g:+.1f}%"  if vrt_g  is not None else "N/A"
-        smci_str = f"{smci_g:+.1f}%" if smci_g is not None else "N/A"
-        desc3 = f"Vertiv营收增速 {vrt_str} · SMCI增速 {smci_str}<br>液冷厂商爆发 = 风冷资产加速淘汰"
-        avg_g = [x for x in [vrt_g, smci_g] if x is not None]
-        display3 = f"{sum(avg_g)/len(avg_g):+.1f}%" if avg_g else "N/A"
+        vrt_g  = vrt.get("rev_growth", 0)
+        smci_g = smci.get("rev_growth", 0)
+        vrt_pos  = vrt.get("price_pos_pct", 50)
+        smci_pos = smci.get("price_pos_pct", 50)
+        avg_g = (vrt_g + smci_g) / 2
+        desc3 = (f"Vertiv营收增速 {vrt_g:+.1f}% · SMCI {smci_g:+.1f}%<br>"
+                 f"股价位置 VRT {vrt_pos:.0f}% · SMCI {smci_pos:.0f}% (52周区间)")
+        display3 = f"{avg_g:+.1f}%"
     else:
-        desc3 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
+        desc3 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display3 = "N/A"
     st.markdown(f"""<div class="metric-card">
   <div class="metric-label">液冷加速信号 <span class="source-tag">FMP</span></div>
@@ -719,13 +754,16 @@ with c4:
     if power_data:
         nee = power_data.get("NEE", {})
         so  = power_data.get("SO",  {})
-        nee_g = nee.get("rev_growth", 0)
-        so_g  = so.get("rev_growth",  0)
-        avg_pg = (nee_g + so_g) / 2
-        desc4 = f"NEE营收增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>电力需求增速反映数据中心用电压力"
+        nee_g   = nee.get("rev_growth", 0)
+        so_g    = so.get("rev_growth",  0)
+        nee_pos = nee.get("price_pos_pct", 50)
+        so_pos  = so.get("price_pos_pct",  50)
+        avg_pg  = (nee_g + so_g) / 2
+        desc4 = (f"NEE增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>"
+                 f"股价位置 NEE {nee_pos:.0f}% · SO {so_pos:.0f}% (52周区间)")
         display4 = f"{avg_pg:+.1f}%"
     else:
-        desc4 = "FMP API 数据暂时无法获取<br>请稍后刷新重试"
+        desc4 = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"
     st.markdown(f"""<div class="metric-card">
   <div class="metric-label">电力基础设施 <span class="source-tag">FMP</span></div>
@@ -917,12 +955,12 @@ with rp:
 """, unsafe_allow_html=True)
 
     # 数据来源标签
-    vrt_rev  = f"VRT: {lc_data['VRT']['rev_growth']:+.1f}% YoY"   if lc_data and 'VRT'  in lc_data and lc_data['VRT']['rev_growth']  is not None else "VRT: N/A"
-    smci_rev = f"SMCI: {lc_data['SMCI']['rev_growth']:+.1f}% YoY" if lc_data and 'SMCI' in lc_data and lc_data['SMCI']['rev_growth'] is not None else "SMCI: N/A"
+    vrt_rev  = f"VRT: {lc_data['VRT'].get('rev_growth',0):+.1f}% YoY"   if lc_data and 'VRT'  in lc_data else "VRT: N/A"
+    smci_rev = f"SMCI: {lc_data['SMCI'].get('rev_growth',0):+.1f}% YoY" if lc_data and 'SMCI' in lc_data else "SMCI: N/A"
 
     st.markdown(f"""
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-  <span class="source-tag">FMP API ✓</span>
+  <span class="source-tag">Yahoo Finance ✓</span>
   <span class="source-tag-warn">GPU规格 静态维护</span>
   <span class="source-tag-gray">{vrt_rev}</span>
   <span class="source-tag-gray">{smci_rev}</span>
@@ -962,6 +1000,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 st.markdown(
-    f'<div class="footer-text">实时数据：FMP API（EQIX · DLR · VRT · SMCI · NEE · XLU）&nbsp;|&nbsp; 静态数据：NVIDIA GPU规格（{AOF_UPDATED}）&nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
+    f'<div class="footer-text">实时数据：Yahoo Finance（EQIX · DLR · VRT · SMCI · NEE · SO）&nbsp;|&nbsp; 静态数据：NVIDIA GPU规格（{AOF_UPDATED}）&nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
     unsafe_allow_html=True
 )
