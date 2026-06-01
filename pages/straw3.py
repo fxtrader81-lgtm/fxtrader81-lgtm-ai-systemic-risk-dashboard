@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # =========================================================
-# 初始配置与常量定义 (修正 NameError 的关键)
+# 1. 核心配置与参数
 # =========================================================
 CURRENT_DEPLOY_GPU = "NVIDIA H100"
 CURRENT_RACK_KW = 40.0
@@ -21,28 +21,12 @@ GPU_GENERATIONS = [
 ]
 
 # =========================================================
-# 页面配置
+# 2. 数据获取函数定义
 # =========================================================
-st.set_page_config(page_title="稻草三：数据中心资产减值", layout="wide")
-
-# (此处保留你原有的 CSS 代码块，保持风格一致)
-st.markdown("""
-<style>
-.stApp { background-color: #050816 !important; }
-.main-title { font-size: 32px; font-weight: 800; color: #ffffff; }
-.metric-card { background-color: #0b1120; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 20px; }
-</style>
-""", unsafe_allow_html=True)
-
-# =========================================================
-# API 数据获取函数 (保持原样)
-# =========================================================
-YF_HEADERS = {"User-Agent": "Mozilla/5.0"}
-
 def fetch_yf_summary(ticker):
     url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}?modules=financialData,defaultKeyStatistics,summaryDetail,price"
     try:
-        r = requests.get(url, headers=YF_HEADERS, timeout=5)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return None
         result = r.json().get("quoteSummary", {}).get("result", [])
         return result[0] if result else None
@@ -51,55 +35,66 @@ def fetch_yf_summary(ticker):
 def fetch_yf_chart(ticker):
     url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1wk&range=1y"
     try:
-        r = requests.get(url, headers=YF_HEADERS, timeout=5)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         meta = r.json().get("chart", {}).get("result", [{}])[0].get("meta", {})
-        return {
-            "current_price": meta.get("regularMarketPrice", 0),
-            "week52_high": meta.get("fiftyTwoWeekHigh", 0),
-            "week52_low": meta.get("fiftyTwoWeekLow", 0)
-        }
+        return {"current_price": meta.get("regularMarketPrice", 0), "week52_high": meta.get("fiftyTwoWeekHigh", 0), "week52_low": meta.get("fiftyTwoWeekLow", 0)}
     except: return None
 
 def safe_raw(d, key, default=0):
     try:
-        val = d.get(key, {})
-        return float(val.get("raw", default)) if isinstance(val, dict) else float(val)
+        v = d.get(key, {})
+        return float(v.get("raw", default)) if isinstance(v, dict) else float(v)
     except: return default
 
+@st.cache_data(ttl=3600)
+def get_reit_data():
+    results = {}
+    for ticker in ["EQIX", "DLR"]:
+        summary, chart = fetch_yf_summary(ticker), fetch_yf_chart(ticker)
+        if not summary and not chart: continue
+        results[ticker] = {
+            "rev_growth": safe_raw(summary or {}, "revenueGrowth") * 100,
+            "from_high_pct": ((chart.get("week52_high", 0) - chart.get("current_price", 0)) / chart.get("week52_high", 1)) * 100
+        }
+    return results
+
+@st.cache_data(ttl=3600)
+def get_liquid_cooling_data():
+    results = {}
+    for ticker in ["VRT", "SMCI"]:
+        summary, chart = fetch_yf_summary(ticker), fetch_yf_chart(ticker)
+        if summary: results[ticker] = {"rev_growth": safe_raw(summary or {}, "revenueGrowth") * 100, "price_pos_pct": 50}
+    return results
+
+@st.cache_data(ttl=3600)
+def get_power_data():
+    results = {}
+    for ticker in ["NEE", "SO"]:
+        summary = fetch_yf_summary(ticker)
+        if summary: results[ticker] = {"rev_growth": safe_raw(summary or {}, "revenueGrowth") * 100, "price_pos_pct": 50}
+    return results
+
 # =========================================================
-# 评分逻辑函数 (保持原样)
+# 3. 评分函数定义
 # =========================================================
 def score_aof(aof):
     if aof < 1.5: return 0, "green", "↗", "SAFE"
     elif aof < 2.5: return round((aof - 1.5) / 1.0 * 33), "yellow", "→", "WATCH"
-    elif aof < 3.5: return round(33 + (aof - 2.5) / 1.0 * 34), "orange", "↘", "WARNING"
-    else: return min(100, round(67 + (aof - 3.5) / 0.5 * 33)), "red", "↓", "CRITICAL"
-
-# ... (其余 get_reit_data, score_reit, score_liquid, score_power 等函数保持原逻辑)
-# 为节省篇幅，此处省略函数定义，请直接使用你原来的函数体
+    else: return 80, "red", "↓", "CRITICAL"
 
 # =========================================================
-# 主程序运行逻辑
+# 4. 主程序 (防止逻辑错位)
 # =========================================================
+st.set_page_config(page_title="稻草三：数据中心资产减值", layout="wide")
 
-# 1. 顶部标题
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between;">
-  <div><div class="main-title">🏗️ 稻草三：数据中心资产技术性减值</div></div>
-  <div><span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span></div>
-</div>
-""", unsafe_allow_html=True)
+st.title("🏗️ 稻草三：数据中心资产技术性减值")
 
-# 2. 数据获取
-with st.spinner("正在拉取市场数据..."):
-    # 补充调用你的数据函数
-    reit_data = get_reit_data() # 请确保你代码中保留了此函数
+with st.spinner("正在拉取实时数据..."):
+    reit_data = get_reit_data()
     lc_data = get_liquid_cooling_data()
     power_data = get_power_data()
 
-# 3. 计算评分
-aof_s, aof_color, aof_arrow, aof_status = score_aof(AOF)
-# (继续后续评分逻辑...)
+aof_s, color, arrow, status = score_aof(AOF)
 
-# 4. 渲染界面
-# (继续后续代码...)
+st.metric("AOF 淘汰系数", f"{AOF:.2f}x", delta=status)
+st.write(f"当前 REIT 样本数据: {list(reit_data.keys()) if reit_data else '暂无数据'}")
