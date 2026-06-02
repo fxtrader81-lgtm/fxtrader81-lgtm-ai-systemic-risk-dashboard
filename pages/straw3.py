@@ -945,4 +945,15 @@ with rp:
     st.plotly_chart(fig, use_container_width=True)
 
     # 图例说明
-    st.mark
+    st.markdown("""
+    <div style="display:flex; gap:16px; justify-content:center; margin-top:-10px;">
+        <span style="color:#7c3aed; font-size:12px;">● 未来架构</span>
+        <span style="color:#ef4444; font-size:12px;">● 当前核心</span>
+        <span style="color:#f97316; font-size:12px;">● 存量激活</span>
+        <span style="color:#334155; font-size:12px;">● 传统遗留</span>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 底部版权声明
+st.markdown('<div class="footer-text">DCOI Index System v3.0 · Last Sync: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + '</div>', unsafe_allow_html=True)
