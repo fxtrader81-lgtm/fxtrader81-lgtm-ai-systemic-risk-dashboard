@@ -1,5 +1,5 @@
 bash
-cat > /home/claude/straw4_v2.py << 'PYEOF'
+cat > /home/claude/straw4.py<< 'PYEOF'
 import streamlit as st
 import requests
 import plotly.graph_objects as go
