@@ -56,10 +56,6 @@ header {
   display: none !important;
 }
 
-[data-testid="stSidebar"],
-[data-testid="collapsedControl"] {
-  display: none !important;
-}
 
 .green { color: var(--green); }
 .red { color: var(--red); }
