@@ -11,13 +11,21 @@ from datetime import datetime
 # ---- CSS 加载 ------------------------------------------------
 
 def load_css():
-    """加载统一黑金样式，每个 Straw 页面顶部调用一次。"""
-    css_path = Path(__file__).parent.parent / "styles" / "bloomberg.css"
+    """按层级加载统一黑金样式，每个 Straw 页面顶部调用一次。"""
+    styles_dir = Path(__file__).parent.parent / "styles"
+    css_files = ["base.css", "components.css", "pages.css"]
+    chunks = []
+
     try:
-        css = css_path.read_text(encoding="utf-8")
-        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning("⚠️ 样式文件未找到：styles/bloomberg.css")
+        for filename in css_files:
+            chunks.append((styles_dir / filename).read_text(encoding="utf-8"))
+        st.markdown(f"<style>{chr(10).join(chunks)}</style>", unsafe_allow_html=True)
+    except FileNotFoundError as exc:
+        fallback = styles_dir / "bloomberg.css"
+        if fallback.exists():
+            st.markdown(f"<style>{fallback.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+        else:
+            st.warning(f"⚠️ 样式文件未找到：{exc.filename}")
 
 
 # ---- 页眉 ----------------------------------------------------
