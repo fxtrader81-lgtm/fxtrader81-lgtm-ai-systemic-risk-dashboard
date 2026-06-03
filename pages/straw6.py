@@ -15,6 +15,7 @@ straw6.py — 宏观市场预警看板
 """
 
 import streamlit as st
+import os
 import requests
 import pandas as pd
 import numpy as np
@@ -35,8 +36,8 @@ st.set_page_config(
 # =========================================================
 # API Keys
 # =========================================================
-FRED_API_KEY = "9d4d8c74237a32ec198773ca5eb0f4e3"
-FMP_API_KEY  = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
+FMP_API_KEY  = os.environ.get("FMP_API_KEY", "")
 
 # =========================================================
 # CSS — 黑金风格
