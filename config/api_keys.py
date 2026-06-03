@@ -3,8 +3,13 @@
 # 所有 API Key 统一在此管理，禁止在各 Straw 文件内硬编码
 # =========================================================
 
-FMP_API_KEY  = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
+import os
+
+FMP_API_KEY  = os.environ.get("FMP_API_KEY", "")
 FMP_BASE     = "https://financialmodelingprep.com/stable"
 
-FRED_API_KEY = "9d4d8c74237a32ec198773ca5eb0f4e3"
+FRED_API_KEY = os.environ.get("FRED_API_KEY", "")
 FRED_BASE    = "https://api.stlouisfed.org/fred/series/observations"
+
+EIA_API_KEY  = os.environ.get("EIA_API_KEY", "")
+EIA_BASE     = "https://api.eia.gov/v2"
