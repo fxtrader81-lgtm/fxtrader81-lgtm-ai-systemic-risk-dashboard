@@ -199,7 +199,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
-#MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+#MainMenu { visibility: hidden; } footer { visibility: hidden; }
 .modebar { display: none !important; }
 
 </style>

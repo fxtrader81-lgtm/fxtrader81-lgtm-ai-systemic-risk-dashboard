@@ -7,19 +7,19 @@ from datetime import datetime
 # 全局基准参数
 # =========================================================
 
-LEGACY_RACK_LIMIT_KW   = 20
-UPGRADED_RACK_LIMIT_KW = 40
-CURRENT_DEPLOY_GPU     = "H100/H200"
-CURRENT_RACK_KW        = 80
-AOF = round(CURRENT_RACK_KW / LEGACY_RACK_LIMIT_KW, 2)   # → 4.0x
+LEGACY_RACK_LIMIT_KW   = 25
+UPGRADED_RACK_LIMIT_KW = 50
+CURRENT_DEPLOY_GPU     = "H100"
+CURRENT_RACK_KW        = 60
+AOF = round(CURRENT_RACK_KW / LEGACY_RACK_LIMIT_KW, 2)   # → 2.4x
 
 GPU_GENERATIONS = [
     {"gen": "V100\n(2017)",  "year": 2017, "rack_kw_min": 10,  "rack_kw_max": 20,  "status": "legacy"},
-    {"gen": "A100\n(2020)",  "year": 2020, "rack_kw_min": 20,  "rack_kw_max": 35,  "status": "legacy"},
-    {"gen": "H100\n(2022)",  "year": 2022, "rack_kw_min": 60,  "rack_kw_max": 100, "status": "active"},
-    {"gen": "H200\n(2024)",  "year": 2024, "rack_kw_min": 70,  "rack_kw_max": 120, "status": "current"},
-    {"gen": "B200\n(2025)",  "year": 2025, "rack_kw_min": 100, "rack_kw_max": 150, "status": "next"},
-    {"gen": "B300\n(2026e)", "year": 2026, "rack_kw_min": 120, "rack_kw_max": 200, "status": "next"},
+    {"gen": "A100\n(2020)",  "year": 2020, "rack_kw_min": 20,  "rack_kw_max": 30,  "status": "legacy"},
+    {"gen": "H100\n(2022)",  "year": 2022, "rack_kw_min": 40,  "rack_kw_max": 80,  "status": "active"},
+    {"gen": "H200\n(2024)",  "year": 2024, "rack_kw_min": 60,  "rack_kw_max": 100, "status": "active"},
+    {"gen": "B200\n(2025)",  "year": 2025, "rack_kw_min": 100, "rack_kw_max": 140, "status": "current"},
+    {"gen": "Rubin\n(2026e)","year": 2026, "rack_kw_min": 180, "rack_kw_max": 220, "status": "next"},
 ]
 
 # =========================================================
@@ -133,7 +133,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #64748b; }
 .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
-#MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+#MainMenu { visibility: hidden; } footer { visibility: hidden; }
 .modebar { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -142,25 +142,71 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 # 数据获取 — yfinance（方案B，自动处理 crumb/cookie）
 # =========================================================
 
+def _statement_row(frame, names):
+    if frame is None or frame.empty:
+        return None
+    for name in names:
+        if name in frame.index:
+            return frame.loc[name].dropna().sort_index(ascending=False)
+    return None
+
+
 def fetch_yf_info(ticker: str) -> dict:
-    """
-    用 yfinance 获取股票 info 字典。
-    返回包含 revenueGrowth、grossMargins、currentPrice、
-    fiftyTwoWeekHigh、fiftyTwoWeekLow 等字段的原始 dict。
-    失败时返回空 dict，不抛异常。
-    """
+    """Build stable market/financial metrics without relying on Ticker.info."""
     try:
         t = yf.Ticker(ticker)
-        info = t.info
-        return info if isinstance(info, dict) else {}
+        history = t.history(period="1y", auto_adjust=True)
+        if history is None or history.empty or "Close" not in history:
+            return {}
+
+        close = history["Close"].dropna()
+        if close.empty:
+            return {}
+
+        result = {
+            "currentPrice": float(close.iloc[-1]),
+            "fiftyTwoWeekHigh": float(history["High"].max()),
+            "fiftyTwoWeekLow": float(history["Low"].min()),
+            "revenueGrowth": None,
+            "grossMargins": None,
+            "operatingMargins": None,
+        }
+
+        try:
+            financials = t.financials
+            revenue = _statement_row(financials, ["Total Revenue", "Operating Revenue"])
+            gross_profit = _statement_row(financials, ["Gross Profit"])
+            operating_income = _statement_row(financials, ["Operating Income"])
+            if revenue is not None and len(revenue) >= 2 and float(revenue.iloc[1]) != 0:
+                result["revenueGrowth"] = float(revenue.iloc[0] / revenue.iloc[1] - 1)
+            if revenue is not None and len(revenue) and float(revenue.iloc[0]) != 0:
+                if gross_profit is not None and len(gross_profit):
+                    result["grossMargins"] = float(gross_profit.iloc[0] / revenue.iloc[0])
+                if operating_income is not None and len(operating_income):
+                    result["operatingMargins"] = float(operating_income.iloc[0] / revenue.iloc[0])
+        except Exception:
+            # Price-based metrics remain valid even if statements are unavailable.
+            pass
+        return result
     except Exception:
         return {}
 
 
-def safe_get(d: dict, key: str, default: float = 0.0) -> float:
-    """安全取值，None 视为 default"""
-    v = d.get(key, default)
-    return float(v) if v is not None else default
+def safe_get(d: dict, key: str, default=None):
+    value = d.get(key, default)
+    try:
+        return float(value) if value is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def fmt_pct(value):
+    return f"{value:+.1f}%" if value is not None else "N/A"
+
+
+def average_present(values):
+    values = [value for value in values if value is not None]
+    return sum(values) / len(values) if values else None
 
 
 # =========================================================
@@ -176,12 +222,13 @@ def get_reit_data():
         if not info:
             continue
 
-        current_p   = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice")
+        current_p   = safe_get(info, "currentPrice", 0)
         week52_high = safe_get(info, "fiftyTwoWeekHigh")
         week52_low  = safe_get(info, "fiftyTwoWeekLow")
-        rev_growth  = safe_get(info, "revenueGrowth") * 100   # 小数 → 百分比
-        gross_margin = safe_get(info, "grossMargins") * 100
-        debt_equity  = safe_get(info, "debtToEquity")
+        rev_raw = safe_get(info, "revenueGrowth")
+        gross_raw = safe_get(info, "grossMargins")
+        rev_growth = rev_raw * 100 if rev_raw is not None else None
+        gross_margin = gross_raw * 100 if gross_raw is not None else None
 
         from_high = ((week52_high - current_p) / week52_high * 100
                      if week52_high > 0 else 0)
@@ -189,7 +236,6 @@ def get_reit_data():
         results[ticker] = {
             "rev_growth":    rev_growth,
             "gross_margin":  gross_margin,
-            "debt_equity":   debt_equity,
             "current_price": current_p,
             "week52_high":   week52_high,
             "week52_low":    week52_low,
@@ -207,11 +253,13 @@ def get_liquid_cooling_data():
         if not info:
             continue
 
-        current_p    = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice")
+        current_p    = safe_get(info, "currentPrice", 0)
         week52_high  = safe_get(info, "fiftyTwoWeekHigh")
         week52_low   = safe_get(info, "fiftyTwoWeekLow")
-        rev_growth   = safe_get(info, "revenueGrowth") * 100
-        gross_margin = safe_get(info, "grossMargins")  * 100
+        rev_raw = safe_get(info, "revenueGrowth")
+        gross_raw = safe_get(info, "grossMargins")
+        rev_growth = rev_raw * 100 if rev_raw is not None else None
+        gross_margin = gross_raw * 100 if gross_raw is not None else None
 
         price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
                      if week52_high > week52_low else 50)
@@ -236,11 +284,13 @@ def get_power_data():
         if not info:
             continue
 
-        current_p   = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice")
+        current_p   = safe_get(info, "currentPrice", 0)
         week52_high = safe_get(info, "fiftyTwoWeekHigh")
         week52_low  = safe_get(info, "fiftyTwoWeekLow")
-        rev_growth  = safe_get(info, "revenueGrowth")    * 100
-        op_margin   = safe_get(info, "operatingMargins") * 100
+        rev_raw = safe_get(info, "revenueGrowth")
+        op_raw = safe_get(info, "operatingMargins")
+        rev_growth = rev_raw * 100 if rev_raw is not None else None
+        op_margin = op_raw * 100 if op_raw is not None else None
 
         price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
                      if week52_high > week52_low else 50)
@@ -300,9 +350,9 @@ def score_reit(reit_data):
     scores = []
     for d in reit_data.values():
         fh = d.get("from_high_pct", 0)
-        rg = d.get("rev_growth", 5)
+        rg = d.get("rev_growth")
         ps = 10 if fh < 5 else (35 if fh < 15 else (60 if fh < 25 else (80 if fh < 40 else 95)))
-        gs = 10 if rg > 12 else (30 if rg > 6 else (55 if rg > 0 else 80))
+        gs = 50 if rg is None else (10 if rg > 12 else (30 if rg > 6 else (55 if rg > 0 else 80)))
         scores.append(ps * 0.65 + gs * 0.35)
     avg = sum(scores) / len(scores)
     if avg < 25:   return round(avg), "green",  "↗", "SAFE"
@@ -316,9 +366,9 @@ def score_liquid(lc_data):
         return 50, "gray", "—", "N/A"
     scores = []
     for d in lc_data.values():
-        g  = d.get("rev_growth", 0) or 0
+        g  = d.get("rev_growth")
         pp = d.get("price_pos_pct", 50)
-        gs = 10 if g < 10 else (30 if g < 30 else (55 if g < 60 else (75 if g < 100 else 90)))
+        gs = 50 if g is None else (10 if g < 10 else (30 if g < 30 else (55 if g < 60 else (75 if g < 100 else 90))))
         ps = 80 if pp > 80 else (60 if pp > 60 else (40 if pp > 40 else 20))
         scores.append(gs * 0.65 + ps * 0.35)
     avg = sum(scores) / len(scores)
@@ -333,9 +383,9 @@ def score_power(power_data):
         return 30, "gray", "—", "N/A"
     scores = []
     for d in power_data.values():
-        g  = d.get("rev_growth", 0) or 0
+        g  = d.get("rev_growth")
         pp = d.get("price_pos_pct", 50)
-        gs = 15 if g < 3 else (35 if g < 8 else (60 if g < 15 else 80))
+        gs = 50 if g is None else (15 if g < 3 else (35 if g < 8 else (60 if g < 15 else 80)))
         ps = 70 if pp > 75 else (50 if pp > 50 else (30 if pp > 25 else 15))
         scores.append(gs * 0.6 + ps * 0.4)
     avg = sum(scores) / len(scores)
@@ -441,9 +491,9 @@ with c2:
         eqix_h = eqix.get("from_high_pct", 0)
         dlr_h  = dlr.get("from_high_pct",  0)
         avg_h  = (eqix_h + dlr_h) / 2
-        eqix_g = eqix.get("rev_growth", 0)
-        dlr_g  = dlr.get("rev_growth",  0)
-        desc2    = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {eqix_g:+.1f}% · DLR {dlr_g:+.1f}%"
+        eqix_g = eqix.get("rev_growth")
+        dlr_g  = dlr.get("rev_growth")
+        desc2    = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {fmt_pct(eqix_g)} · DLR {fmt_pct(dlr_g)}"
         display2 = f"-{avg_h:.1f}%"
     else:
         desc2    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
@@ -461,14 +511,14 @@ with c3:
     if lc_data:
         vrt      = lc_data.get("VRT",  {})
         smci     = lc_data.get("SMCI", {})
-        vrt_g    = vrt.get("rev_growth", 0)
-        smci_g   = smci.get("rev_growth", 0)
+        vrt_g    = vrt.get("rev_growth")
+        smci_g   = smci.get("rev_growth")
         vrt_pos  = vrt.get("price_pos_pct", 50)
         smci_pos = smci.get("price_pos_pct", 50)
-        avg_g    = (vrt_g + smci_g) / 2
-        desc3    = (f"Vertiv营收增速 {vrt_g:+.1f}% · SMCI {smci_g:+.1f}%<br>"
+        avg_g    = average_present([vrt_g, smci_g])
+        desc3    = (f"Vertiv营收增速 {fmt_pct(vrt_g)} · SMCI {fmt_pct(smci_g)}<br>"
                     f"股价位置 VRT {vrt_pos:.0f}% · SMCI {smci_pos:.0f}% (52周区间)")
-        display3 = f"{avg_g:+.1f}%"
+        display3 = fmt_pct(avg_g)
     else:
         desc3    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
         display3 = "N/A"
@@ -485,14 +535,14 @@ with c4:
     if power_data:
         nee     = power_data.get("NEE", {})
         so      = power_data.get("SO",  {})
-        nee_g   = nee.get("rev_growth", 0)
-        so_g    = so.get("rev_growth",  0)
+        nee_g   = nee.get("rev_growth")
+        so_g    = so.get("rev_growth")
         nee_pos = nee.get("price_pos_pct", 50)
         so_pos  = so.get("price_pos_pct",  50)
-        avg_pg  = (nee_g + so_g) / 2
-        desc4   = (f"NEE增速 {nee_g:+.1f}% · SO增速 {so_g:+.1f}%<br>"
+        avg_pg  = average_present([nee_g, so_g])
+        desc4   = (f"NEE增速 {fmt_pct(nee_g)} · SO增速 {fmt_pct(so_g)}<br>"
                    f"股价位置 NEE {nee_pos:.0f}% · SO {so_pos:.0f}% (52周区间)")
-        display4 = f"{avg_pg:+.1f}%"
+        display4 = fmt_pct(avg_pg)
     else:
         desc4    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"

@@ -47,8 +47,7 @@ section[data-testid="stMain"] > div {
 }
 
 #MainMenu,
-footer,
-header {
+footer {
   visibility: hidden;
 }
 
