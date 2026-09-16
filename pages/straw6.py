@@ -816,7 +816,7 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
 
         with col_chart:
             fig_hist = build_alert_history_chart(y10, sp500, "ALL")
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, use_container_width=True, key="straw6_alert_history")
 
         with col_table:
             st.markdown("""
@@ -973,10 +973,10 @@ with tab_all:
         y10, y30, sp500, nasdaq, dow, shcomp, szcomp,
         period=period, show_crashes=show_crashes,
     )
-    st.plotly_chart(fig_overview, use_container_width=True)
+    st.plotly_chart(fig_overview, use_container_width=True, key="straw6_all_overview")
 
     fig_spread = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread, use_container_width=True)
+    st.plotly_chart(fig_spread, use_container_width=True, key="straw6_all_spread")
 
     # 股灾事件索引
     if show_crashes:
@@ -1013,10 +1013,10 @@ with tab_us:
         period=period, show_crashes=show_crashes,
         title="美债收益率（左轴）× 美股三大指数（右轴）",
     )
-    st.plotly_chart(fig_us, use_container_width=True)
+    st.plotly_chart(fig_us, use_container_width=True, key="straw6_us_markets")
 
     fig_spread_us = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread_us, use_container_width=True)
+    st.plotly_chart(fig_spread_us, use_container_width=True, key="straw6_us_spread")
 
     st.markdown("""
     <div class="panel">
@@ -1056,10 +1056,10 @@ with tab_cn:
         period=period, show_crashes=show_crashes,
         title="美债收益率（左轴）× A股指数（右轴）",
     )
-    st.plotly_chart(fig_cn, use_container_width=True)
+    st.plotly_chart(fig_cn, use_container_width=True, key="straw6_cn_markets")
 
     fig_spread_cn = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread_cn, use_container_width=True)
+    st.plotly_chart(fig_spread_cn, use_container_width=True, key="straw6_cn_spread")
 
     st.markdown("""
     <div class="panel">
