@@ -79,7 +79,10 @@ def render_osci_card(
 <div class="osci-card">
   <div class="osci-left">
     <div class="osci-label">{label}</div>
-    <div class="osci-score" style="color:{color};">{score:.0f}</div>
+    <div class="osci-score-row">
+      <div class="osci-score" style="color:{color};">{score:.0f}</div>
+      <div class="osci-scale">/100</div>
+    </div>
     <div class="osci-desc">{desc}</div>
   </div>
   <div class="osci-right">

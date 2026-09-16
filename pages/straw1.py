@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from config.api_keys import FMP_API_KEY, FMP_BASE
 from components.ui import load_css
-from core.alert_engine import render_osci_card, score_to_state
+from core.alert_engine import render_alert, render_osci_card, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
 
@@ -193,34 +193,37 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     risk_state   = score_to_state(risk_score)
     register_score("straw1", risk_score)
 
-    # 状态判断
-    if diff >= 0.2:
-        status, sc, si = "过热预警", "yellow", "⚠️"
-        status_desc  = "当前AI资本扩张已进入<br>高波动风险阶段。"
-        alert_title  = "结论：AI资本开支扩张速度明显高于收入增长，进入过热阶段"
-        alert_body   = (f'当前资本开支增速比收入增速高出 <span class="yellow"><b>{diff*100:.2f}%</b></span>，'
-                        f'企业AI基础设施投入已超出现实需求支撑。<br>'
-                        f'若趋势持续，将提升未来盈利与现金流承压风险，需重点跟踪需求兑现情况。')
-    elif diff >= 0:
-        status, sc, si = "偏热", "yellow", "⚠️"
-        status_desc  = "资本扩张开始领先收入增长。<br>系统进入高估值区间。"
-        alert_title  = "结论：资本开支增速超出收入增速，进入偏热区间"
-        alert_body   = (f'当前资本开支增速比收入增速高出 <span class="yellow"><b>{diff*100:.2f}%</b></span>，'
-                        f'资本扩张速度开始领先，需关注需求兑现节奏。')
-    else:
-        status, sc, si = "健康", "green", "✅"
-        status_desc  = "收入增长仍高于资本扩张。<br>AI需求尚能支撑投资。"
-        alert_title  = "结论：当前AI投资处于健康扩张阶段"
-        alert_body   = (f'收入增速高于资本开支增速，差值为 <span class="green"><b>{abs(diff)*100:.2f}%</b></span>，'
-                        f'AI基础设施投入与现实需求匹配良好。')
+    # 结论与顶部总状态共用同一套四级标准，避免出现互相冲突的状态名称。
+    risk_color_class = {
+        "SAFE": "green", "WATCH": "yellow", "WARNING": "orange", "CRITICAL": "red"
+    }[risk_state]
+    conclusions = {
+        "SAFE": (
+            "结论：收入增长快于资本开支，当前处于 SAFE 区间",
+            f"收入增速高于资本开支增速 {abs(diff) * 100:.2f} 个百分点，AI基础设施投入仍有现实需求支撑。",
+        ),
+        "WATCH": (
+            "结论：资本开支开始领先收入增长，进入 WATCH 区间",
+            f"资本开支增速比收入增速高出 {diff * 100:.2f} 个百分点，建议提高对需求兑现与现金流的监测频率。",
+        ),
+        "WARNING": (
+            "结论：资本扩张显著领先收入增长，进入 WARNING 区间",
+            f"资本开支增速比收入增速高出 {diff * 100:.2f} 个百分点，资本回报和自由现金流压力正在上升。",
+        ),
+        "CRITICAL": (
+            "结论：资本开支严重超前，进入 CRITICAL 危机区间",
+            f"资本开支增速比收入增速高出 {diff * 100:.2f} 个百分点，AI基础设施投入已明显超前；若趋势持续，将显著提升盈利与现金流风险。",
+        ),
+    }
+    alert_title, alert_body = conclusions[risk_state]
 
     st.markdown(render_osci_card(
         "CAPEX–REVENUE RISK INDEX", risk_score, risk_state,
         f"资本开支增速与收入增速差：{diff * 100:+.2f} 个百分点",
     ), unsafe_allow_html=True)
 
-    # ===== 四张卡片 =====
-    c1, c2, c3, c4 = st.columns(4)
+    # ===== 三张核心指标卡片（状态仅在顶部总卡展示） =====
+    c1, c2, c3 = st.columns(3)
 
     with c1:
         st.markdown(f"""<div class="metric-card">
@@ -240,22 +243,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         ds = "+" if diff >= 0 else ""
         st.markdown(f"""<div class="metric-card">
   <div class="metric-label">增速差 (CapEx - Revenue)</div>
-  <div class="metric-row"><span class="metric-number yellow">{ds}{diff*100:.2f}%</span></div>
+  <div class="metric-row"><span class="metric-number {risk_color_class}">{ds}{diff*100:.2f}%</span></div>
   <div class="metric-desc">资本扩张速度已开始超过<br>收入增长速度。</div>
 </div>""", unsafe_allow_html=True)
 
-    with c4:
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">状态判断</div>
-  <div class="metric-row"><span class="metric-number {sc}">{status}</span><span class="metric-arrow {sc}">{si}</span></div>
-  <div class="metric-desc">{status_desc}</div>
-</div>""", unsafe_allow_html=True)
-
     # ===== Alert =====
-    st.markdown(f"""<div class="alert-box">
-  <div class="alert-icon">⚠️</div>
-  <div class="alert-text"><div class="alert-title">{alert_title}</div><div>{alert_body}</div></div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(render_alert(risk_state, alert_title, alert_body), unsafe_allow_html=True)
 
     # ===== 下方面板 =====
     lp, rp = st.columns([1, 1.5])
@@ -267,11 +260,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
   <div class="logic-step"><div class="step-num">2</div><div class="step-text">计算收入增长率 = (本期收入 - 上期收入) / 上期收入</div></div>
   <div class="logic-step"><div class="step-num">3</div><div class="step-text">计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支</div></div>
   <div class="logic-step"><div class="step-num">4</div><div class="step-text">计算增速差 = 资本开支增长率 - 收入增长率</div></div>
-  <div class="logic-step"><div class="step-num">5</div><div class="step-text">根据阈值判断状态：</div></div>
+  <div class="logic-step"><div class="step-num">5</div><div class="step-text">映射风险分数：Score = clamp(25 + 250 × 增速差, 0, 100)，再按统一四级阈值判断状态：</div></div>
   <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">增速差 ≥ 20%</div><div class="t-arrow">→</div><div class="t-status red">过热预警（红色）</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">0% ≤ 增速差 &lt; 20%</div><div class="t-arrow">→</div><div class="t-status yellow">偏离预警（黄色）</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">增速差 &lt; 0%</div><div class="t-arrow">→</div><div class="t-status green">健康（绿色）</div></div>
+    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">增速差 &lt; 0%（Score &lt; 25）</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
+    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">0% ≤ 增速差 &lt; 10%（25 ≤ Score &lt; 50）</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
+    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">10% ≤ 增速差 &lt; 20%（50 ≤ Score &lt; 75）</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
+    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">增速差 ≥ 20%（Score ≥ 75）</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
   </div>
 </div>""", unsafe_allow_html=True)
 

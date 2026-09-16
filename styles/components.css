@@ -51,6 +51,18 @@
   letter-spacing: -3px;
 }
 
+.osci-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.osci-scale {
+  color: var(--text-dark);
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .system-score-num {
   font-size: 96px;
   font-weight: 900;
