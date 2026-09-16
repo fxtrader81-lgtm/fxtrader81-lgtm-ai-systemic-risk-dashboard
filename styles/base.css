@@ -55,6 +55,90 @@ footer {
   display: none !important;
 }
 
+header[data-testid="stHeader"] {
+  background: rgba(5, 8, 22, 0.96) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+header[data-testid="stHeader"]::before {
+  content: "导航";
+  position: fixed;
+  top: 19px;
+  left: 48px;
+  z-index: 1000000;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  pointer-events: none;
+}
+
+/* ---- 看板导航 ------------------------------------------------ */
+section[data-testid="stSidebar"] {
+  background: linear-gradient(180deg, #070b14 0%, #0a1020 100%) !important;
+  border-right: 1px solid rgba(251, 191, 36, 0.12);
+}
+
+section[data-testid="stSidebar"] > div {
+  background: transparent !important;
+}
+
+.nav-brand {
+  margin: 4px 8px 18px;
+  padding: 16px 14px 15px;
+  background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(11,17,32,0.35));
+  border: 1px solid rgba(251,191,36,0.16);
+  border-radius: 12px;
+}
+
+.nav-brand-kicker {
+  color: var(--yellow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.nav-brand-title {
+  color: var(--text-main);
+  font-size: 17px;
+  font-weight: 750;
+  margin-top: 5px;
+}
+
+.nav-brand-subtitle {
+  color: var(--text-faint);
+  font-size: 9px;
+  letter-spacing: 1.1px;
+  margin-top: 3px;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] span,
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+  color: var(--text-dim) !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  margin: 2px 8px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.05);
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] {
+  background: #0d1526 !important;
+  border-color: rgba(251,191,36,0.16);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] a[aria-current="page"] span {
+  color: var(--text-main) !important;
+  font-weight: 700;
+}
 
 .green { color: var(--green); }
 .red { color: var(--red); }

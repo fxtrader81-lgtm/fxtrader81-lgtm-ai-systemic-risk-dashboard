@@ -79,19 +79,21 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     background-color: #0b1120;
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 14px; padding: 20px 22px 18px;
-    height: 168px;
+    min-height: 188px; height: auto;
 }
 .metric-label {
-    color: #ffffff; font-size: 18px; font-weight: 600;
+    color: #ffffff; font-size: clamp(12px, 1vw, 15px); font-weight: 600;
     margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.4px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
 }
 .metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
-.metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
+.metric-number { font-size: clamp(30px, 3vw, 38px); font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
 .metric-arrow { font-size: 20px; font-weight: 700; }
 .metric-desc, .metric-desc p {
     color: #cbd5e1 !important;
-    font-size: 15px !important;
-    line-height: 1.6;
+    font-size: clamp(12px, 1vw, 15px) !important;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
 }
 
 .green  { color: #22c55e; }
@@ -976,7 +978,7 @@ fresh_infra_inline = freshness_badge(INFRA_DATA["updated"])
 fresh_gpu_inline   = freshness_badge(GPU_EFFICIENCY_DATA["updated"])
 fresh_cost_inline  = freshness_badge(ENERGY_COST_DATA["updated"])
 
-st.markdown(f"""
+source_note_html = f"""
 <div style="margin-top: 28px; padding: 18px 22px; background: #0a0f1e;
      border: 1px solid rgba(251,191,36,0.15); border-radius: 10px;
      border-left: 3px solid #fbbf24;">
@@ -1010,7 +1012,12 @@ st.markdown(f"""
     FERC并网队列原始Excel · NERC区域储备率 · 数据中心PPA合同价格（私有付费数据）
   </div>
 </div>
-""", unsafe_allow_html=True)
+"""
+# Markdown 会把空行后带四个空格的 HTML 当作代码块；统一去掉行首缩进。
+st.markdown(
+    "\n".join(line.strip() for line in source_note_html.splitlines()),
+    unsafe_allow_html=True,
+)
 
 st.markdown(
     f'<div class="footer-text">'

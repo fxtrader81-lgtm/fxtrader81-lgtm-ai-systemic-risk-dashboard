@@ -23,20 +23,33 @@ st.set_page_config(
 from components.ui import load_css
 load_css()
 
+# ---- 导航品牌 ------------------------------------------------
+st.sidebar.markdown(
+    """
+    <div class="nav-brand">
+      <div class="nav-brand-kicker">COMPUTE-DOLLAR</div>
+      <div class="nav-brand-title">风险监测终端</div>
+      <div class="nav-brand-subtitle">SYSTEMIC RISK MONITOR</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ---- 页面定义 -----------------------------------------------
-dashboard_page = st.Page("pages/dashboard.py", title="📡 总览 Dashboard", icon="📡", default=True)
+# icon 仅在 st.Page 的 icon 参数中声明一次，避免标题中重复出现图标。
+dashboard_page = st.Page("pages/dashboard.py", title="系统风险总览", icon="📡", default=True)
 straw_pages = [
-    st.Page("pages/straw1.py", title="🌾 Straw 1 · 资本开支", icon="🌾"),
-    st.Page("pages/straw2.py", title="💻 Straw 2 · 开源压缩", icon="💻"),
-    st.Page("pages/straw3.py", title="🏗 Straw 3 · 数据中心减值", icon="🏗"),
-    st.Page("pages/straw4.py", title="⚡ Straw 4 · 能源控制", icon="⚡"),
+    st.Page("pages/straw1.py", title="01 · 资本开支偏离", icon="🌾"),
+    st.Page("pages/straw2.py", title="02 · 开源商业化压缩", icon="💻"),
+    st.Page("pages/straw3.py", title="03 · 数据中心资产减值", icon="🏗"),
+    st.Page("pages/straw4.py", title="04 · AI能源约束", icon="⚡"),
 ]
 
 if (Path(__file__).parent / "pages" / "straw5.py").exists():
-    straw_pages.append(st.Page("pages/straw5.py", title="🏦 Straw 5 · 金融证券化", icon="🏦"))
+    straw_pages.append(st.Page("pages/straw5.py", title="05 · 金融证券化风险", icon="🏦"))
 
-straw_pages.append(st.Page("pages/straw6.py", title="📊 Straw 6 · 宏观预警", icon="📊"))
+straw_pages.append(st.Page("pages/straw6.py", title="06 · 宏观市场预警", icon="📊"))
 
-pg = st.navigation({"系统总览": [dashboard_page], "风险因子": straw_pages})
+pg = st.navigation({"监测总览": [dashboard_page], "风险因子": straw_pages})
 
 pg.run()
