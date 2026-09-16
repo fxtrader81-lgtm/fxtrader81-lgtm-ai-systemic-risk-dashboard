@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # =========================================================
 # core/score_engine.py
 # 每个 Straw 计算完自己的分数后，注册到这里
@@ -24,32 +26,40 @@ def register_score(straw_id: str, score: float):
 
 # ---- 系统总分 ------------------------------------------------
 
-def system_risk_score(scores: dict) -> float:
+def system_risk_score(scores: dict) -> float | None:
     """
     加权平均各 Straw 分数 → System Risk Score (0–100)
     scores: {"straw1": 82, "straw2": 61, ...}
-    缺失的 Straw 用 50（中性）填充。
+    缺失项不参与计算；覆盖率不足时由调用方显示不可用。
     """
     total_weight = 0.0
     weighted_sum = 0.0
     for straw_id, weight in STRAW_WEIGHTS.items():
-        score = scores.get(straw_id, 50.0)
+        score = scores.get(straw_id)
+        if score is None:
+            continue
         weighted_sum += score * weight
         total_weight += weight
     if total_weight == 0:
-        return 50.0
+        return None
     return round(weighted_sum / total_weight, 1)
 
 
 # ---- Dashboard 渲染工具 -------------------------------------
 
-def render_system_card(scores: dict) -> str:
+def render_system_card(scores: dict, *, system_result: dict | None = None) -> str:
     """
     返回系统总分大卡片 HTML。
     scores: {"straw1": 82, ...}
     """
-    sys_score = system_risk_score(scores)
-    state     = score_to_state(sys_score)
+    sys_score = system_result.get("score") if system_result else system_risk_score(scores)
+    coverage = system_result.get("coverage", 100) if system_result else 100
+    if sys_score is None:
+        return f'''<div class="system-score-card system-score-unavailable">
+  <div><div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · 系统总分</div>
+  <div class="system-score-na">N/A</div><div class="system-score-desc">有效数据覆盖率 {coverage}%：不足以形成可信总分。</div></div>
+  <div class="system-score-meta">缺失数据不按安全或中性分处理</div></div>'''
+    state     = (system_result or {}).get("state") or score_to_state(sys_score)
     color     = STATE_COLORS.get(state, "#fbbf24")
     bar_w     = min(int(sys_score), 100)
 
@@ -65,7 +75,7 @@ def render_system_card(scores: dict) -> str:
   <div>
     <div class="system-score-label">🌾 Compute-Dollar Risk Terminal · 系统总分</div>
     <div class="system-score-num" style="color:{color};">{sys_score:.0f}</div>
-    <div class="system-score-desc">{descs.get(state, '')}</div>
+    <div class="system-score-desc">{descs.get(state, '')}<br><span class="coverage-text">有效权重覆盖率 {coverage}%</span></div>
   </div>
   <div style="text-align:right;">
     <div class="osci-state-label">系统状态</div>
@@ -88,20 +98,21 @@ STRAW_LABELS = {
 }
 
 
-def render_straw_rows(scores: dict) -> str:
+def render_straw_rows(scores: dict, results: dict | None = None) -> str:
     """
     渲染六根稻草进度条列表 HTML。
     """
     rows = ""
     for straw_id, label in STRAW_LABELS.items():
-        score  = scores.get(straw_id, None)
+        result = (results or {}).get(straw_id, {})
+        score  = result.get("score") if results is not None else scores.get(straw_id, None)
         if score is None:
             score_txt  = "—"
             color      = "#475569"
-            state_txt  = "N/A"
+            state_txt  = "待建设" if straw_id == "straw5" else "N/A"
             bar_w      = 0
         else:
-            state     = score_to_state(score)
+            state     = result.get("state") or score_to_state(score)
             color     = STATE_COLORS.get(state, "#fbbf24")
             score_txt = f"{score:.0f}"
             state_txt = state

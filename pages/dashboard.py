@@ -1,75 +1,57 @@
-# =========================================================
-# pages/dashboard.py
-# Compute-Dollar Risk Terminal — 总览首页
-#
-# 显示：
-#   · 系统总风险评分（加权汇总）
-#   · 六根稻草各自评分进度条
-#   · 点击可跳转各 Straw 详情页（通过侧边栏导航）
-# =========================================================
+"""Compute-Dollar Risk Terminal — source-backed system overview."""
+
+from datetime import datetime
+from html import escape
 
 import streamlit as st
-from datetime import datetime
-from core.score_engine import (
-    render_system_card, render_straw_rows,
-    system_risk_score, STRAW_LABELS,
-)
-from core.alert_engine import score_to_state
+
+from components.ui import load_css
 from config.thresholds import STATE_COLORS
+from core.factor_registry import aggregate_factor_results, load_factor_results
+from core.score_engine import render_straw_rows, render_system_card
 
+load_css()
 
-# ---- 读取已注册的 Straw 评分 --------------------------------
-scores = st.session_state.get("straw_scores", {})
+def _conclusion(system, results):
+    if not system["available"]:
+        return "当前有效数据覆盖不足，系统暂不输出方向性结论。请以右侧各因子的可用状态为准。"
+    leaders = sorted((x for x in results.values() if x.get("available")), key=lambda x: x["score"], reverse=True)[:2]
+    names = "、".join(x["name"] for x in leaders)
+    messages = {
+        "SAFE": "当前可用因子整体处于正常区间，尚未形成系统性风险共振。",
+        "WATCH": "早期风险信号已经出现，建议提高数据刷新和交叉验证频率。",
+        "WARNING": "多个风险因子同步抬升，资本、资产与宏观链条需要重点跟踪。",
+        "CRITICAL": "风险因子出现高位共振，应立即开展深度尽调与风险敞口评估。",
+    }
+    return f"{messages[system['state']]} 当前贡献较高的因子为：{names}。"
 
-# ---- 页眉 ---------------------------------------------------
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;">
-  <div>
-    <div class="main-title">📡 Compute-Dollar Risk Terminal</div>
-    <div class="sub-title">AI次贷危机监测系统 · 六大风险因子实时评分</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+with st.spinner("正在汇总五个已上线风险因子…"):
+    results = load_factor_results()
+system = aggregate_factor_results(results)
+scores = {key: item["score"] for key, item in results.items() if item.get("available")}
 
-# ---- 系统总分卡片 -------------------------------------------
-st.markdown(render_system_card(scores), unsafe_allow_html=True)
+st.markdown(f"""<div class="dashboard-header"><div><div class="main-title">📡 Compute-Dollar Risk Terminal</div>
+<div class="sub-title">AI次贷危机监测系统 · 五个已上线风险因子自动汇总</div></div>
+<span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span></div>""", unsafe_allow_html=True)
+st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
 
-# ---- 六根稻草评分 -------------------------------------------
-col_bars, col_tip = st.columns([2, 1])
+color = STATE_COLORS.get(system["state"], "#64748b")
+st.markdown(f"""<div class="dashboard-grid">
+<div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>
+<div class="conclusion-state" style="color:{color};">{escape(system['state'])}</div>
+<div class="conclusion-copy">{escape(_conclusion(system, results))}</div>
+<div class="conclusion-note">有效权重覆盖率 {system['coverage']}% · Straw 5 待建设且不计入总分</div></div>
+<div class="factor-block"><div class="compact-title">六个风险因子</div>{render_straw_rows(scores, results=results)}</div>
+</div>""", unsafe_allow_html=True)
 
-with col_bars:
-    st.markdown('<div class="panel-title">六大风险因子评分</div>', unsafe_allow_html=True)
-    st.markdown(render_straw_rows(scores), unsafe_allow_html=True)
+source_items = []
+for key in ("straw1", "straw2", "straw3", "straw4", "straw6"):
+    item = results[key]
+    availability = f"{item['coverage']:.0f}%" if item["available"] else "不可用"
+    source_items.append(f'<div class="source-status"><b>{escape(item["name"])}</b><span>{availability}</span><small>{escape(item["source"])}</small></div>')
+st.markdown('<div class="source-strip"><div class="compact-title">数据覆盖与来源</div>' + "".join(source_items) + "</div>", unsafe_allow_html=True)
 
-with col_tip:
-    sys_score = system_risk_score(scores)
-    state     = score_to_state(sys_score)
-    color     = STATE_COLORS.get(state, "#fbbf24")
-
-    st.markdown(f"""
-<div class="panel" style="height:100%;">
-  <div class="panel-title">📋 使用说明</div>
-  <div class="step-text">
-    1. 点击左侧导航栏中的各 <b>Straw</b> 页面查看详情。<br><br>
-    2. 每个 Straw 完成加载后，评分自动注册到本页面总览。<br><br>
-    3. <b>系统总分</b>为六根稻草加权平均值（未加载的 Straw 默认计 50 分）。<br><br>
-    4. 评分标准：<br>
-       &nbsp;&nbsp;<span class="green">0–25 SAFE</span> &nbsp;
-       <span class="yellow">25–50 WATCH</span> &nbsp;
-       <span style="color:#f97316">50–75 WARNING</span> &nbsp;
-       <span class="red">75+ CRITICAL</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ---- 页脚 ---------------------------------------------------
-if not scores:
-    st.info("💡 尚未加载任何 Straw 数据。请点击左侧导航栏进入各 Straw 页面，数据加载后评分将自动汇总至此。")
-
-st.markdown(
-    f'<div class="footer-text">Compute-Dollar Risk Terminal · 数据实时采集 · {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
-    unsafe_allow_html=True,
-)
+if st.button("刷新全部因子数据", use_container_width=False):
+    st.cache_data.clear()
+    st.rerun()
+st.markdown(f'<div class="footer-text">缺失值不填 0、不填 50 · 数据缓存 1 小时 · {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>', unsafe_allow_html=True)

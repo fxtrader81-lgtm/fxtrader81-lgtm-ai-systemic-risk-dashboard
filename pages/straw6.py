@@ -23,6 +23,8 @@ from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
+from components.ui import load_css
+from core.score_engine import register_score
 
 # =========================================================
 # 页面配置
@@ -32,171 +34,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+load_css()
 
 # =========================================================
 # CSS — 黑金风格
 # =========================================================
-st.markdown("""
-<style>
-html, body, [class*="css"] {
-    background-color: #050816 !important;
-    color: white;
-    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-.stApp { background-color: #050816 !important; }
-section[data-testid="stMain"] > div { background-color: #050816 !important; }
-.block-container {
-    padding-top: 1.8rem;
-    padding-left: 2.2rem;
-    padding-right: 2.2rem;
-    max-width: 1600px;
-    background-color: #050816 !important;
-}
-/* 标题 */
-.main-title {
-    font-size: 30px; font-weight: 800; color: #ffffff;
-    margin: 0 0 6px 0; letter-spacing: -0.5px;
-}
-.sub-title { font-size: 15px !important; color: #cbd5e1 !important; margin: 0; }
-.timestamp-text { font-size: 12px; color: #475569; margin-bottom: 8px; display: block; }
-.symbol-badge {
-    display: inline-block;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px; padding: 3px 14px;
-    font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 1px;
-}
-
-/* 指标卡片 */
-.metric-card {
-    background-color: #0b1120;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px; padding: 20px 22px 18px;
-    height: 160px;
-}
-.metric-label {
-    color: #94a3b8; font-size: 11px; font-weight: 700;
-    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.2px;
-}
-.metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-.metric-number { font-size: 36px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
-.metric-sub { font-size: 13px; color: #64748b; line-height: 1.6; }
-.metric-badge {
-    display: inline-block; border-radius: 5px;
-    padding: 2px 9px; font-size: 11px; font-weight: 700;
-    letter-spacing: 0.8px; margin-top: 8px;
-}
-
-/* 综合预警大卡片 */
-.alert-master-card {
-    background: linear-gradient(135deg, #0b1120 0%, #0d1829 100%);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
-    padding: 28px 32px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.alert-score { font-size: 72px; font-weight: 800; line-height: 1; letter-spacing: -3px; }
-.alert-label { font-size: 12px; font-weight: 700; color: #475569; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
-.alert-state { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; }
-.bar-wrap { margin-top: 12px; width: 280px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; }
-.bar-fill { height: 6px; border-radius: 3px; }
-
-/* Alert 结论框 */
-.alert-box {
-    margin: 16px 0; background: #120e00;
-    border: 1px solid rgba(251,191,36,0.18);
-    border-radius: 14px; padding: 20px 24px;
-    display: flex; gap: 16px; align-items: flex-start;
-}
-.alert-box-red { margin: 16px 0; background: #120000; border: 1px solid rgba(239,68,68,0.25); border-radius: 14px; padding: 20px 24px; display: flex; gap: 16px; align-items: flex-start; }
-.alert-box-green { margin: 16px 0; background: #001208; border: 1px solid rgba(34,197,94,0.2); border-radius: 14px; padding: 20px 24px; display: flex; gap: 16px; align-items: flex-start; }
-.alert-box-orange { margin: 16px 0; background: #120800; border: 1px solid rgba(249,115,22,0.25); border-radius: 14px; padding: 20px 24px; display: flex; gap: 16px; align-items: flex-start; }
-.alert-icon { font-size: 40px; flex-shrink: 0; line-height: 1; }
-.alert-title { font-size: 20px !important; font-weight: 700; margin-bottom: 8px; }
-.alert-text { font-size: 15px !important; color: #cbd5e1 !important; line-height: 1.75; }
-
-/* Panel */
-.panel {
-    background-color: #0b1120; border-radius: 14px;
-    padding: 22px; border: 1px solid rgba(255,255,255,0.07);
-    margin-bottom: 16px;
-}
-.panel-title { font-size: 17px !important; font-weight: 700; margin-bottom: 18px; color: #e2e8f0; }
-
-/* 历史复盘表 */
-.history-row {
-    display: flex; gap: 10px; padding: 12px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    align-items: center;
-}
-.history-row:last-child { border-bottom: none; }
-.h-date { font-size: 13px; font-weight: 700; color: #94a3b8; width: 80px; flex-shrink: 0; }
-.h-event { font-size: 13px; color: #e2e8f0; flex: 1; }
-.h-yield { font-size: 13px; font-weight: 700; color: #5CB85C; width: 60px; text-align: right; }
-.h-drop { font-size: 13px; font-weight: 700; color: #ef4444; width: 60px; text-align: right; }
-
-/* 颜色 */
-.green  { color: #22c55e; }
-.red    { color: #ef4444; }
-.yellow { color: #fbbf24; }
-.orange { color: #f97316; }
-.gray   { color: #94a3b8; }
-.blue   { color: #4F8EF7; }
-
-/* 分割线 */
-.section-divider {
-    border: none; border-top: 1px solid rgba(255,255,255,0.06);
-    margin: 28px 0;
-}
-
-#MainMenu { visibility: hidden; } footer { visibility: hidden; }
-.modebar { display: none !important; }
-
-/* Tab 样式 */
-.stTabs [data-baseweb="tab-list"] {
-    background: transparent;
-    gap: 4px;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    padding-bottom: 0;
-}
-.stTabs [data-baseweb="tab"] {
-    background: transparent;
-    border-radius: 8px 8px 0 0;
-    padding: 10px 28px;
-    color: #64748b;
-    font-weight: 700;
-    font-size: 14px;
-    border: 1px solid transparent;
-    border-bottom: none;
-    letter-spacing: 0.3px;
-}
-.stTabs [aria-selected="true"] {
-    background: #0b1120 !important;
-    color: #60a5fa !important;
-    border-color: rgba(255,255,255,0.08) !important;
-    border-bottom: none !important;
-}
-.stTabs [data-baseweb="tab-panel"] {
-    background: transparent;
-    padding-top: 24px;
-}
-
-/* 控制栏 */
-.ctrl-bar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-    padding: 12px 16px;
-    background: #0b1120;
-    border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.06);
-}
-</style>
-""", unsafe_allow_html=True)
 
 # =========================================================
 # 股灾事件数据库（内置）
@@ -324,6 +166,14 @@ def fetch_yf_index(ticker: str, start: str = "1994-01-01") -> pd.Series:
     except Exception as e:
         st.warning(f"yfinance {ticker} 获取失败: {e}")
         return pd.Series(dtype=float)
+
+
+def fetch_yf_yield(ticker: str, start: str = "1994-01-01") -> pd.Series:
+    """Normalize Yahoo Treasury indices to percentage points across feed variants."""
+    series = fetch_yf_index(ticker, start)
+    if series.empty:
+        return series
+    return series / 10.0 if float(series.median()) > 15 else series
 
 
 def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
@@ -713,33 +563,6 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
          letter-spacing:1.5px; margin-bottom:16px;">🚨 Alert System · 预警系统</div>
     """, unsafe_allow_html=True)
 
-    # 综合预警大卡片
-    st.markdown(f"""
-    <div class="alert-master-card">
-      <div>
-        <div class="alert-label">COMPOSITE ALERT SCORE</div>
-        <div style="display:flex; align-items:baseline; gap:12px;">
-          <div class="alert-score {master_css}">{master_score}</div>
-          <div style="font-size:18px; color:#475569; font-weight:600;">/100</div>
-        </div>
-        <div style="font-size:15px; color:#94a3b8; margin-top:6px;">
-          综合加权：10Y水平×0.15 · 3M速率×0.40 · 期限利差×0.25 · 相关性×0.20
-        </div>
-        <div class="bar-wrap">
-          <div class="bar-fill" style="width:{master_score}%; background:{master_color};"></div>
-        </div>
-      </div>
-      <div style="text-align:right;">
-        <div class="alert-label">SYSTEM STATE</div>
-        <div class="alert-state {master_css}">{master_grade}</div>
-        <div style="margin-top:8px; font-size:13px; color:#64748b; line-height:2;">
-          SAFE 0–25 &nbsp;·&nbsp; WATCH 25–50<br>
-          WARNING 50–75 &nbsp;·&nbsp; CRITICAL 75–100
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     # 4 指标卡片
     m1 = metrics["y10_level"]
     m2 = metrics["y10_momentum"]
@@ -915,6 +738,10 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
 def load_all_data():
     y10    = fetch_fred("DGS10",      "1994-01-01")
     y30    = fetch_fred("DGS30",      "1994-01-01")
+    if y10.empty:
+        y10 = fetch_yf_yield("^TNX", "1994-01-01")
+    if y30.empty:
+        y30 = fetch_yf_yield("^TYX", "1994-01-01")
     sp500  = fetch_market_index("^GSPC", "1994-01-01")
     nasdaq = fetch_market_index("^IXIC", "1994-01-01")
     dow    = fetch_market_index("^DJI",  "1994-01-01")
@@ -961,6 +788,20 @@ with ctrl_col3:
         st.rerun()
 
 st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+
+# 综合评分固定置顶，避免用户在三个 Tab 中反复寻找。
+top_metrics = compute_alert_metrics(y10, y30, sp500)
+top_composite = top_metrics["composite"]
+register_score("straw6", top_composite["score"])
+top_color = grade_to_color(top_composite["grade"])
+top_css = grade_to_css(top_composite["grade"])
+st.markdown(f"""<div class="alert-master-card">
+  <div><div class="alert-label">MACRO ALERT COMPOSITE</div>
+  <div style="display:flex;align-items:baseline;gap:12px;"><div class="alert-score {top_css}">{top_composite['score']}</div><div style="font-size:18px;color:#475569;">/100</div></div>
+  <div class="osci-desc">10Y水平 ×0.15 · 3M速率 ×0.40 · 期限利差 ×0.25 · 股债相关性 ×0.20</div></div>
+  <div class="osci-right"><div class="alert-label">SYSTEM STATE</div><div class="alert-state {top_css}">{top_composite['grade']}</div>
+  <div class="bar-wrap"><div class="bar-fill" style="width:{top_composite['score']}%;background:{top_color};"></div></div></div>
+</div>""", unsafe_allow_html=True)
 
 # KPI 行（全局共用）
 render_kpi_row(y10, y30, sp500, shcomp)
