@@ -52,14 +52,19 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
     返回系统总分大卡片 HTML。
     scores: {"straw1": 82, ...}
     """
-    sys_score = system_result.get("score") if system_result else system_risk_score(scores)
-    coverage = system_result.get("coverage", 100) if system_result else 100
+    raw_score = system_result.get("score") if system_result else system_risk_score(scores)
+    raw_coverage = system_result.get("coverage", 100) if system_result else 100
+    try:
+        sys_score = None if raw_score is None else float(raw_score)
+        coverage = int(round(float(raw_coverage)))
+    except (TypeError, ValueError, OverflowError):
+        sys_score, coverage = None, 0
     if sys_score is None:
         return f'''<div class="system-score-card system-score-unavailable">
   <div><div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · 系统总分</div>
   <div class="system-score-na">N/A</div><div class="system-score-desc">有效数据覆盖率 {coverage}%：不足以形成可信总分。</div></div>
   <div class="system-score-meta">缺失数据不按安全或中性分处理</div></div>'''
-    state     = (system_result or {}).get("state") or score_to_state(sys_score)
+    state     = str((system_result or {}).get("state") or score_to_state(sys_score))
     color     = STATE_COLORS.get(state, "#fbbf24")
     bar_w     = min(int(sys_score), 100)
 
