@@ -803,6 +803,9 @@ st.markdown(f"""<div class="alert-master-card">
   <div class="bar-wrap"><div class="bar-fill" style="width:{top_composite['score']}%;background:{top_color};"></div></div></div>
 </div>""", unsafe_allow_html=True)
 
+# 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
+render_alert_system(y10, y30, sp500, show_hist_chart=True)
+
 # KPI 行（全局共用）
 render_kpi_row(y10, y30, sp500, shcomp)
 
@@ -848,10 +851,6 @@ with tab_all:
                 """, unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Alert System
-    render_alert_system(y10, y30, sp500, show_hist_chart=True)
-
-
 # ─────────────────────────────────────────────
 # Tab: US
 # ─────────────────────────────────────────────
@@ -891,10 +890,6 @@ with tab_us:
     </div>
     """, unsafe_allow_html=True)
 
-    # Alert System（无历史图表，保持简洁）
-    render_alert_system(y10, y30, sp500, show_hist_chart=False)
-
-
 # ─────────────────────────────────────────────
 # Tab: CN
 # ─────────────────────────────────────────────
@@ -933,10 +928,6 @@ with tab_cn:
       </div>
     </div>
     """, unsafe_allow_html=True)
-
-    # Alert System（无历史图表）
-    render_alert_system(y10, y30, sp500, show_hist_chart=False)
-
 
 # =========================================================
 # 底部版权
