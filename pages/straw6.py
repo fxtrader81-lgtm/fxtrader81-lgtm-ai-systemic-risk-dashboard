@@ -326,6 +326,14 @@ def fetch_yf_index(ticker: str, start: str = "1994-01-01") -> pd.Series:
         return pd.Series(dtype=float)
 
 
+def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
+    """优先使用 FMP；无历史数据时自动切换 Yahoo Finance。"""
+    series = fetch_fmp_index(symbol, start)
+    if not series.empty:
+        return series
+    return fetch_yf_index(symbol, start)
+
+
 # =========================================================
 # 预警计算
 # =========================================================
@@ -907,9 +915,9 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
 def load_all_data():
     y10    = fetch_fred("DGS10",      "1994-01-01")
     y30    = fetch_fred("DGS30",      "1994-01-01")
-    sp500  = fetch_fmp_index("^GSPC", "1994-01-01")
-    nasdaq = fetch_fmp_index("^IXIC", "1994-01-01")
-    dow    = fetch_fmp_index("^DJI",  "1994-01-01")
+    sp500  = fetch_market_index("^GSPC", "1994-01-01")
+    nasdaq = fetch_market_index("^IXIC", "1994-01-01")
+    dow    = fetch_market_index("^DJI",  "1994-01-01")
     shcomp = fetch_yf_index("000001.SS", "1994-01-01")
     szcomp = fetch_yf_index("399001.SZ", "1994-01-01")
     return y10, y30, sp500, nasdaq, dow, shcomp, szcomp
@@ -1095,7 +1103,7 @@ with tab_cn:
 st.markdown(f"""
 <div style="margin-top:32px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.05);
      font-size:11px; color:#1e293b; text-align:right; line-height:2;">
-  实时数据：FRED（DGS10·DGS30）· FMP（^GSPC·^IXIC·^DJI）· Yahoo Finance（000001.SS·399001.SZ）
+  实时数据：FRED（DGS10·DGS30）· 美股指数 FMP（Yahoo Finance 备用）· A股 Yahoo Finance
   &nbsp;|&nbsp; 更新时间：{datetime.now().strftime("%Y-%m-%d %H:%M")}
   &nbsp;|&nbsp; Straw 6 · 仅供研究参考，不构成投资建议
 </div>
