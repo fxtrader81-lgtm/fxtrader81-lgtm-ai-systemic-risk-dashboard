@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 from datetime import datetime
+from components.ui import load_css
+from core.score_engine import register_score
 
 # =========================================================
 # 页面配置
@@ -11,199 +13,12 @@ st.set_page_config(
     page_title="稻草二：开源压缩风险",
     layout="wide"
 )
+load_css()
 
 # =========================================================
 # CSS — 与稻草一完全一致的黑金风格
 # =========================================================
 
-st.markdown("""
-<style>
-
-html, body, [class*="css"] {
-    background-color: #050816 !important;
-    color: white;
-    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-.stApp { background-color: #050816 !important; }
-section[data-testid="stMain"] > div { background-color: #050816 !important; }
-.block-container {
-    padding-top: 1.8rem;
-    padding-left: 2.2rem;
-    padding-right: 2.2rem;
-    max-width: 1600px;
-    background-color: #050816 !important;
-}
-
-.main-title {
-    font-size: 32px; font-weight: 800; color: #ffffff;
-    margin: 0 0 6px 0; letter-spacing: -0.5px;
-    display: flex; align-items: center; gap: 10px;
-}
-.sub-title {
-    font-size: 16px !important;
-    color: #cbd5e1 !important;
-    margin: 0;
-}
-.timestamp-text { font-size: 13px; color: #475569; margin-bottom: 8px; display: block; }
-.symbol-badge {
-    display: inline-block;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px; padding: 3px 16px;
-    font-size: 13px; font-weight: 600; color: #94a3b8; letter-spacing: 1px;
-}
-
-.stTextInput input {
-    background-color: #0f172a !important; color: white !important;
-    border-radius: 10px !important; border: 1px solid rgba(255,255,255,0.1) !important;
-    font-size: 14px !important;
-}
-.stTextInput label { color: #94a3b8 !important; font-size: 13px !important; }
-
-/* OSCI 总分大卡片 */
-.osci-card {
-    background: linear-gradient(135deg, #0b1120 0%, #0d1829 100%);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
-    padding: 28px 32px;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.osci-left { display: flex; flex-direction: column; gap: 6px; }
-.osci-label { font-size: 13px; font-weight: 600; color: #475569; letter-spacing: 1.5px; text-transform: uppercase; }
-.osci-score { font-size: 72px; font-weight: 800; line-height: 1; letter-spacing: -3px; }
-.osci-desc { font-size: 15px; color: #94a3b8; margin-top: 4px; }
-.osci-right { text-align: right; }
-.osci-state-label { font-size: 13px; color: #475569; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-.osci-state { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; }
-.osci-bar-wrap { margin-top: 12px; width: 280px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; }
-.osci-bar-fill { height: 6px; border-radius: 3px; transition: width 0.5s; }
-
-/* 指标卡片 */
-.metric-card {
-    background-color: #0b1120;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 14px; padding: 20px 22px 18px;
-    height: 168px;
-}
-.metric-label {
-    color: #ffffff; font-size: 18px; font-weight: 600;
-    margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.4px;
-}
-.metric-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
-.metric-number { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
-.metric-arrow { font-size: 20px; font-weight: 700; }
-.metric-desc, .metric-desc p {
-    color: #cbd5e1 !important;
-    font-size: 15px !important;
-    line-height: 1.6;
-}
-
-.green  { color: #22c55e; }
-.red    { color: #ef4444; }
-.yellow { color: #fbbf24; }
-.orange { color: #f97316; }
-.gray   { color: #94a3b8; }
-
-/* Alert 结论框 */
-.alert-box {
-    margin: 18px 0; background: #120e00;
-    border: 1px solid rgba(251,191,36,0.18);
-    border-radius: 14px; padding: 22px 26px;
-    display: flex; gap: 18px; align-items: flex-start;
-}
-.alert-box-red {
-    margin: 18px 0; background: #120000;
-    border: 1px solid rgba(239,68,68,0.25);
-    border-radius: 14px; padding: 22px 26px;
-    display: flex; gap: 18px; align-items: flex-start;
-}
-.alert-box-green {
-    margin: 18px 0; background: #001208;
-    border: 1px solid rgba(34,197,94,0.2);
-    border-radius: 14px; padding: 22px 26px;
-    display: flex; gap: 18px; align-items: flex-start;
-}
-.alert-icon { font-size: 44px; flex-shrink: 0; line-height: 1; }
-.alert-title {
-    font-size: 23px !important;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
-.alert-text, .alert-text p {
-    font-size: 17px !important;
-    color: #cbd5e1 !important;
-    line-height: 1.75;
-}
-
-/* Panel */
-.panel {
-    background-color: #0b1120; border-radius: 14px;
-    padding: 22px; border: 1px solid rgba(255,255,255,0.07);
-}
-.panel-title {
-    font-size: 20px !important;
-    font-weight: 700;
-    margin-bottom: 20px;
-    color: #e2e8f0;
-}
-
-.logic-step { display: flex; gap: 12px; margin-bottom: 13px; align-items: flex-start; }
-.step-num {
-    width: 22px; height: 22px; min-width: 22px; border-radius: 50%;
-    background: #1e3a5f; color: #60a5fa; font-size: 12px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center; margin-top: 2px;
-}
-.step-text, .logic-step p {
-    font-size: 16px !important;
-    color: #cbd5e1 !important;
-    line-height: 1.6;
-}
-.threshold-block { margin-left: 34px; margin-top: 8px; }
-.threshold-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 12px; border-radius: 7px; margin-bottom: 6px;
-    background: rgba(255,255,255,0.02);
-}
-.t-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.t-label, .threshold-row p {
-    font-size: 15px !important;
-    color: #cbd5e1 !important;
-    flex: 1;
-}
-.t-arrow { font-size: 13px; color: #475569; }
-.t-status { font-size: 15px !important; font-weight: 600; }
-
-/* 数据源标签 */
-.source-tag {
-    display: inline-block;
-    background: rgba(96,165,250,0.1);
-    border: 1px solid rgba(96,165,250,0.2);
-    border-radius: 6px;
-    padding: 2px 10px;
-    font-size: 12px;
-    color: #60a5fa;
-    margin-left: 8px;
-}
-.source-tag-gray {
-    display: inline-block;
-    background: rgba(148,163,184,0.1);
-    border: 1px solid rgba(148,163,184,0.2);
-    border-radius: 6px;
-    padding: 2px 10px;
-    font-size: 12px;
-    color: #94a3b8;
-    margin-left: 8px;
-}
-
-.footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
-#MainMenu { visibility: hidden; } footer { visibility: hidden; }
-.modebar { display: none !important; }
-
-</style>
-""", unsafe_allow_html=True)
 
 # =========================================================
 # 工具函数
@@ -532,6 +347,7 @@ else:
 osci, cap_s, price_s, deploy_s, vel_s = compute_osci(
     cap_gap_pct, price_compression_pct, deploy_growth_pct, os_velocity_score
 )
+register_score("straw2", osci)
 
 state, state_color, state_hex, state_eng, state_cn = get_state(osci)
 
