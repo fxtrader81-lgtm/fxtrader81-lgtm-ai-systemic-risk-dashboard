@@ -22,6 +22,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import yfinance as yf
+from config.api_keys import FMP_API_KEY, FRED_API_KEY
 
 # =========================================================
 # 页面配置
@@ -29,14 +30,8 @@ import yfinance as yf
 st.set_page_config(
     page_title="Straw 6 · 宏观预警看板",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
-
-# =========================================================
-# API Keys
-# =========================================================
-FRED_API_KEY = "9d4d8c74237a32ec198773ca5eb0f4e3"
-FMP_API_KEY  = "jDx2a8ksphDCURyajTmywdYAXyJXBpLN"
 
 # =========================================================
 # CSS — 黑金风格
@@ -57,10 +52,6 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     max-width: 1600px;
     background-color: #050816 !important;
 }
-/* 隐藏侧边栏 */
-[data-testid="stSidebar"] { display: none !important; }
-[data-testid="collapsedControl"] { display: none !important; }
-
 /* 标题 */
 .main-title {
     font-size: 30px; font-weight: 800; color: #ffffff;
@@ -161,7 +152,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     margin: 28px 0;
 }
 
-#MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+#MainMenu { visibility: hidden; } footer { visibility: hidden; }
 .modebar { display: none !important; }
 
 /* Tab 样式 */

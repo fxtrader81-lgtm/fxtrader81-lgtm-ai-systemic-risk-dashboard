@@ -1,8 +1,9 @@
 import streamlit as st
-import os
 import requests
+import yfinance as yf
 import plotly.graph_objects as go
 from datetime import datetime
+from config.api_keys import FMP_API_KEY, FMP_BASE
 
 # =========================================================
 # 页面配置
@@ -17,8 +18,8 @@ st.set_page_config(
 # API 配置 — 保持最稳定的原始限制模式
 # =========================================================
 
-API_KEY = os.environ.get("FMP_API_KEY", "")
-BASE = "https://financialmodelingprep.com/stable"
+API_KEY = FMP_API_KEY
+BASE = FMP_BASE
 
 # =========================================================
 # CSS — 完美保留截图黑金高级风格
@@ -167,7 +168,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 .t-status { font-size: 15px !important; font-weight: 600; }
 
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
-#MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+#MainMenu { visibility: hidden; } footer { visibility: hidden; }
 .modebar { display: none !important; }
 
 </style>
@@ -177,14 +178,85 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 # 工具函数
 # =========================================================
 
-def fetch(url):
+def fetch_fmp(endpoint, symbol):
+    """Return FMP data and a safe diagnostic message."""
+    if not API_KEY:
+        return [], "FMP_API_KEY 未配置"
+
     try:
-        r = requests.get(url)
+        r = requests.get(
+            f"{BASE}/{endpoint}",
+            params={"symbol": symbol, "limit": 5, "apikey": API_KEY},
+            timeout=15,
+        )
         if r.status_code != 200:
-            return []
-        return r.json()
-    except:
-        return []
+            return [], f"FMP 返回 HTTP {r.status_code}"
+        data = r.json()
+        if not isinstance(data, list):
+            return [], "FMP 返回了非预期数据格式"
+        return data, ""
+    except requests.RequestException as exc:
+        return [], f"FMP 网络请求失败：{type(exc).__name__}"
+    except ValueError:
+        return [], "FMP 返回内容无法解析"
+
+
+def _financial_row(frame, names):
+    if frame is None or frame.empty:
+        return None
+    for name in names:
+        if name in frame.index:
+            return frame.loc[name]
+    return None
+
+
+def fetch_yfinance_financials(symbol):
+    """Fallback source when FMP is unavailable; returns FMP-shaped rows."""
+    try:
+        ticker = yf.Ticker(symbol)
+        income_frame = ticker.financials
+        cash_frame = ticker.cashflow
+        revenue = _financial_row(income_frame, ["Total Revenue", "Operating Revenue"])
+        capex = _financial_row(cash_frame, ["Capital Expenditure", "Capital Expenditure Reported"])
+        if revenue is None or capex is None:
+            return [], [], "Yahoo Finance 缺少收入或资本开支字段"
+
+        income, cash = [], []
+        common_dates = sorted(set(revenue.dropna().index) & set(capex.dropna().index), reverse=True)
+        for period in common_dates[:5]:
+            date_str = period.strftime("%Y-%m-%d")
+            income.append({
+                "date": date_str,
+                "calendarYear": str(period.year),
+                "revenue": float(revenue.loc[period]),
+            })
+            cash.append({
+                "date": date_str,
+                "capitalExpenditure": float(capex.loc[period]),
+            })
+        if len(income) < 2:
+            return [], [], "Yahoo Finance 可用年度数据少于两期"
+        return income, cash, ""
+    except Exception as exc:
+        return [], [], f"Yahoo Finance 获取失败：{type(exc).__name__}"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_financial_data(symbol):
+    diagnostics = []
+    income, income_error = fetch_fmp("income-statement", symbol)
+    cash, cash_error = fetch_fmp("cash-flow-statement", symbol)
+    if len(income) >= 2 and len(cash) >= 2:
+        return income, cash, "Financial Modeling Prep", ""
+
+    diagnostics.extend(message for message in [income_error, cash_error] if message)
+    income, cash, yf_error = fetch_yfinance_financials(symbol)
+    if len(income) >= 2 and len(cash) >= 2:
+        return income, cash, "Yahoo Finance（FMP 备用源）", "；".join(diagnostics)
+
+    if yf_error:
+        diagnostics.append(yf_error)
+    return [], [], "", "；".join(dict.fromkeys(diagnostics))
 
 def safe(x, k):
     try:
@@ -219,8 +291,7 @@ with col_title:
 # 稳定获取：硬性 limit=5
 # =========================================================
 
-income = fetch(f"{BASE}/income-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
-cash   = fetch(f"{BASE}/cash-flow-statement?symbol={symbol}&limit=5&apikey={API_KEY}")
+income, cash, data_source, load_diagnostic = load_financial_data(symbol.strip().upper())
 
 if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
 
@@ -250,6 +321,12 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         if item["year"] not in seen_years:
             seen_years.add(item["year"])
             final_timeline.append(item)
+
+    if len(final_timeline) < 2:
+        st.error("收入与资本开支的共同年度数据少于两期，暂时无法计算增长率。")
+        if load_diagnostic:
+            st.caption(load_diagnostic)
+        st.stop()
 
     # 计算最新财年的增长率与增速差
     rev_growth   = (final_timeline[-1]["revenue"] - final_timeline[-2]["revenue"]) / final_timeline[-2]["revenue"]
@@ -410,8 +487,10 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：Financial Modeling Prep (FMP) · 实时采集 · 当前标的：{symbol}</div>',
+    st.markdown(f'<div class="footer-text">数据来源：{data_source} · 实时采集 · 当前标的：{symbol}</div>',
                 unsafe_allow_html=True)
 
 else:
-    st.error(f"API数据加载失败，请检查股票代码是否正确。")
+    st.error("财务数据加载失败。这通常不是股票代码错误，而是数据源密钥、限额或网络状态异常。")
+    if load_diagnostic:
+        st.caption(load_diagnostic)

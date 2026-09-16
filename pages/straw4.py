@@ -1,8 +1,8 @@
 import streamlit as st
-import os
 import requests
 import plotly.graph_objects as go
 from datetime import datetime, date
+from config.api_keys import EIA_API_KEY
 
 # =========================================================
 # 页面配置
@@ -242,7 +242,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 }
 
 .footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
-#MainMenu { visibility: hidden; } footer { visibility: hidden; } header { visibility: hidden; }
+#MainMenu { visibility: hidden; } footer { visibility: hidden; }
 .modebar { display: none !important; }
 
 </style>
@@ -323,8 +323,6 @@ ENERGY_COST_DATA = {
 # =========================================================
 # EIA API — 实时美国商业电价
 # =========================================================
-
-EIA_API_KEY = os.environ.get("EIA_API_KEY", "")
 
 @st.cache_data(ttl=86400)   # 每 24 小时刷新一次（EIA 数据月度更新）
 def fetch_eia_electricity_price() -> dict:

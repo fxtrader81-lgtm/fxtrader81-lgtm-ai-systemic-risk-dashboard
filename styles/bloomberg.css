@@ -219,7 +219,6 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
 /* ---- 隐藏 Streamlit 默认元素 ---- */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-header { visibility: hidden; }
 .modebar { display: none !important; }
 
 /* ---- 页脚 ---- */
