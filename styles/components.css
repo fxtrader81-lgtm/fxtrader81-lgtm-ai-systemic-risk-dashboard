@@ -339,12 +339,12 @@
 .factor-panel { padding:22px 26px; }
 .conclusion-eyebrow, .compact-title { color:var(--text-dark); font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
 .conclusion-state { font-size:30px; font-weight:900; margin-bottom:10px; }
-.conclusion-copy { color:var(--text-soft); font-size:15px; line-height:1.65; }
-.conclusion-summary { font-weight:700; color:var(--text-main); margin-bottom:12px; }
-.conclusion-factor-list { display:grid; gap:7px; }
-.conclusion-factor-row { display:grid; grid-template-columns:152px minmax(0,1fr); gap:10px; align-items:start; }
-.conclusion-factor-row b { color:var(--text-soft); font-size:12px; line-height:1.5; }
-.conclusion-factor-row span { color:var(--text-muted); font-size:12px; line-height:1.5; }
+.conclusion-copy { color:var(--text-soft); font-size:13px; line-height:1.68; }
+.conclusion-report p { margin:0 0 10px; }
+.conclusion-report p:last-child { margin-bottom:0; }
+.conclusion-report b { color:var(--text-main); }
+.conclusion-report strong { color:var(--text-soft); font-weight:800; }
+.conclusion-report .conclusion-summary { font-size:15px; font-weight:750; color:var(--text-main); margin-bottom:14px; }
 .conclusion-note, .coverage-text { color:var(--text-dark); font-size:12px; }
 .conclusion-note { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-soft); }
 .factor-panel .straw-row { padding:14px 0; gap:12px; }

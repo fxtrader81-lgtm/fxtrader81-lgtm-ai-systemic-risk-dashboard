@@ -8,7 +8,7 @@ import streamlit as st
 from components.ui import load_css
 from config.thresholds import STATE_COLORS
 from core.factor_registry import aggregate_factor_results, load_factor_results
-from core.score_engine import STRAW_LABELS, render_straw_rows, render_system_card
+from core.score_engine import render_straw_rows, render_system_card
 
 load_css()
 
@@ -26,20 +26,36 @@ def _conclusion(system, results):
     return f"{messages[system['state']]} 当前贡献较高的因子为：{names}。"
 
 
-def _factor_conclusion_rows(results):
-    rows = []
-    for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6"):
-        item = results[key]
-        label = STRAW_LABELS[key].split(" ", 1)[1]
-        if item.get("available"):
-            detail = f"{item['state']} · {item['detail']}"
-        else:
-            detail = f"N/A · {item['detail']}"
-        rows.append(
-            f'<div class="conclusion-factor-row"><b>{escape(label)}</b>'
-            f'<span>{escape(detail)}</span></div>'
-        )
-    return "".join(rows)
+def _state_text(item):
+    return item["state"] if item.get("available") else "数据不足"
+
+
+def _conclusion_report(system, results):
+    """Compile the six factor readings into one causal, reader-facing brief."""
+    s1, s2, s3 = results["straw1"], results["straw2"], results["straw3"]
+    s4, s5, s6 = results["straw4"], results["straw5"], results["straw6"]
+    paragraphs = [
+        f'<p class="conclusion-summary">{escape(_conclusion(system, results))}</p>',
+        (
+            '<p><b>核心驱动：</b>资本开支偏离处于 '
+            f'<strong>{escape(_state_text(s1))}</strong>，{escape(s1["detail"])}；'
+            f'开源商业化压缩同处于 <strong>{escape(_state_text(s2))}</strong>，'
+            '说明高投入与商业化承压正在同时出现，盈利兑现速度是当前风险链的首要矛盾。</p>'
+        ),
+        (
+            '<p><b>资产与供给约束：</b>数据中心资产减值和 AI 能源约束分别处于 '
+            f'<strong>{escape(_state_text(s3))} / {escape(_state_text(s4))}</strong>。'
+            'GPU 适配、相关资产价格、电网排队、成本与效率信号已进入观察区，但尚未形成危机级共振；'
+            '若资本开支继续领先需求，这两项会放大折旧、改造和交付压力。</p>'
+        ),
+        (
+            '<p><b>金融传导与宏观缓冲：</b>AI 融资闭环处于 '
+            f'<strong>{escape(_state_text(s5))}</strong>，期限错配、资本角色重叠与证券化传染是主要传导路径；'
+            f'宏观市场预警为 <strong>{escape(_state_text(s6))}</strong>，当前美债水平、变化速率、期限利差和股债相关性'
+            '尚未构成额外冲击。因此现阶段更像是 AI 产业内部的投资回报与信用链压力，而不是宏观市场已经全面失稳。</p>'
+        ),
+    ]
+    return "".join(paragraphs)
 
 with st.spinner("正在汇总六个风险因子…"):
     results = load_factor_results()
@@ -55,8 +71,7 @@ color = STATE_COLORS.get(system["state"], "#64748b")
 st.markdown(f"""<div class="dashboard-grid">
 <div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>
 <div class="conclusion-state" style="color:{color};">{escape(system['state'])}</div>
-<div class="conclusion-copy conclusion-summary">{escape(_conclusion(system, results))}</div>
-<div class="conclusion-factor-list">{_factor_conclusion_rows(results)}</div>
+<div class="conclusion-copy conclusion-report">{_conclusion_report(system, results)}</div>
 <div class="conclusion-note">有效权重覆盖率 {system['coverage']}% · 缺失因子不按安全或中性分处理</div></div>
 <div class="factor-block">{render_straw_rows(scores, results=results)}</div>
 </div>""", unsafe_allow_html=True)

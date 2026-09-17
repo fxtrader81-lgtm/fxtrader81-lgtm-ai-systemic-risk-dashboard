@@ -403,42 +403,43 @@ def treasury_spread(y10: pd.Series, y30: pd.Series, period: str) -> pd.Series:
 
 
 def add_spread_background(fig, y10, y30, period):
-    """Render the historical term spread as translucent green/red bars behind lines."""
+    """Render a compact, bottom-anchored term-spread band behind the lines."""
     spread = treasury_spread(y10, y30, period)
     if spread.empty:
         return
 
     spread_bps = spread * 100
+    # Magnitude is retained in the bar height while sign is encoded by color.
+    # Drawing both signs upward keeps the visual band attached to the time axis;
+    # inverted observations remain explicit in red and in the exact hover value.
+    display_height = spread_bps.abs()
     colors = [
-        "rgba(34,197,94,0.24)" if value >= 0 else "rgba(239,68,68,0.30)"
+        "rgba(34,197,94,0.48)" if value >= 0 else "rgba(239,68,68,0.62)"
         for value in spread_bps.values
     ]
     fig.add_trace(go.Bar(
         x=spread.index,
-        y=spread_bps.values,
+        y=display_height.values,
+        base=0,
         customdata=spread_bps.round(1),
         name=SPREAD_NAME,
         marker=dict(color=colors, line=dict(width=0)),
-        opacity=0.82,
+        opacity=0.92,
         showlegend=False,
         hovertemplate="30Y−10Y利差: %{customdata:.1f} bps<extra></extra>",
     ))
     fig.data[-1].update(yaxis="y3")
 
-    min_spread = float(spread_bps.min())
-    max_spread = float(spread_bps.max())
-    spread_floor = min(-20.0, min_spread * 1.15)
-    spread_ceiling = max(100.0, max_spread * 2.6)
+    max_magnitude = max(1.0, float(display_height.max()))
     fig.update_layout(
         barmode="overlay",
         yaxis3=dict(
             overlaying="y",
             side="right",
-            range=[spread_floor, spread_ceiling],
+            range=[0, max_magnitude * 4.5],
             showgrid=False,
             showticklabels=False,
-            zeroline=True,
-            zerolinecolor="rgba(255,255,255,0.20)",
+            zeroline=False,
             fixedrange=True,
         ),
     )
@@ -536,11 +537,14 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
     fig.update_yaxes(
         title_text="股票指数（实际点位）", secondary_y=False,
         showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False,
+        rangemode="tozero",
     )
     fig.update_yaxes(
         title_text="美债收益率 (%)", secondary_y=True,
         showgrid=False, zeroline=True, zerolinecolor="rgba(255,255,255,0.24)",
+        rangemode="tozero",
     )
+    fig.update_xaxes(showline=True, linecolor="rgba(255,255,255,0.20)", linewidth=1)
     return fig
 
 
@@ -592,13 +596,14 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
     fig.update_yaxes(
         title_text="指数点位", secondary_y=False,
         showgrid=True, gridcolor="rgba(255,255,255,0.04)",
-        tickfont=dict(size=11), zeroline=False,
+        tickfont=dict(size=11), zeroline=False, rangemode="tozero",
     )
     fig.update_yaxes(
         title_text="美债收益率 (%)", secondary_y=True,
         showgrid=False, tickfont=dict(size=11), zeroline=True,
-        zerolinecolor="rgba(255,255,255,0.24)",
+        zerolinecolor="rgba(255,255,255,0.24)", rangemode="tozero",
     )
+    fig.update_xaxes(showline=True, linecolor="rgba(255,255,255,0.20)", linewidth=1)
     return fig
 
 
