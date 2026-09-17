@@ -373,7 +373,7 @@ c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">AOF 资产淘汰 <span class="source-tag-warn">⚠ 静态基准</span></div>
+  <div class="metric-label">AOF 资产淘汰 <span class="source-tag-warn static-data-badge">⚠ 静态基准</span></div>
   <div class="metric-row">
     <span class="metric-number {aof_color}">{AOF}x</span>
     <span class="metric-arrow {aof_color}">{aof_arrow}</span>

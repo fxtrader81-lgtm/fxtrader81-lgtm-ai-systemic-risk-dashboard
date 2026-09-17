@@ -45,7 +45,7 @@ def freshness_badge(updated_str: str) -> str:
         else:
             css = "freshness-ok"
             label = f"✓ {days_ago} 天前更新"
-        return f'<span class="{css}">{label}</span>'
+        return f'<span class="{css} static-data-badge">{label}</span>'
     except Exception:
         return '<span class="source-tag-warn">更新时间未知</span>'
 
@@ -671,8 +671,8 @@ with rp:
 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
   <span class="source-tag">Yahoo Finance ✓</span>
   {eia_tag}
-  <span class="source-tag-warn">基础设施数据 静态维护</span>
-  <span class="source-tag-warn">效率数据 静态维护</span>
+  <span class="source-tag-warn static-data-badge">基础设施数据 静态维护</span>
+  <span class="source-tag-warn static-data-badge">效率数据 静态维护</span>
   <span class="source-tag-gray">AECR={aecr}%</span>
   <span class="source-tag-gray">{ceg_pos_str}</span>
   <span class="source-tag-gray">{vst_pos_str}</span>

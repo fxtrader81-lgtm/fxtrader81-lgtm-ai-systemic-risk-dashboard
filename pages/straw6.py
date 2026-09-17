@@ -21,6 +21,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+from copy import deepcopy
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import load_css
@@ -60,6 +61,20 @@ CRASH_EVENTS = [
     {"date": "2023-03-01", "label": "SVB Crisis",          "desc": "硅谷银行倒闭·银行业危机",       "severity": "WARNING"},
 ]
 
+HISTORY_TABLE = [
+    ("2000-03", "科网泡沫崩盘", "6.79%", "-49%", "CRITICAL"),
+    ("2001-09", "911恐袭", "4.76%", "-30%", "CRITICAL"),
+    ("2007-08", "次贷危机苗头", "4.96%", "-57%", "WARNING"),
+    ("2008-09", "雷曼破产", "3.69%", "-57%", "CRITICAL"),
+    ("2010-05", "闪崩", "3.54%", "-7%", "WATCH"),
+    ("2011-08", "美国评级下调", "2.56%", "-19%", "WARNING"),
+    ("2015-08", "A股股灾", "2.17%", "-12%", "WARNING"),
+    ("2018-12", "圣诞崩盘", "2.83%", "-20%", "WARNING"),
+    ("2020-03", "COVID崩盘", "0.54%", "-34%", "CRITICAL"),
+    ("2022-06", "加息周期峰值", "3.49%", "-25%", "CRITICAL"),
+    ("2023-10", "10Y触5%", "5.02%", "-10%", "WARNING"),
+]
+
 SEVERITY_COLOR = {
     "WATCH":    "#fbbf24",
     "WARNING":  "#f97316",
@@ -74,15 +89,15 @@ BOND_FILL = {
     "30Y Treasury": "rgba(88,120,255,0.15)",
 }
 BOND_LINE = {
-    "10Y Treasury": "#5CB85C",
-    "30Y Treasury": "#5878FF",
+    "10Y Treasury": "#7EE787",
+    "30Y Treasury": "#A5B4FC",
 }
 STOCK_LINE = {
-    "S&P 500":    "#4F8EF7",
-    "NASDAQ 100": "#FF7F50",
-    "Dow Jones":  "#2CA58D",
-    "上证指数":   "#E63946",
-    "深证成指":   "#9D4EDD",
+    "S&P 500":    "#00D9FF",
+    "NASDAQ 100": "#FF9F1C",
+    "Dow Jones":  "#E879F9",
+    "上证指数":   "#FF4D6D",
+    "深证成指":   "#A78BFA",
 }
 NORM_FILL = {
     "10Y Treasury": "rgba(92,184,92,0.15)",
@@ -94,13 +109,8 @@ NORM_FILL = {
     "深证成指":     "rgba(157,78,221,0)",
 }
 NORM_LINE = {
-    "10Y Treasury": "#5CB85C",
-    "30Y Treasury": "#5878FF",
-    "S&P 500":      "#4F8EF7",
-    "NASDAQ 100":   "#FF7F50",
-    "Dow Jones":    "#2CA58D",
-    "上证指数":     "#E63946",
-    "深证成指":     "#9D4EDD",
+    **BOND_LINE,
+    **STOCK_LINE,
 }
 
 # =========================================================
@@ -284,6 +294,8 @@ PLOTLY_LAYOUT = dict(
         bordercolor="rgba(255,255,255,0.1)",
         borderwidth=1,
         font=dict(size=12, color="#cbd5e1"),
+        itemclick="toggle",
+        itemdoubleclick="toggleothers",
     ),
     xaxis=dict(
         showgrid=True, gridcolor="rgba(255,255,255,0.04)",
@@ -370,51 +382,70 @@ def normalize_series(s: pd.Series) -> pd.Series:
 # =========================================================
 
 def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, show_crashes):
-    """ALL tab: 归一化全资产对比"""
-    fig = go.Figure()
+    """ALL tab: 股票指数左轴；利率右轴并以山形面积作为背景。"""
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    assets = [
-        (y10,    "10Y Treasury",  True),
-        (y30,    "30Y Treasury",  True),
-        (sp500,  "S&P 500",       False),
-        (nasdaq, "NASDAQ 100",    False),
-        (dow,    "Dow Jones",     False),
-        (shcomp, "上证指数",      False),
-        (szcomp, "深证成指",      False),
-    ]
+    for series, name, dash in [
+        (y10, "10Y Treasury", "solid"),
+        (y30, "30Y Treasury", "dot"),
+    ]:
+        if series.empty:
+            continue
+        s = filter_by_period(series, period).dropna()
+        if s.empty:
+            continue
+        fig.add_trace(go.Scatter(
+            x=s.index, y=s.values, name=name,
+            fill="tozeroy",
+            fillcolor=BOND_FILL[name],
+            line=dict(color=BOND_LINE[name], width=1.4, dash=dash),
+            mode="lines",
+            hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
+        ), secondary_y=True)
 
-    for series, name, is_bond in assets:
+    for series, name, dash in [
+        (sp500, "S&P 500", "solid"),
+        (nasdaq, "NASDAQ 100", "solid"),
+        (dow, "Dow Jones", "dash"),
+        (shcomp, "上证指数", "solid"),
+        (szcomp, "深证成指", "dash"),
+    ]:
         if series.empty:
             continue
         s = filter_by_period(normalize_series(series), period).dropna()
         if s.empty:
             continue
-        fill_color = NORM_FILL.get(name, "rgba(148,163,184,0)")
-        line_color = NORM_LINE.get(name, "#94a3b8")
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name=name,
-            fill="tozeroy" if is_bond else "none",
-            fillcolor=fill_color,
-            line=dict(color=line_color, width=1.5 if is_bond else 1.8),
+            line=dict(color=STOCK_LINE[name], width=2.2, dash=dash),
             mode="lines",
-        ))
+            hovertemplate=f"{name}: %{{y:,.1f}}（起点=100）<extra></extra>",
+        ), secondary_y=False)
 
     if show_crashes:
         add_crash_annotations(fig, CRASH_EVENTS)
+    add_inversion_bands(fig, y10, y30)
 
-    layout = dict(**PLOTLY_LAYOUT)
-    layout["height"] = 520
-    layout["title"] = dict(text="归一化全资产走势对比（1995年=100）", font=dict(size=14, color="#e2e8f0"), x=0.01)
-    layout["yaxis"]["title"] = dict(text="指数化（100=起点）", font=dict(size=11))
+    layout = deepcopy(PLOTLY_LAYOUT)
+    layout["height"] = 560
+    layout["title"] = dict(text="全资产双轴走势 · 股指起点=100 / 利率为实际百分比", font=dict(size=14, color="#e2e8f0"), x=0.01)
     fig.update_layout(**layout)
+    fig.update_yaxes(
+        title_text="股票指数（起点=100）", secondary_y=False,
+        showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False,
+    )
+    fig.update_yaxes(
+        title_text="美债收益率 (%)", secondary_y=True,
+        showgrid=False, zeroline=False, rangemode="tozero",
+    )
     return fig
 
 
 def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title):
-    """双Y轴图: 债券山形（左）+ 股指折线（右）"""
+    """双Y轴图: 股指折线（左）+ 债券山形（右）。"""
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    for series, name in [(y10, "10Y Treasury"), (y30, "30Y Treasury")]:
+    for series, name, dash in [(y10, "10Y Treasury", "solid"), (y30, "30Y Treasury", "dot")]:
         if series.empty:
             continue
         s = filter_by_period(series, period).dropna()
@@ -422,39 +453,39 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title):
             x=s.index, y=s.values, name=name,
             fill="tozeroy",
             fillcolor=BOND_FILL[name],
-            line=dict(color=BOND_LINE[name], width=1.5),
+            line=dict(color=BOND_LINE[name], width=1.4, dash=dash),
             mode="lines",
             hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
-        ), secondary_y=False)
+        ), secondary_y=True)
 
-    for series, name in stock_pairs:
+    for idx, (series, name) in enumerate(stock_pairs):
         if series.empty:
             continue
         s = filter_by_period(series, period).dropna()
         color = STOCK_LINE.get(name, "#94a3b8")
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name=name,
-            line=dict(color=color, width=2),
+            line=dict(color=color, width=2.3, dash="dash" if idx == 2 else "solid"),
             mode="lines",
             hovertemplate=f"{name}: %{{y:,.0f}}<extra></extra>",
-        ), secondary_y=True)
+        ), secondary_y=False)
 
     if show_crashes:
         add_crash_annotations(fig, CRASH_EVENTS)
     add_inversion_bands(fig, y10, y30)
 
-    layout = dict(**PLOTLY_LAYOUT)
+    layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 500
     layout["title"] = dict(text=title, font=dict(size=14, color="#e2e8f0"), x=0.01)
     fig.update_layout(**layout)
     fig.update_yaxes(
-        title_text="收益率 (%)", secondary_y=False,
+        title_text="指数点位", secondary_y=False,
         showgrid=True, gridcolor="rgba(255,255,255,0.04)",
         tickfont=dict(size=11), zeroline=False,
     )
     fig.update_yaxes(
-        title_text="指数点位", secondary_y=True,
-        showgrid=False, tickfont=dict(size=11), zeroline=False,
+        title_text="美债收益率 (%)", secondary_y=True,
+        showgrid=False, tickfont=dict(size=11), zeroline=False, rangemode="tozero",
     )
     return fig
 
@@ -481,28 +512,61 @@ def build_spread_chart(y10, y30, period):
     return fig
 
 
-def build_alert_history_chart(y10, sp500, period):
+def build_alert_history_chart(y10, sp500, period, selected_month=None):
+    """历史事件图：悬停看详情，点击事件顶部圆点可锁定并联动下方列表。"""
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    y_min, y_max = 0.0, 8.0
     if not y10.empty:
         s = filter_by_period(y10, period)
+        if not s.empty:
+            y_min = max(0.0, float(s.min()) - 0.35)
+            y_max = float(s.max()) + 0.45
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name="10Y Treasury",
             fill="tozeroy", fillcolor="rgba(92,184,92,0.15)",
-            line=dict(color="#5CB85C", width=1.5), mode="lines",
+            line=dict(color=BOND_LINE["10Y Treasury"], width=1.8), mode="lines",
+            hovertemplate="10Y收益率: %{y:.2f}%<extra></extra>",
         ), secondary_y=False)
     if not sp500.empty:
         s = filter_by_period(sp500, period)
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name="S&P 500",
-            line=dict(color="#4F8EF7", width=1.8), mode="lines",
+            line=dict(color=STOCK_LINE["S&P 500"], width=2.2), mode="lines",
+            hovertemplate="S&P 500: %{y:,.0f}<extra></extra>",
         ), secondary_y=True)
-    critical_events = [e for e in CRASH_EVENTS if e["severity"] in ("CRITICAL", "WARNING")]
-    add_crash_annotations(fig, critical_events)
-    layout = dict(**PLOTLY_LAYOUT)
-    layout["height"] = 380
-    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 历史预警事件", font=dict(size=14, color="#e2e8f0"), x=0.01)
+
+    for month, event, y10v, spv, severity in HISTORY_TABLE:
+        dt = pd.to_datetime(month + "-01")
+        color = SEVERITY_COLOR.get(severity, "#94a3b8")
+        active = month == selected_month
+        fig.add_trace(go.Scatter(
+            x=[dt, dt], y=[y_min, y_max],
+            mode="lines+markers",
+            line=dict(color=color, width=4.5 if active else 1.7, dash="solid" if active else "dot"),
+            marker=dict(size=[0, 13 if active else 8], color=color, symbol="diamond" if active else "circle"),
+            customdata=[[month], [month]],
+            name=event,
+            showlegend=False,
+            hovertemplate=(
+                f"<b>{month} · {event}</b><br>级别: {severity}<br>"
+                f"10Y: {y10v}<br>S&P跌幅: {spv}<extra></extra>"
+            ),
+        ), secondary_y=False)
+        if active:
+            fig.add_annotation(
+                x=dt, y=y_max, text=f"聚焦：{event}", showarrow=True,
+                arrowcolor=color, font=dict(color="#ffffff", size=11),
+                bgcolor="rgba(11,17,32,.92)", bordercolor=color,
+            )
+
+    layout = deepcopy(PLOTLY_LAYOUT)
+    layout["height"] = 470
+    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 悬停查看 / 点击锁定历史事件", font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["clickmode"] = "event+select"
+    layout["hovermode"] = "closest"
+    layout["hoverdistance"] = 24
     fig.update_layout(**layout)
-    fig.update_yaxes(title_text="收益率 (%)", secondary_y=False, showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False)
+    fig.update_yaxes(title_text="收益率 (%)", secondary_y=False, showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False, range=[y_min, y_max])
     fig.update_yaxes(title_text="S&P 500", secondary_y=True, showgrid=False, zeroline=False)
     return fig
 
@@ -557,11 +621,10 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
     master_color = grade_to_color(master_grade)
     master_css   = grade_to_css(master_grade)
 
-    st.markdown(f"""
-    <hr class="section-divider">
-    <div style="font-size:13px; font-weight:700; color:#475569; text-transform:uppercase;
-         letter-spacing:1.5px; margin-bottom:16px;">🚨 Alert System · 预警系统</div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="alert-system-heading">🚨 Alert System · 预警系统</div>',
+        unsafe_allow_html=True,
+    )
 
     # 4 指标卡片
     m1 = metrics["y10_level"]
@@ -642,54 +705,58 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
     """, unsafe_allow_html=True)
 
     if show_hist_chart:
-        st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
-        col_chart, col_table = st.columns([1.6, 1])
+        selected_month = st.session_state.get("straw6_selected_event")
+        if selected_month and st.button("清除事件聚焦", key="straw6_clear_event"):
+            st.session_state.pop("straw6_selected_event", None)
+            st.rerun()
 
-        with col_chart:
-            fig_hist = build_alert_history_chart(y10, sp500, "ALL")
-            st.plotly_chart(fig_hist, use_container_width=True, key="straw6_alert_history")
+        fig_hist = build_alert_history_chart(y10, sp500, "ALL", selected_month)
+        chart_event = st.plotly_chart(
+            fig_hist,
+            use_container_width=True,
+            key="straw6_alert_history",
+            on_select="rerun",
+            selection_mode="points",
+        )
+        try:
+            points = chart_event.selection.points
+            custom = points[0].get("customdata") if points else None
+            clicked_month = custom[0] if isinstance(custom, (list, tuple)) else custom
+            if clicked_month and clicked_month != selected_month:
+                st.session_state["straw6_selected_event"] = clicked_month
+                st.rerun()
+        except (AttributeError, IndexError, TypeError):
+            pass
 
-        with col_table:
-            st.markdown("""
-            <div class="panel" style="height:400px; overflow-y:auto;">
-              <div class="panel-title">📋 历史CRITICAL/WARNING复盘</div>
-              <div style="display:flex; gap:8px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.08);">
-                <div style="font-size:11px; color:#475569; width:80px;">时间</div>
-                <div style="font-size:11px; color:#475569; flex:1;">事件</div>
-                <div style="font-size:11px; color:#475569; width:55px; text-align:right;">10Y</div>
-                <div style="font-size:11px; color:#475569; width:55px; text-align:right;">SP跌幅</div>
+        st.markdown("""
+        <div class="panel">
+          <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
+          <div class="metric-sub" style="margin:-8px 0 10px;">悬停事件线查看详情；点击顶部事件点可锁定，并放大对应事件行。</div>
+          <div style="display:flex; gap:8px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:11px; color:#475569; width:90px;">时间</div>
+            <div style="font-size:11px; color:#475569; flex:1;">事件</div>
+            <div style="font-size:11px; color:#475569; width:80px; text-align:right;">10Y</div>
+            <div style="font-size:11px; color:#475569; width:80px; text-align:right;">SP跌幅</div>
+          </div>
+        """, unsafe_allow_html=True)
+
+        for date, event, y10v, spv, sev in HISTORY_TABLE:
+            color = SEVERITY_COLOR.get(sev, "#94a3b8")
+            active_class = " history-row-active" if date == st.session_state.get("straw6_selected_event") else ""
+            st.markdown(f"""
+            <div class="history-row{active_class}">
+              <div class="h-date" style="width:90px;">{date}</div>
+              <div class="h-event">{event}
+                <span style="display:inline-block; font-size:10px; padding:0 6px;
+                  border-radius:4px; background:{color}22; color:{color};
+                  font-weight:700; margin-left:4px;">{sev}</span>
               </div>
+              <div class="h-yield" style="width:80px;">{y10v}</div>
+              <div class="h-drop" style="width:80px;">{spv}</div>
+            </div>
             """, unsafe_allow_html=True)
 
-            HISTORY_TABLE = [
-                ("2000-03", "科网泡沫崩盘",   "6.79%", "-49%", "CRITICAL"),
-                ("2001-09", "911恐袭",         "4.76%", "-30%", "CRITICAL"),
-                ("2007-08", "次贷危机苗头",    "4.96%", "-57%", "WARNING"),
-                ("2008-09", "雷曼破产",        "3.69%", "-57%", "CRITICAL"),
-                ("2010-05", "闪崩",            "3.54%",  "-7%", "WATCH"),
-                ("2011-08", "美国评级下调",    "2.56%", "-19%", "WARNING"),
-                ("2015-08", "A股股灾",         "2.17%", "-12%", "WARNING"),
-                ("2018-12", "圣诞崩盘",        "2.83%", "-20%", "WARNING"),
-                ("2020-03", "COVID崩盘",       "0.54%", "-34%", "CRITICAL"),
-                ("2022-06", "加息周期峰值",    "3.49%", "-25%", "CRITICAL"),
-                ("2023-10", "10Y触5%",         "5.02%", "-10%", "WARNING"),
-            ]
-            for date, event, y10v, spv, sev in HISTORY_TABLE:
-                color = SEVERITY_COLOR.get(sev, "#94a3b8")
-                st.markdown(f"""
-                <div class="history-row">
-                  <div class="h-date">{date}</div>
-                  <div class="h-event">{event}
-                    <span style="display:inline-block; font-size:10px; padding:0 6px;
-                      border-radius:4px; background:{color}22; color:{color};
-                      font-weight:700; margin-left:4px;">{sev}</span>
-                  </div>
-                  <div class="h-yield">{y10v}</div>
-                  <div class="h-drop">{spv}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # 预警逻辑说明
         st.markdown("""
@@ -856,9 +923,7 @@ with tab_all:
         period=period, show_crashes=show_crashes,
     )
     st.plotly_chart(fig_overview, use_container_width=True, key="straw6_all_overview")
-
-    fig_spread = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread, use_container_width=True, key="straw6_all_spread")
+    st.caption("点击图例可显示/隐藏单项，双击仅保留该项；红色背景区为30Y−10Y利差倒挂。")
 
     # 股灾事件索引
     if show_crashes:
@@ -889,12 +954,10 @@ with tab_us:
         y10, y30,
         [(sp500, "S&P 500"), (nasdaq, "NASDAQ 100"), (dow, "Dow Jones")],
         period=period, show_crashes=show_crashes,
-        title="美债收益率（左轴）× 美股三大指数（右轴）",
+        title="美股三大指数（左轴）× 美债收益率山形背景（右轴）",
     )
     st.plotly_chart(fig_us, use_container_width=True, key="straw6_us_markets")
-
-    fig_spread_us = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread_us, use_container_width=True, key="straw6_us_spread")
+    st.caption("点击图例可显示/隐藏单项，双击仅保留该项；红色背景区为期限利差倒挂。")
 
     st.markdown("""
     <div class="panel">
@@ -928,12 +991,10 @@ with tab_cn:
         y10, y30,
         [(shcomp, "上证指数"), (szcomp, "深证成指")],
         period=period, show_crashes=show_crashes,
-        title="美债收益率（左轴）× A股指数（右轴）",
+        title="A股指数（左轴）× 美债收益率山形背景（右轴）",
     )
     st.plotly_chart(fig_cn, use_container_width=True, key="straw6_cn_markets")
-
-    fig_spread_cn = build_spread_chart(y10, y30, period)
-    st.plotly_chart(fig_spread_cn, use_container_width=True, key="straw6_cn_spread")
+    st.caption("点击图例可显示/隐藏单项，双击仅保留该项；红色背景区为期限利差倒挂。")
 
     st.markdown("""
     <div class="panel">

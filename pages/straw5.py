@@ -23,12 +23,13 @@ def _color_class(state: str) -> str:
     return {"SAFE": "green", "WATCH": "yellow", "WARNING": "orange", "CRITICAL": "red"}.get(state, "gray")
 
 
-def _component_card(label: str, component: dict, detail: str) -> str:
+def _component_card(label: str, component: dict, detail: str, badge: str = "") -> str:
     score = component.get("score")
+    label_html = f'{label} <span class="source-tag-warn static-data-badge">{badge}</span>' if badge else label
     if score is None:
-        return metric_card(label, "N/A", "gray", "—", f"数据未覆盖 · {detail}")
+        return metric_card(label_html, "N/A", "gray", "—", f"数据未覆盖 · {detail}")
     state = state_for(score)
-    return metric_card(label, f"{score:.1f}", _color_class(state), "", f"{state} · {detail}")
+    return metric_card(label_html, f"{score:.1f}", _color_class(state), "", f"{state} · {detail}")
 
 
 def _relationship_figure() -> go.Figure:
@@ -134,9 +135,9 @@ st.markdown(render_osci_card(
 components = analysis["components"]
 cols = st.columns(4)
 cards = [
-    _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限"),
-    _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠"),
-    _component_card("证券化传染 ×0.25", components["securitization"], "结构风险 + HYG/HYXF市场代理"),
+    _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限", "⚠ 静态披露"),
+    _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠", "⚠ 静态披露"),
+    _component_card("证券化传染 ×0.25", components["securitization"], "结构风险 + HYG/HYXF市场代理", "◐ 静态+实时"),
     _component_card("抵押品脆弱度 ×0.15", components["collateral"], "直接引用 Straw 3 DCOI，不重复评分"),
 ]
 for column, card in zip(cols, cards):
@@ -222,4 +223,3 @@ if score is not None:
     register_score("straw5", score)
 
 render_footer("SEC公司披露与行业函件（季度静态维护） · Yahoo Finance HYG/HYXF（小时缓存） · Straw 3 DCOI")
-

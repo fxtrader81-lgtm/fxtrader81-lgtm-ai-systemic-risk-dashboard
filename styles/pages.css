@@ -226,6 +226,24 @@
   border-bottom: none;
 }
 
+.history-row-active {
+  background: rgba(96,165,250,0.10);
+  border: 1px solid rgba(96,165,250,0.30);
+  border-radius: 9px;
+  transform: scale(1.012);
+  transform-origin: center;
+  box-shadow: 0 0 18px rgba(96,165,250,0.10);
+}
+
+.alert-system-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin: 4px 0 14px;
+}
+
 .h-date {
   font-size: 13px;
   font-weight: 700;

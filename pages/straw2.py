@@ -396,7 +396,7 @@ c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">能力代差 <span class="source-tag-gray">⚠ 静态基准</span></div>
+  <div class="metric-label">能力代差 <span class="source-tag-gray static-data-badge">⚠ 静态基准</span></div>
   <div class="metric-row">
     <span class="metric-number {cap_color}">{cap_gap_pct:+.1f}%</span>
     <span class="metric-arrow {cap_color}">{cap_arrow}</span>
