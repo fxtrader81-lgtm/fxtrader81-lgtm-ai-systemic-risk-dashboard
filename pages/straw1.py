@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 from config.api_keys import FMP_API_KEY, FMP_BASE
 from components.ui import load_css
-from core.alert_engine import render_alert, render_osci_card, score_to_state
+from core.alert_engine import render_alert, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
 
@@ -224,16 +224,34 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         "CRITICAL": "CapEx growth materially exceeds revenue",
     }
 
-    st.markdown(render_osci_card(
-        "CAPEX–REVENUE RISK INDEX", risk_score, risk_state,
-        f"综合评分：资本开支增速与收入增速差为 {diff * 100:+.2f} 个百分点。",
-        state_detail=state_details[risk_state],
-        components_html=(
-            f"收入增长 {rev_growth * 100:.2f}% · 资本开支增长 {capex_growth * 100:.2f}%<br>"
-            f"增速差 {diff * 100:+.2f} 个百分点 · 单因子评分"
-        ),
-        score_display=f"{risk_score:.0f}",
-    ), unsafe_allow_html=True)
+    risk_color = {
+        "SAFE": "#22c55e", "WATCH": "#fbbf24",
+        "WARNING": "#f97316", "CRITICAL": "#ef4444",
+    }[risk_state]
+    st.markdown(f"""
+<div class="osci-card">
+  <div class="osci-left">
+    <div class="osci-label">CAPEX–REVENUE RISK INDEX</div>
+    <div class="osci-score-row">
+      <div class="osci-score" style="color:{risk_color};">{risk_score:.0f}</div>
+      <div class="osci-scale">/100</div>
+    </div>
+    <div class="osci-desc">综合评分：资本开支增速与收入增速差为 {diff * 100:+.2f} 个百分点。</div>
+    <div class="osci-bar-wrap">
+      <div class="osci-bar-fill" style="width:{risk_score}%; background:{risk_color};"></div>
+    </div>
+  </div>
+  <div class="osci-right">
+    <div class="osci-state-label">SYSTEM STATE</div>
+    <div class="osci-state" style="color:{risk_color};">{risk_state}</div>
+    <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_details[risk_state]}</div>
+    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
+      收入增长 {rev_growth * 100:.2f}% · 资本开支增长 {capex_growth * 100:.2f}%<br>
+      增速差 {diff * 100:+.2f} 个百分点 · 单因子评分
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
     # ===== 三张核心指标卡片（状态仅在顶部总卡展示） =====
     c1, c2, c3 = st.columns(3)

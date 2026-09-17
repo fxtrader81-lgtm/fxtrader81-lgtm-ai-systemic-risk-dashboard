@@ -24,7 +24,6 @@ from datetime import datetime, timedelta
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import load_css
-from core.alert_engine import render_osci_card
 from core.score_engine import register_score
 
 # =========================================================
@@ -807,18 +806,32 @@ top_state_cn = {
     "CRITICAL": "多项宏观指标进入极端区间，系统性风险升高。",
 }[top_composite["grade"]]
 
-st.markdown(render_osci_card(
-    "MACRO ALERT COMPOSITE",
-    top_composite["score"],
-    top_composite["grade"],
-    f"综合评分：{top_state_cn}",
-    state_detail=top_state_detail,
-    components_html=(
-        "10Y水平 ×0.15 · 3M速率 ×0.40<br>"
-        "期限利差 ×0.25 · 股债相关性 ×0.20"
-    ),
-    score_display=f"{top_composite['score']:.1f}",
-), unsafe_allow_html=True)
+top_color = grade_to_color(top_composite["grade"])
+top_css = grade_to_css(top_composite["grade"])
+st.markdown(f"""
+<div class="osci-card">
+  <div class="osci-left">
+    <div class="osci-label">MACRO ALERT COMPOSITE</div>
+    <div class="osci-score-row">
+      <div class="osci-score {top_css}">{top_composite['score']:.1f}</div>
+      <div class="osci-scale">/100</div>
+    </div>
+    <div class="osci-desc">综合评分：{top_state_cn}</div>
+    <div class="osci-bar-wrap">
+      <div class="osci-bar-fill" style="width:{top_composite['score']}%; background:{top_color};"></div>
+    </div>
+  </div>
+  <div class="osci-right">
+    <div class="osci-state-label">SYSTEM STATE</div>
+    <div class="osci-state {top_css}">{top_composite['grade']}</div>
+    <div style="margin-top:8px; font-size:14px; color:#64748b;">{top_state_detail}</div>
+    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
+      10Y水平 ×0.15 · 3M速率 ×0.40<br>
+      期限利差 ×0.25 · 股债相关性 ×0.20
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(y10, y30, sp500, show_hist_chart=True)
