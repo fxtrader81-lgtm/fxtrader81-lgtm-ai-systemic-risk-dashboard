@@ -362,3 +362,23 @@
   font-size: 11px;
   text-align: right;
 }
+
+.series-selector-title {
+  margin: 4px 0 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* Plotly trace paths can provide immediate pointer feedback while retaining
+   the native hover tooltip and the click-to-lock event interaction. */
+div[data-testid="stPlotlyChart"] .scatterlayer .trace .js-line {
+  transition: stroke-width .12s ease, filter .12s ease;
+}
+
+div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
+  stroke-width: 5px !important;
+  filter: drop-shadow(0 0 3px currentColor);
+}
