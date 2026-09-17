@@ -1,9 +1,9 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
-from datetime import datetime, date
 from config.api_keys import EIA_API_KEY
-from components.ui import load_css
+from components.ui import freshness_badge, load_css, render_data_freshness, render_footer, render_header
+from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
 # =========================================================
@@ -11,43 +11,14 @@ from core.score_engine import register_score
 # =========================================================
 
 st.set_page_config(
-    page_title="稻草四：全球AI能源控制体系失效",
+    page_title="AI能源约束",
     layout="wide"
 )
 load_css()
 
 # =========================================================
-# CSS — 与稻草一/二/三完全一致的黑金风格
+# CSS — 使用全站统一的风险页面样式
 # =========================================================
-
-
-# =========================================================
-# 工具函数：数据新鲜度
-# =========================================================
-
-def freshness_badge(updated_str: str) -> str:
-    """
-    传入 'YYYY-MM' 或 'YYYY-MM-DD' 格式的更新日期字符串，
-    返回带颜色的 HTML 标签，显示"距上次更新 X 天"。
-    超过 90 天 → 红色闪烁警告；30-90 天 → 黄色；≤30 天 → 绿色。
-    """
-    try:
-        if len(updated_str) == 7:           # 'YYYY-MM'
-            updated_str += "-01"
-        d_updated = date.fromisoformat(updated_str)
-        days_ago = (date.today() - d_updated).days
-        if days_ago > 90:
-            css = "freshness-stale"
-            label = f"⚠ 数据已 {days_ago} 天未更新"
-        elif days_ago > 30:
-            css = "freshness-warn"
-            label = f"🕐 {days_ago} 天前更新"
-        else:
-            css = "freshness-ok"
-            label = f"✓ {days_ago} 天前更新"
-        return f'<span class="{css} static-data-badge">{label}</span>'
-    except Exception:
-        return '<span class="source-tag-warn">更新时间未知</span>'
 
 
 # =========================================================
@@ -336,7 +307,7 @@ def get_state(esri):
     elif esri < 70:
         return "WARNING", "orange", "Thermodynamic Bottleneck",    "热力学瓶颈形成，能源成本上升向推理成本传导，AI ROI开始承压。"
     else:
-        return "CRITICAL","red",    "Energy Monetization Crunch",  "货币化能力受物理侧切断，算力扩张撞墙，需联动稻草一确认CASCADE。"
+        return "CRITICAL","red",    "Energy Monetization Crunch",  "货币化能力受物理侧切断，算力扩张撞墙，需联动资本开支偏离确认CASCADE。"
 
 
 def score_to_color(s):
@@ -350,18 +321,7 @@ def score_to_color(s):
 # 顶部标题
 # =========================================================
 
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px;">
-  <div>
-    <div class="main-title">⚡ 稻草四：全球AI能源控制体系失效</div>
-    <div class="sub-title">核心命题：AI需求增长速度 &gt; 美国控制体系下的能源扩张速度</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-    <span class="symbol-badge">ESRI · 能源系统风险指数</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+render_header("⚡ AI能源约束", "核心监测维度：AI需求增长速度是否超过可调度能源的扩张速度", symbol="ESRI · 能源系统风险指数")
 
 # =========================================================
 # 数据加载
@@ -412,30 +372,12 @@ mkt_color,    mkt_arrow    = score_to_color(market_s)
 # ESRI 总分大卡片
 # =========================================================
 
-st.markdown(f"""
-<div class="osci-card">
-  <div class="osci-left">
-    <div class="osci-label">ENERGY SYSTEM RISK INDEX</div>
-    <div style="display:flex; align-items:baseline; gap:12px;">
-      <div class="osci-score {state_color}">{esri}</div>
-      <div style="font-size:18px; color:#475569; font-weight:600;">/100</div>
-    </div>
-    <div class="osci-desc">综合评分：{state_cn}</div>
-    <div class="osci-bar-wrap">
-      <div class="osci-bar-fill" style="width:{esri}%; background:{bar_color};"></div>
-    </div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">SYSTEM STATE</div>
-    <div class="osci-state {state_color}">{state}</div>
-    <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_eng}</div>
-    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      基础设施 ×0.40 · 成本压力 ×0.25<br>
-      效率对冲 ×0.20 · 市场信号 ×0.15
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_osci_card(
+    "ENERGY SYSTEM RISK INDEX", esri, state, f"综合评分：{state_cn}",
+    bar_color=bar_color, state_detail=state_eng,
+    components_html="基础设施 ×0.40 · 成本压力 ×0.25<br>效率对冲 ×0.20 · 市场信号 ×0.15",
+    score_display=f"{esri:.0f}",
+), unsafe_allow_html=True)
 
 # =========================================================
 # 四张指标卡片
@@ -555,27 +497,19 @@ alert_map = {
         "icon":        "⚠️",
         "title_color": "#f97316",
         "title":       "结论：热力学瓶颈形成，能源成本开始侵蚀AI推理利润率",
-        "body":        f'当前 ESRI = <span class="orange"><b>{esri}</b></span>，进入高危区间。AECR = <b>{aecr}%</b>。中美电价剪刀差扩大，美国数据中心电力成本在全球竞争中处于劣势。能源成本占推理OpEx比例上升，Inference Margin开始承压。注意：这是成本端信号，尚未构成系统崩塌，需联动稻草一（CapEx ROI）共同确认传导。'
+        "body":        f'当前 ESRI = <span class="orange"><b>{esri}</b></span>，进入高危区间。AECR = <b>{aecr}%</b>。中美电价剪刀差扩大，美国数据中心电力成本在全球竞争中处于劣势。能源成本占推理OpEx比例上升，Inference Margin开始承压。注意：这是成本端信号，尚未构成系统崩塌，需联动资本开支偏离共同确认传导。'
     },
     "CRITICAL": {
         "box_class":   "alert-box-red",
         "icon":        "🔴",
         "title_color": "#ef4444",
-        "title":       "结论：算力扩张撞墙，需与稻草一联动确认CASCADE",
-        "body":        f'当前 ESRI = <span class="red"><b>{esri}</b></span>，进入危机区间。AECR = <b>{aecr}%</b>，美国控制的能源体系已无法覆盖全球AI需求。并网排队彻底失控，数据中心因无电可用成为闲置资产。注意：Straw 4单独不触发CASCADE。CASCADE条件：Straw 4 = CRITICAL <b>且</b> Straw 1 = WARNING以上（AI收入无法覆盖CapEx）同时成立。建议立即对照稻草一财报数据。'
+        "title":       "结论：算力扩张触及能源瓶颈，需与资本开支偏离联动确认CASCADE",
+        "body":        f'当前 ESRI = <span class="red"><b>{esri}</b></span>，进入危机区间。AECR = <b>{aecr}%</b>，可调用能源容量已无法覆盖全球AI需求。并网排队彻底失控，数据中心可能因无电可用成为闲置资产。本因子单独不触发CASCADE；只有当能源约束为 CRITICAL 且资本开支偏离达到 WARNING 以上时才升级。'
     }
 }
 
 alert = alert_map.get(state, alert_map["WATCH"])
-st.markdown(f"""
-<div class="{alert['box_class']}">
-  <div class="alert-icon">{alert['icon']}</div>
-  <div class="alert-text">
-    <div class="alert-title" style="color:{alert['title_color']};">{alert['title']}</div>
-    <div>{alert['body']}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
 # 下方面板：检测逻辑 + 图表 + 反证模块
@@ -654,11 +588,11 @@ with rp:
     fig.update_layout(
         height=280,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#64748b", size=12),
+        font=dict(color="#94a3b8", size=12),
         margin=dict(l=10, r=60, t=30, b=10),
         xaxis=dict(range=[0, 105], showgrid=True,
                    gridcolor="rgba(255,255,255,0.05)", zeroline=False,
-                   tickfont=dict(color="#64748b", size=11)),
+                   tickfont=dict(color="#94a3b8", size=11)),
         yaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=13)),
         showlegend=False,
     )
@@ -689,8 +623,8 @@ st.markdown("""
   <div style="font-size:18px; font-weight:700; color:#e2e8f0; margin-bottom:4px;">
     🛡️ 反证模块（Counter Signals）— 能源风险对冲因素
   </div>
-  <div style="font-size:14px; color:#475569;">
-    以下信号若持续增强，将系统性降低稻草四的风险等级
+  <div style="font-size:14px; color:#94a3b8;">
+    以下信号若持续增强，将系统性降低能源约束因子的风险等级
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -740,62 +674,11 @@ with cc3:
 # 底部注释：数据说明（含EIA实时状态）
 # =========================================================
 
-eia_status_line = (
-    f"EIA商业电价（实时）：${us_price_live:.4f}/kWh · 数据期：{eia_result.get('period','N/A')} · 每24小时自动刷新"
-    if eia_result["price_usd"]
-    else f"EIA API 不可用（{eia_result.get('error','')}），使用静态后备值 ${ENERGY_COST_DATA['us_datacenter_ppa_usd']}/kWh"
-)
-
-fresh_infra_inline = freshness_badge(INFRA_DATA["updated"])
-fresh_gpu_inline   = freshness_badge(GPU_EFFICIENCY_DATA["updated"])
-fresh_cost_inline  = freshness_badge(ENERGY_COST_DATA["updated"])
-
-source_note_html = f"""
-<div style="margin-top: 28px; padding: 18px 22px; background: #0a0f1e;
-     border: 1px solid rgba(251,191,36,0.15); border-radius: 10px;
-     border-left: 3px solid #fbbf24;">
-  <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px; letter-spacing:0.5px;">
-    📡 数据来源与新鲜度说明
-  </div>
-  <div style="font-size:13px; color:#64748b; line-height:2.1;">
-
-    <b style="color:#22c55e;">● 实时数据（自动刷新）</b><br>
-    &nbsp;&nbsp;· <b style="color:#94a3b8;">美国商业电价：</b>{eia_status_line}<br>
-    &nbsp;&nbsp;· <b style="color:#94a3b8;">核电市场信号：</b>Yahoo Finance — CEG · VST · NEE · XLU · ICLN，每小时刷新<br>
-
-    <br><b style="color:#fbbf24;">● 静态数据（手动维护）</b><br>
-    &nbsp;&nbsp;· <b style="color:#94a3b8;">基础设施数据 {fresh_infra_inline}：</b>
-    并网排队 {INFRA_DATA["interconnection_queue_months"]}月（FERC）·
-    变压器交期 {INFRA_DATA["transformer_lead_time_months"]}月（LPT采购调研）·
-    PJM储备率 {INFRA_DATA["pjm_reserve_margin_pct"]}%（NERC）<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#475569; font-size:12px;">更新时机：FERC每季度1/4/7/10月 · NERC每年5/11月发布夏冬评估</span><br>
-
-    &nbsp;&nbsp;· <b style="color:#94a3b8;">效率数据 {fresh_gpu_inline}：</b>
-    B200每瓦性能={GPU_EFFICIENCY_DATA["B200"]["tflops_per_watt"]}x · Rubin预估={GPU_EFFICIENCY_DATA["Rubin"]["tflops_per_watt"]}x（H100=1.0，来源：NVIDIA官方规格）<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#475569; font-size:12px;">更新时机：每次NVIDIA发布新架构后</span><br>
-
-    &nbsp;&nbsp;· <b style="color:#94a3b8;">中国西部电价 {fresh_cost_inline}：</b>
-    ${ENERGY_COST_DATA["cn_west_industrial_usd"]}/kWh（国家能源局，新疆/内蒙直供电）·
-    推理电力占OpEx {ENERGY_COST_DATA["inference_energy_opex_pct"]}%（行业均值）<br>
-    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#475569; font-size:12px;">更新时机：每季度，或国家能源局发布重大价格调整后</span><br>
-
-    <br><b style="color:#94a3b8;">手动更新位置：</b>代码顶部 INFRA_DATA · GPU_EFFICIENCY_DATA · ENERGY_COST_DATA 三个字典<br>
-    <b style="color:#94a3b8;">无法自动获取的数据：</b>
-    FERC并网队列原始Excel · NERC区域储备率 · 数据中心PPA合同价格（私有付费数据）
-  </div>
-</div>
-"""
-# Markdown 会把空行后带四个空格的 HTML 当作代码块；统一去掉行首缩进。
-st.markdown(
-    "\n".join(line.strip() for line in source_note_html.splitlines()),
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    f'<div class="footer-text">'
-    f'实时：Yahoo Finance（CEG · VST · NEE · XLU · ICLN）· EIA Open Data API（US商业电价 {eia_result.get("period","N/A")}）&nbsp;|&nbsp; '
-    f'静态：FERC · NERC · NVIDIA规格 · BloombergNEF（{INFRA_DATA["updated"]}）&nbsp;|&nbsp; '
-    f'{datetime.now().strftime("%Y-%m-%d %H:%M")}'
-    f'</div>',
-    unsafe_allow_html=True
-)
+render_data_freshness([
+    {"name": "美国商业电价", "source": f"EIA Open Data · ${us_price_live:.4f}/kWh", "updated_at": eia_result.get("period") or "备用值", "mode": "live" if eia_result["price_usd"] else "fallback"},
+    {"name": "核电市场信号", "source": "Yahoo Finance · CEG / VST / NEE / XLU / ICLN", "updated_at": "每小时缓存", "mode": "live"},
+    {"name": "基础设施约束", "source": "FERC · NERC · LPT采购调研", "updated_at": INFRA_DATA["updated"], "mode": "static"},
+    {"name": "GPU效率", "source": "NVIDIA官方规格", "updated_at": GPU_EFFICIENCY_DATA["updated"], "mode": "static"},
+    {"name": "中国西部电价", "source": "国家能源局 · 行业均值", "updated_at": ENERGY_COST_DATA["updated"], "mode": "static"},
+])
+render_footer(f'Yahoo Finance · EIA Open Data · FERC · NERC · NVIDIA规格 · BloombergNEF（{INFRA_DATA["updated"]}）')

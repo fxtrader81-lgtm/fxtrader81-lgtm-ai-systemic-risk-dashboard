@@ -1,4 +1,4 @@
-"""Straw 5: AI financing loop and securitization contagion risk."""
+"""AI financing loop and securitization contagion risk."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from core.score_engine import register_score
 from core.straw5_engine import SOURCES, STATIC_INPUTS, load_straw5_analysis, state_for
 
 
-st.set_page_config(page_title="稻草五：AI融资闭环与证券化风险", layout="wide")
+st.set_page_config(page_title="AI融资闭环风险", layout="wide")
 load_css()
 
 
@@ -40,7 +40,7 @@ def _relationship_figure() -> go.Figure:
         arrangement="snap",
         node=dict(
             label=labels,
-            color=["#76b900", "#60a5fa", "#a78bfa", "#fbbf24", "#f97316", "#64748b"],
+            color=["#76b900", "#60a5fa", "#a78bfa", "#fbbf24", "#f97316", "#94a3b8"],
             pad=24,
             thickness=18,
             line=dict(color="#0b1120", width=1),
@@ -102,19 +102,19 @@ def _duration_figure() -> go.Figure:
 
 
 render_header(
-    "🏦 稻草五：AI融资闭环与证券化风险",
-    "核心检测维度：押在AI基础设施上的债务，在资本闭环与资产减值叠加下能否安全到期",
+    "🏦 AI融资闭环风险",
+    "核心监测维度：押在AI基础设施上的债务，在资本闭环与资产减值叠加下能否安全到期",
     symbol="AFSI · AI FINANCING STRESS",
 )
 
-with st.spinner("正在读取SEC季度基准、信用ETF代理与 Straw 3 DCOI…"):
+with st.spinner("正在读取SEC季度基准、信用ETF代理与数据中心资产减值指数…"):
     factor_results = load_factor_results()
     dcoi_score = factor_results.get("straw3", {}).get("score") if factor_results.get("straw3", {}).get("available") else None
     analysis = load_straw5_analysis(dcoi_score)
 
 score = analysis["score"]
 state = analysis["state"]
-color = STATE_COLORS.get(state, "#64748b")
+color = STATE_COLORS.get(state, "#94a3b8")
 market = analysis["market"]
 confidence_cn = {"NORMAL": "正常置信度", "LOW CONFIDENCE": "低置信度", "INSUFFICIENT": "覆盖不足"}[analysis["confidence"]]
 market_line = (
@@ -138,7 +138,7 @@ cards = [
     _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限", "⚠ 静态披露"),
     _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠", "⚠ 静态披露"),
     _component_card("证券化传染 ×0.25", components["securitization"], "结构风险 + HYG/HYXF市场代理", "◐ 静态+实时"),
-    _component_card("抵押品脆弱度 ×0.15", components["collateral"], "直接引用 Straw 3 DCOI，不重复评分"),
+    _component_card("抵押品脆弱度 ×0.15", components["collateral"], "直接引用数据中心资产减值指数，不重复评分"),
 ]
 for column, card in zip(cols, cards):
     with column:
@@ -152,7 +152,7 @@ cascade = (
 )
 if cascade:
     title = "CASCADE：融资压力与上游风险已形成联动"
-    body = f"Straw 5 为 {state}，Straw 1 为 {straw1_state}，Straw 3 为 {straw3_state}。应优先检查再融资、抵押品折价与容量兜底的共同敞口。"
+    body = f"融资闭环为 {state}，资本开支偏离为 {straw1_state}，资产减值为 {straw3_state}。应优先检查再融资、抵押品折价与容量兜底的共同敞口。"
 else:
     title = {
         "SAFE": "融资结构尚未形成系统性压力",
@@ -161,8 +161,8 @@ else:
         "CRITICAL": "融资风险处于高位，等待上游因子确认级联",
     }.get(state, "数据覆盖不足，暂不形成风险结论")
     body = (
-        f"当前 AFSI {score:.1f}/100；Straw 1={straw1_state}，Straw 3={straw3_state}。"
-        "Straw 5 单独不会触发 CASCADE；只有与资本开支偏离或抵押品减值共同恶化时才升级。"
+        f"当前 AFSI {score:.1f}/100；资本开支偏离={straw1_state}，资产减值={straw3_state}。"
+        "融资闭环因子单独不会触发 CASCADE；只有与资本开支偏离或抵押品减值共同恶化时才升级。"
     )
 st.markdown(render_alert("CRITICAL" if cascade else state, title, body), unsafe_allow_html=True)
 
@@ -184,7 +184,7 @@ with tab1:
   <div class="logic-step"><div class="step-num">1</div><div class="step-text"><b>期限错配（35%）</b>：合同WAL与GPU寿命、设施租约及债务尾部期限的缺口。</div></div>
   <div class="logic-step"><div class="step-num">2</div><div class="step-text"><b>资本闭环（25%）</b>：投资者、供应商、容量兜底方与信用支持方是否重叠。</div></div>
   <div class="logic-step"><div class="step-num">3</div><div class="step-text"><b>证券化传染（25%）</b>：40%结构证据 + 60% HYG/HYXF市场代理。ETF不是AI数据中心ABS直接利差。</div></div>
-  <div class="logic-step"><div class="step-num">4</div><div class="step-text"><b>抵押品脆弱度（15%）</b>：直接引用 Straw 3 DCOI；前者看资产是否过时，本页看债务有多少依赖这些资产。</div></div>
+  <div class="logic-step"><div class="step-num">4</div><div class="step-text"><b>抵押品脆弱度（15%）</b>：直接引用数据中心资产减值指数；前者看资产是否过时，本页看债务有多少依赖这些资产。</div></div>
   <div class="logic-step"><div class="step-num">5</div><div class="step-text"><b>缺失值政策</b>：按可用权重重算；覆盖≥75%正常，50–75%标注LOW CONFIDENCE，低于50%输出N/A。</div></div>
   <div class="threshold-block">
     <div class="threshold-row"><div class="t-dot" style="background:#22c55e"></div><div class="t-label">0–24.9</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
@@ -222,4 +222,4 @@ with tab3:
 if score is not None:
     register_score("straw5", score)
 
-render_footer("SEC公司披露与行业函件（季度静态维护） · Yahoo Finance HYG/HYXF（小时缓存） · Straw 3 DCOI")
+render_footer("SEC公司披露与行业函件（季度静态维护） · Yahoo Finance HYG/HYXF（小时缓存） · 数据中心资产减值指数")

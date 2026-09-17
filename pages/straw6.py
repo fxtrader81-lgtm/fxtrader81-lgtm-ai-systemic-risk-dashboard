@@ -1,6 +1,5 @@
 """
-straw6.py — 宏观市场预警看板
-股市 × 债市联动分析 · Bloomberg风格 · 黑金主题
+宏观市场预警看板
 
 数据源:
   - FRED API  : 美国国债收益率 (DGS10, DGS30)
@@ -24,14 +23,17 @@ from datetime import datetime, timedelta
 from copy import deepcopy
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
-from components.ui import load_css
+from components.ui import load_css, render_footer, render_header
+from core.alert_engine import render_alert, render_osci_card
+from core.macro_data import load_macro_snapshot
+from core.macro_risk import compute_macro_metrics
 from core.score_engine import register_score
 
 # =========================================================
 # 页面配置
 # =========================================================
 st.set_page_config(
-    page_title="Straw 6 · 宏观预警看板",
+    page_title="宏观市场预警",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -45,34 +47,34 @@ load_css()
 # 股灾事件数据库（内置）
 # =========================================================
 CRASH_EVENTS = [
-    {"date": "1997-10-01", "label": "Asian Crisis",       "desc": "亚洲金融危机·港元保卫战",        "severity": "WARNING"},
-    {"date": "1998-08-01", "label": "LTCM / Russia",      "desc": "俄罗斯违约·LTCM崩盘",           "severity": "WARNING"},
-    {"date": "2000-03-01", "label": "Dot-com Peak",        "desc": "科网泡沫顶点·纳指跌78%",         "severity": "CRITICAL"},
-    {"date": "2001-09-01", "label": "9/11 Attack",         "desc": "911恐袭·市场关闭4天",            "severity": "CRITICAL"},
-    {"date": "2002-10-01", "label": "Post 9/11 Bottom",    "desc": "科网熊市底部",                   "severity": "WARNING"},
-    {"date": "2007-08-01", "label": "Subprime Starts",     "desc": "次贷危机苗头·贝尔斯登基金崩盘", "severity": "WARNING"},
-    {"date": "2008-09-01", "label": "Lehman Collapse",     "desc": "雷曼破产·金融海啸",              "severity": "CRITICAL"},
-    {"date": "2010-05-01", "label": "Flash Crash",         "desc": "闪崩·道指单日跌近1000点",       "severity": "WATCH"},
-    {"date": "2011-08-01", "label": "US Downgrade",        "desc": "美国主权评级下调·欧债危机",      "severity": "WARNING"},
-    {"date": "2015-08-01", "label": "China Crash",         "desc": "A股股灾·人民币贬值",            "severity": "WARNING"},
-    {"date": "2018-12-01", "label": "Fed Tightening",      "desc": "美联储加息恐慌·圣诞崩盘",       "severity": "WARNING"},
-    {"date": "2020-03-01", "label": "COVID Crash",         "desc": "新冠疫情·史上最快熊市",         "severity": "CRITICAL"},
-    {"date": "2022-01-01", "label": "Rate Hike Cycle",     "desc": "加息周期启动·纳指跌33%",        "severity": "CRITICAL"},
-    {"date": "2023-03-01", "label": "SVB Crisis",          "desc": "硅谷银行倒闭·银行业危机",       "severity": "WARNING"},
+    {"date": "1997-10-01", "label": "Asian Crisis",       "desc": "亚洲金融危机扩散，港元与区域资产承受集中抛压。", "severity": "WARNING"},
+    {"date": "1998-08-01", "label": "LTCM / Russia",      "desc": "俄罗斯违约与LTCM危机令杠杆和流动性风险暴露。", "severity": "WARNING"},
+    {"date": "2000-03-01", "label": "Dot-com Peak",       "desc": "科技估值见顶，随后进入长期盈利与估值重估。", "severity": "CRITICAL"},
+    {"date": "2001-09-01", "label": "9/11 Attack",        "desc": "恐袭导致市场停摆，并快速推高避险与流动性需求。", "severity": "CRITICAL"},
+    {"date": "2002-10-01", "label": "Post 9/11 Bottom",   "desc": "科技熊市完成主要去杠杆阶段并形成周期低点。", "severity": "WARNING"},
+    {"date": "2007-08-01", "label": "Subprime Starts",    "desc": "贝尔斯登基金事件使次贷信用风险开始向市场传导。", "severity": "WARNING"},
+    {"date": "2008-09-01", "label": "Lehman Collapse",    "desc": "雷曼破产冻结融资市场并触发全球信用链收缩。", "severity": "CRITICAL"},
+    {"date": "2010-05-01", "label": "Flash Crash",        "desc": "市场结构与流动性异常造成指数短时间内急跌。", "severity": "WATCH"},
+    {"date": "2011-08-01", "label": "US Downgrade",       "desc": "美国评级下调与欧债压力共同推高全球避险交易。", "severity": "WARNING"},
+    {"date": "2015-08-01", "label": "China Crash",        "desc": "A股波动与人民币贬值冲击全球风险偏好。", "severity": "WARNING"},
+    {"date": "2018-12-01", "label": "Fed Tightening",     "desc": "加息与缩表预期引发年末估值快速压缩。", "severity": "WARNING"},
+    {"date": "2020-03-01", "label": "COVID Crash",        "desc": "疫情外生冲击造成流动性挤兑与快速熊市。", "severity": "CRITICAL"},
+    {"date": "2022-01-01", "label": "Rate Hike Cycle",    "desc": "快速加息重估久期资产并持续压制成长股估值。", "severity": "CRITICAL"},
+    {"date": "2023-03-01", "label": "SVB Crisis",         "desc": "久期错配导致银行挤兑并扩散至区域银行体系。", "severity": "WARNING"},
 ]
 
-HISTORY_TABLE = [
-    ("2000-03", "科网泡沫崩盘", "6.79%", "-49%", "CRITICAL"),
-    ("2001-09", "911恐袭", "4.76%", "-30%", "CRITICAL"),
-    ("2007-08", "次贷危机苗头", "4.96%", "-57%", "WARNING"),
-    ("2008-09", "雷曼破产", "3.69%", "-57%", "CRITICAL"),
-    ("2010-05", "闪崩", "3.54%", "-7%", "WATCH"),
-    ("2011-08", "美国评级下调", "2.56%", "-19%", "WARNING"),
-    ("2015-08", "A股股灾", "2.17%", "-12%", "WARNING"),
-    ("2018-12", "圣诞崩盘", "2.83%", "-20%", "WARNING"),
-    ("2020-03", "COVID崩盘", "0.54%", "-34%", "CRITICAL"),
-    ("2022-06", "加息周期峰值", "3.49%", "-25%", "CRITICAL"),
-    ("2023-10", "10Y触5%", "5.02%", "-10%", "WARNING"),
+HISTORY_EVENTS = [
+    ("2000-03", "科网泡沫见顶", "高估值科技股进入长期去杠杆阶段。"),
+    ("2001-09", "9·11冲击", "交易中断与避险需求同时冲击风险资产。"),
+    ("2007-08", "次贷风险显性化", "贝尔斯登基金事件令信用收缩开始外溢。"),
+    ("2008-09", "雷曼破产", "融资市场冻结并触发全球信用链收缩。"),
+    ("2010-05", "闪电崩盘", "流动性与市场结构冲击造成指数瞬时急跌。"),
+    ("2011-08", "美国评级下调", "主权评级与欧债风险共同推升避险交易。"),
+    ("2015-08", "中国市场波动", "人民币贬值与A股波动影响全球风险偏好。"),
+    ("2018-12", "紧缩压力调整", "加息与缩表预期引发年末估值压缩。"),
+    ("2020-03", "疫情冲击", "外生冲击造成流动性挤兑和快速熊市。"),
+    ("2022-06", "快速加息周期", "通胀与紧缩预期持续压缩成长资产估值。"),
+    ("2023-10", "10Y收益率高位", "长端利率快速上行重新定价风险资产。"),
 ]
 
 SEVERITY_COLOR = {
@@ -106,7 +108,7 @@ SERIES_MARKERS = {
     "10Y Treasury": "🟩",
     "30Y Treasury": "🟦",
     SPREAD_NAME: "⬜",
-    "S&P 500": "🔷",
+    "S&P 500": "🟦",
     "NASDAQ 100": "🟧",
     "Dow Jones": "🟪",
     "上证指数": "🟥",
@@ -212,80 +214,51 @@ def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
 # =========================================================
 
 def compute_alert_metrics(y10: pd.Series, y30: pd.Series, sp500: pd.Series) -> dict:
-    result = {}
+    return compute_macro_metrics(y10, y30, sp500)
 
-    cur_y10 = float(y10.iloc[-1]) if not y10.empty else 0
-    if cur_y10 < 3.0:
-        score1, grade1 = 0, "SAFE"
-    elif cur_y10 < 4.0:
-        score1, grade1 = 33, "WATCH"
-    elif cur_y10 < 5.0:
-        score1, grade1 = 67, "WARNING"
-    else:
-        score1, grade1 = 100, "CRITICAL"
-    result["y10_level"] = {"value": cur_y10, "grade": grade1, "score": score1, "unit": "%"}
 
-    if len(y10) >= 3:
-        chg3m = float(y10.iloc[-1] - y10.iloc[-3]) * 100
-    else:
-        chg3m = 0.0
-    if chg3m < 50:
-        score2, grade2 = 0, "SAFE"
-    elif chg3m < 100:
-        score2, grade2 = 33, "WATCH"
-    elif chg3m < 150:
-        score2, grade2 = 67, "WARNING"
-    else:
-        score2, grade2 = 100, "CRITICAL"
-    result["y10_momentum"] = {"value": chg3m, "grade": grade2, "score": score2, "unit": "bps/3M"}
+def build_history_rows(y10: pd.Series, y30: pd.Series, sp500: pd.Series) -> list[dict]:
+    """Calculate every historical row from source series; event metadata is descriptive only."""
+    rows = []
+    weights = {"y10_level": 0.15, "y10_momentum": 0.40, "spread": 0.25, "correlation": 0.20}
+    labels = {"y10_level": "10Y水平", "y10_momentum": "10Y三个月变化", "spread": "30Y−10Y利差", "correlation": "股债相关性"}
+    for month, event, description in HISTORY_EVENTS:
+        event_end = pd.Timestamp(month) + pd.offsets.MonthEnd(0)
+        y10_hist = y10[y10.index <= event_end]
+        y30_hist = y30[y30.index <= event_end]
+        sp_hist = sp500[sp500.index <= event_end]
+        if y10_hist.empty or sp_hist.empty:
+            rows.append({"month": month, "event": event, "description": description, "available": False})
+            continue
 
-    if not y30.empty and not y10.empty:
-        common = y30.index.intersection(y10.index)
-        spread = float(y30.loc[common[-1]] - y10.loc[common[-1]]) * 100 if len(common) > 0 else 20.0
-    else:
-        spread = 20.0
-    if spread > 20:
-        score3, grade3 = 0, "SAFE"
-    elif spread > 0:
-        score3, grade3 = 33, "WATCH"
-    elif spread > -30:
-        score3, grade3 = 67, "WARNING"
-    else:
-        score3, grade3 = 100, "CRITICAL"
-    result["spread"] = {"value": spread, "grade": grade3, "score": score3, "unit": "bps"}
-
-    corr_val = 0.0
-    if len(y10) >= 12 and len(sp500) >= 12:
-        common = y10.index.intersection(sp500.index)
-        if len(common) >= 12:
-            y_aligned = y10.loc[common].tail(12)
-            s_aligned = sp500.loc[common].tail(12)
-            s_ret = s_aligned.pct_change().dropna()
-            y_chg = y_aligned.diff().dropna()
-            common2 = s_ret.index.intersection(y_chg.index)
-            if len(common2) >= 6:
-                corr_val = float(np.corrcoef(y_chg.loc[common2], s_ret.loc[common2])[0, 1])
-    if corr_val > -0.3:
-        score4, grade4 = 0, "SAFE"
-    elif corr_val > -0.5:
-        score4, grade4 = 33, "WATCH"
-    elif corr_val > -0.7:
-        score4, grade4 = 67, "WARNING"
-    else:
-        score4, grade4 = 100, "CRITICAL"
-    result["correlation"] = {"value": corr_val, "grade": grade4, "score": score4, "unit": "r"}
-
-    composite = score1 * 0.15 + score2 * 0.40 + score3 * 0.25 + score4 * 0.20
-    if composite < 25:
-        master_grade = "SAFE"
-    elif composite < 50:
-        master_grade = "WATCH"
-    elif composite < 75:
-        master_grade = "WARNING"
-    else:
-        master_grade = "CRITICAL"
-    result["composite"] = {"score": round(composite, 1), "grade": master_grade}
-    return result
+        metrics = compute_alert_metrics(y10_hist, y30_hist, sp_hist)
+        event_window = sp500[
+            (sp500.index >= event_end - pd.DateOffset(months=6))
+            & (sp500.index <= event_end + pd.DateOffset(months=12))
+        ]
+        if event_window.empty:
+            drawdown = np.nan
+        else:
+            drawdown = float((event_window / event_window.cummax() - 1).min())
+        components = []
+        for key in ("y10_level", "y10_momentum", "spread", "correlation"):
+            item = metrics[key]
+            unit = item["unit"]
+            raw = f'{item["value"]:+.2f}{unit}' if key != "y10_level" else f'{item["value"]:.2f}{unit}'
+            contribution = item["score"] * weights[key]
+            components.append(f'{labels[key]} {raw} → {item["score"]}/100 ×{weights[key]:.2f} = {contribution:.1f}')
+        rows.append({
+            "month": month,
+            "event": event,
+            "description": description,
+            "available": True,
+            "y10": f'{metrics["y10_level"]["value"]:.2f}%',
+            "drawdown": "N/A" if np.isnan(drawdown) else f"{drawdown:.0%}",
+            "score": metrics["composite"]["score"],
+            "state": metrics["composite"]["grade"],
+            "components": " · ".join(components),
+        })
+    return rows
 
 
 def grade_to_color(grade: str) -> str:
@@ -629,7 +602,7 @@ def build_spread_chart(y10, y30, period):
     return fig
 
 
-def build_alert_history_chart(y10, sp500, period, selected_month=None):
+def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=None):
     """历史事件图：悬停看详情，点击事件顶部圆点可锁定并联动下方列表。"""
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     y_min, y_max = 0.0, 8.0
@@ -652,7 +625,9 @@ def build_alert_history_chart(y10, sp500, period, selected_month=None):
             hovertemplate="S&P 500: %{y:,.0f}<extra></extra>",
         ), secondary_y=True)
 
-    for month, event, y10v, spv, severity in HISTORY_TABLE:
+    for row in history_rows:
+        month, event = row["month"], row["event"]
+        severity = row.get("state", "N/A")
         dt = pd.to_datetime(month + "-01")
         color = SEVERITY_COLOR.get(severity, "#94a3b8")
         active = month == selected_month
@@ -668,8 +643,8 @@ def build_alert_history_chart(y10, sp500, period, selected_month=None):
             name=event,
             showlegend=False,
             hovertemplate=(
-                f"<b>{month} · {event}</b><br>级别: {severity}<br>"
-                f"10Y: {y10v}<br>S&P跌幅: {spv}<extra></extra>"
+                f"<b>{month} · {event}</b><br>当时评分: {row.get('score', 'N/A')}/100 · {severity}<br>"
+                f"10Y: {row.get('y10', 'N/A')}<br>事件窗口最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
             ),
         ), secondary_y=False)
         fig.add_annotation(
@@ -699,7 +674,7 @@ def build_alert_history_chart(y10, sp500, period, selected_month=None):
     layout["hoverdistance"] = 36
     layout["hoverlabel"] = dict(
         bgcolor="#111827",
-        bordercolor="#64748b",
+        bordercolor="#94a3b8",
         font=dict(size=16, color="#f8fafc", family="'PingFang SC','Microsoft YaHei',sans-serif"),
         align="left",
     )
@@ -758,6 +733,7 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
     master_grade = composite["grade"]
     master_color = grade_to_color(master_grade)
     master_css   = grade_to_css(master_grade)
+    history_rows = build_history_rows(y10, y30, sp500)
 
     st.markdown(
         '<div class="alert-system-heading">🚨 Alert System · 预警系统</div>',
@@ -778,16 +754,16 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
         with col:
             st.markdown(f"""
             <div class="metric-card" style="height:210px;">
-              <div class="metric-label">{icon} {title} <span style="color:#475569;">×{weight}</span></div>
+              <div class="metric-label">{icon} {title} <span class="weight-label">×{weight}</span></div>
               <div class="metric-row">
                 <span class="metric-number {css}">{value}</span>
-                <span style="font-size:14px; color:#64748b;">{unit}</span>
+                <span style="font-size:14px; color:#94a3b8;">{unit}</span>
               </div>
               <div>
                 <span class="metric-badge"
                   style="background:{color}22; color:{color}; border:1px solid {color}44;">{grade}</span>
               </div>
-              <div style="margin-top:10px; font-size:12px; color:#475569; line-height:1.8;">
+              <div class="threshold-copy">
                 {threshold_html}
               </div>
             </div>
@@ -795,8 +771,8 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
 
     alert_card(c1, "📊", "10Y收益率水平", f"{m1['value']:.2f}", "%", m1["grade"], "0.15",
                "&lt;3.0 SAFE · 3-4 WATCH<br>4-5 WARNING · &gt;5 CRITICAL")
-    alert_card(c2, "🚀", "3个月变化速率", f"{m2['value']:+.0f}", "bps", m2["grade"], "0.40",
-               "历史P75=+50 · P90=+100<br>P95=+150bps<br>最关键预警指标")
+    alert_card(c2, "🚀", "10Y三个月变化速率", f"{m2['value']:+.0f}", "bps", m2["grade"], "0.40",
+               "配置阈值：+50 / +100 / +150bps<br>本模型最高权重指标")
     alert_card(c3, "📐", "30Y−10Y利差", f"{m3['value']:+.0f}", "bps", m3["grade"], "0.25",
                "&gt;20 SAFE · 0-20 WATCH<br>0~-30 WARNING · &lt;-30 CRITICAL")
     alert_card(c4, "🔗", "股债滚动相关性", f"{m4['value']:+.2f}", "r(12M)", m4["grade"], "0.20",
@@ -821,26 +797,18 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
         "WARNING": {
             "box": "alert-box-orange", "icon": "⚠️",
             "title_color": "#f97316",
-            "title": "结论：高风险区间，历史上此阶段股市平均调整15-25%",
-            "body": "多项指标进入高风险区间。历史参照：2022年Q1-Q2，加息周期启动初期，10Y收益率3个月内上升230bps，纳指最终下跌33%，标普下跌25%。<b>估值压缩风险显著，科技/成长股暴露度需降低。</b>",
+            "title": "结论：高风险区间，估值压缩压力显著上升",
+            "body": "多项指标进入高风险区间。请结合下方按事件时点计算的历史评分与事件窗口回撤进行比较；不同事件的驱动因素和回撤路径并不相同。<b>建议重点复核久期较长的科技与成长资产敞口。</b>",
         },
         "CRITICAL": {
             "box": "alert-box-red", "icon": "🔴",
             "title_color": "#ef4444",
-            "title": "结论：极端风险，历史上触发CRITICAL级别后市场均出现重大调整",
-            "body": "所有核心指标均处于极端区间。历史复盘：2000年科网顶点（10Y=6.79%），2008年雷曼前夕（5.25%），2022年加息顶峰（5.02%），触发本级别后12个月内S&P500平均下跌32%。<b>历史数据显示，此级别触发后进行防御性配置的胜率超过80%。</b>",
+            "title": "结论：极端风险，多项宏观压力已形成共振",
+            "body": "核心指标进入极端区间。历史比较必须使用事件当时可获得的原始序列与统一窗口；下方列表逐项展示原始值、子评分、权重贡献和事件前6个月至后12个月的最大回撤。<b>当前应开展情景压力测试，而不是把历史事件视为确定性预测。</b>",
         },
     }
     conc = ALERT_CONCLUSIONS.get(master_grade, ALERT_CONCLUSIONS["WATCH"])
-    st.markdown(f"""
-    <div class="{conc['box']}">
-      <div class="alert-icon">{conc['icon']}</div>
-      <div class="alert-text">
-        <div class="alert-title" style="color:{conc['title_color']};">{conc['title']}</div>
-        <div>{conc['body']}</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(render_alert(master_grade, conc["title"], conc["body"]), unsafe_allow_html=True)
 
     if show_hist_chart:
         selected_month = st.session_state.get("straw6_selected_event")
@@ -848,7 +816,7 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
             st.session_state.pop("straw6_selected_event", None)
             st.rerun()
 
-        fig_hist = build_alert_history_chart(y10, sp500, "ALL", selected_month)
+        fig_hist = build_alert_history_chart(y10, sp500, "ALL", history_rows, selected_month)
         chart_event = st.plotly_chart(
             fig_hist,
             use_container_width=True,
@@ -869,28 +837,34 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="metric-sub" style="margin:-8px 0 10px;">悬停事件线查看详情；点击顶部事件点可锁定，并放大对应事件行。</div>
-          <div style="display:flex; gap:8px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.08);">
-            <div style="font-size:11px; color:#475569; width:90px;">时间</div>
-            <div style="font-size:11px; color:#475569; flex:1;">事件</div>
-            <div style="font-size:11px; color:#475569; width:80px; text-align:right;">10Y</div>
-            <div style="font-size:11px; color:#475569; width:80px; text-align:right;">SP跌幅</div>
+          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。原始值与评分均由历史月度序列现场计算；回撤口径为事件前6个月至后12个月月末收盘价的最大峰谷回撤。</div>
+          <div class="history-header">
+            <div style="width:90px;">时间</div>
+            <div style="flex:1;">事件与计算依据</div>
+            <div style="width:90px; text-align:right;">10Y</div>
+            <div style="width:110px; text-align:right;">事件窗口回撤</div>
+            <div style="width:110px; text-align:right;">当时评分</div>
           </div>
         """, unsafe_allow_html=True)
 
-        for date, event, y10v, spv, sev in HISTORY_TABLE:
+        for row in history_rows:
+            date, event = row["month"], row["event"]
+            sev = row.get("state", "N/A")
             color = SEVERITY_COLOR.get(sev, "#94a3b8")
             active_class = " history-row-active" if date == st.session_state.get("straw6_selected_event") else ""
             st.markdown(f"""
             <div class="history-row{active_class}">
               <div class="h-date" style="width:90px;">{date}</div>
-              <div class="h-event">{event}
+              <div class="h-event"><b>{event}</b>
                 <span style="display:inline-block; font-size:10px; padding:0 6px;
                   border-radius:4px; background:{color}22; color:{color};
                   font-weight:700; margin-left:4px;">{sev}</span>
+                <small>{row['description']}</small>
+                <small class="history-calculation">{row.get('components', '该事件时点的源数据不足，未生成评分。')}</small>
               </div>
-              <div class="h-yield" style="width:80px;">{y10v}</div>
-              <div class="h-drop" style="width:80px;">{spv}</div>
+              <div class="h-yield" style="width:90px;">{row.get('y10', 'N/A')}</div>
+              <div class="h-drop" style="width:110px;">{row.get('drawdown', 'N/A')}</div>
+              <div class="history-score" style="width:110px; color:{color};">{row.get('score', 'N/A')}/100</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -899,18 +873,19 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
         # 预警逻辑说明
         st.markdown("""
         <div class="panel">
-          <div class="panel-title">⚙️ 预警逻辑与阈值推导（基于1994-今历史统计）</div>
+          <div class="panel-title">⚙️ 预警逻辑、阈值与数据口径</div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px;">
             <div>
               <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px;">
-                🚀 指标②：3M收益率变化速率（权重最高 ×0.40）
+                🚀 指标②：10Y三个月变化速率（权重最高 ×0.40）
               </div>
               <div style="font-size:13px; color:#94a3b8; line-height:2;">
-                这是历史上与股市调整相关性最强的单一指标。<br>
-                <b style="color:#22c55e;">P75 = +50bps</b> → 进入WATCH：如2021 Q1（+82bps），短暂调整<br>
-                <b style="color:#f97316;">P90 = +100bps</b> → 进入WARNING：如2013 Taper（+130bps），-6%<br>
-                <b style="color:#ef4444;">P95 = +150bps</b> → 进入CRITICAL：如2022（+230bps），-25%<br>
-                <span style="color:#475569;">数据来源：FRED DGS10月度数据，1994-今历史分位数计算</span>
+                这是本模型赋予最高权重的动量指标。<br>
+                <b style="color:#22c55e;">低于 +50bps</b> → SAFE<br>
+                <b style="color:#fbbf24;">+50 至 +100bps</b> → WATCH<br>
+                <b style="color:#f97316;">+100 至 +150bps</b> → WARNING<br>
+                <b style="color:#ef4444;">高于 +150bps</b> → CRITICAL<br>
+                <span class="source-note">数据来源：FRED DGS10月度期末值；变化量按事件月与前三个月之差计算。</span>
               </div>
             </div>
             <div>
@@ -919,16 +894,16 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
               </div>
               <div style="font-size:13px; color:#94a3b8; line-height:2;">
                 期限结构是债市对未来经济的隐性预测。<br>
-                <b style="color:#ef4444;">倒挂（&lt;0）</b>：历史上每次持续倒挂均先于衰退6-18个月<br>
+                <b style="color:#ef4444;">倒挂（&lt;0）</b>：持续倒挂常被用作未来6–18个月衰退风险信号<br>
                 <b style="color:#f97316;">2006-2007</b>：倒挂持续8个月 → 2008金融危机<br>
                 <b style="color:#fbbf24;">2019</b>：短暂倒挂 → 2020衰退（COVID加速触发）<br>
-                <span style="color:#475569;">注：2020年COVID属于外生冲击，本系统存在盲区</span>
+                <span class="source-note">注：2020年COVID属于外生冲击，本系统存在盲区</span>
               </div>
             </div>
           </div>
           <div style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.06);
-               font-size:12px; color:#475569; line-height:1.8;">
-            ⚠️ <b style="color:#64748b;">系统盲区声明</b>：本预警体系专门针对"利率上行杀估值"场景。对外生冲击（COVID、地缘政治）、
+               font-size:13px; color:#94a3b8; line-height:1.8;">
+            ⚠️ <b style="color:#cbd5e1;">系统盲区声明</b>：本预警体系专门针对"利率上行杀估值"场景。对外生冲击（COVID、地缘政治）、
             中国政策性股市崩盘（2015）、Flash Crash等非利率驱动型下跌，本系统预警能力有限。
           </div>
         </div>
@@ -941,13 +916,7 @@ def render_alert_system(y10, y30, sp500, show_hist_chart=True):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_all_data():
-    y10    = fetch_fred("DGS10",      "1994-01-01")
-    y30    = fetch_fred("DGS30",      "1994-01-01")
-    if y10.empty:
-        y10 = fetch_yf_yield("^TNX", "1994-01-01")
-    if y30.empty:
-        y30 = fetch_yf_yield("^TYX", "1994-01-01")
-    sp500  = fetch_market_index("^GSPC", "1994-01-01")
+    y10, y30, sp500, _macro_source = load_macro_snapshot()
     nasdaq = fetch_market_index("^IXIC", "1994-01-01")
     dow    = fetch_market_index("^DJI",  "1994-01-01")
     shcomp = fetch_yf_index("000001.SS", "1994-01-01")
@@ -962,20 +931,11 @@ with st.spinner("正在从 FRED · FMP · Yahoo Finance 拉取数据..."):
 # 页面顶部：标题 + 控制栏
 # =========================================================
 
-now_str = datetime.now().strftime("%Y-%m-%d %H:%M ET")
-
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
-  <div>
-    <div class="main-title">📡 Straw 6 · 宏观市场预警看板</div>
-    <div class="sub-title">股市 × 债市联动分析 · Bloomberg风格 · 黑金主题</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 {now_str}</span>
-    <span class="symbol-badge">STRAW 6 · MACRO ALERT</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+render_header(
+    "📡 宏观市场预警",
+    "核心监测维度：股市与债市压力是否同步上升，并形成跨市场风险共振",
+    symbol="MACRO ALERT",
+)
 
 # 控制栏（时间范围 + 股灾标注 + 刷新）
 ctrl_col1, ctrl_col2, ctrl_col3, ctrl_spacer = st.columns([2, 2, 1.2, 4])
@@ -1012,31 +972,13 @@ top_state_cn = {
 }[top_composite["grade"]]
 
 top_color = grade_to_color(top_composite["grade"])
-top_css = grade_to_css(top_composite["grade"])
-st.markdown(f"""
-<div class="osci-card">
-  <div class="osci-left">
-    <div class="osci-label">MACRO ALERT COMPOSITE</div>
-    <div class="osci-score-row">
-      <div class="osci-score {top_css}">{top_composite['score']:.1f}</div>
-      <div class="osci-scale">/100</div>
-    </div>
-    <div class="osci-desc">综合评分：{top_state_cn}</div>
-    <div class="osci-bar-wrap">
-      <div class="osci-bar-fill" style="width:{top_composite['score']}%; background:{top_color};"></div>
-    </div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">SYSTEM STATE</div>
-    <div class="osci-state {top_css}">{top_composite['grade']}</div>
-    <div style="margin-top:8px; font-size:14px; color:#64748b;">{top_state_detail}</div>
-    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      10Y水平 ×0.15 · 3M速率 ×0.40<br>
-      期限利差 ×0.25 · 股债相关性 ×0.20
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_osci_card(
+    "MACRO ALERT COMPOSITE", top_composite["score"], top_composite["grade"],
+    f"综合评分：{top_state_cn}", bar_color=top_color,
+    state_detail=top_state_detail,
+    components_html="10Y水平 ×0.15 · 10Y三个月变化 ×0.40<br>期限利差 ×0.25 · 股债相关性 ×0.20",
+    score_display=f"{top_composite['score']:.1f}",
+), unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(y10, y30, sp500, show_hist_chart=True)
@@ -1085,8 +1027,8 @@ with tab_all:
                 <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
                   <div style="width:3px; background:{color}; border-radius:2px; flex-shrink:0;"></div>
                   <div>
-                    <div style="font-size:11px; color:{color}; font-weight:700;">{ev['date'][:7]} · {ev['label']}</div>
-                    <div style="font-size:12px; color:#94a3b8; margin-top:2px;">{ev['desc']}</div>
+                    <div style="font-size:14px; color:{color}; font-weight:700;">{ev['date'][:7]} · {ev['label']}</div>
+                    <div style="font-size:14px; line-height:1.55; color:#cbd5e1; margin-top:4px;">{ev['desc']}</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1181,11 +1123,4 @@ with tab_cn:
 # =========================================================
 # 底部版权
 # =========================================================
-st.markdown(f"""
-<div style="margin-top:32px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.05);
-     font-size:11px; color:#1e293b; text-align:right; line-height:2;">
-  实时数据：FRED（DGS10·DGS30）· 美股指数 FMP（Yahoo Finance 备用）· A股 Yahoo Finance
-  &nbsp;|&nbsp; 更新时间：{datetime.now().strftime("%Y-%m-%d %H:%M")}
-  &nbsp;|&nbsp; Straw 6 · 仅供研究参考，不构成投资建议
-</div>
-""", unsafe_allow_html=True)
+render_footer("FRED（DGS10、DGS30）· FMP（美股）· Yahoo Finance（备用及A股）")

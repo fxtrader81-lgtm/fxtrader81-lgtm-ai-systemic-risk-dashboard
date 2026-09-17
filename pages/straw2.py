@@ -1,8 +1,8 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
-from datetime import datetime
-from components.ui import load_css
+from components.ui import load_css, render_footer, render_header
+from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
 # =========================================================
@@ -10,13 +10,13 @@ from core.score_engine import register_score
 # =========================================================
 
 st.set_page_config(
-    page_title="稻草二：开源压缩风险",
+    page_title="开源商业化压缩",
     layout="wide"
 )
 load_css()
 
 # =========================================================
-# CSS — 与稻草一完全一致的黑金风格
+# CSS — 使用全站统一的风险页面样式
 # =========================================================
 
 
@@ -212,18 +212,7 @@ def get_state(osci):
 # 顶部标题
 # =========================================================
 
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px;">
-  <div>
-    <div class="main-title">🔬 稻草二：开源压缩风险监控</div>
-    <div class="sub-title">核心检测维度：AI智力垄断是否正在被开源生态商品化</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-    <span class="symbol-badge">OSCI · 开源压缩指数</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+render_header("🔬 开源商业化压缩", "核心监测维度：AI智力垄断是否正在被开源生态商品化", symbol="OSCI · 开源压缩指数")
 
 # =========================================================
 # 数据加载
@@ -363,30 +352,12 @@ bar_color_map = {
 }
 bar_color = bar_color_map.get(state_color, "#94a3b8")
 
-st.markdown(f"""
-<div class="osci-card">
-  <div class="osci-left">
-    <div class="osci-label">OPEN SOURCE COMPRESSION INDEX</div>
-    <div style="display:flex; align-items:baseline; gap:12px;">
-      <div class="osci-score {state_color}">{osci}</div>
-      <div style="font-size:18px; color:#475569; font-weight:600;">/100</div>
-    </div>
-    <div class="osci-desc">综合评分：{state_cn}</div>
-    <div class="osci-bar-wrap">
-      <div class="osci-bar-fill" style="width:{osci}%; background:{bar_color};"></div>
-    </div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">SYSTEM STATE</div>
-    <div class="osci-state {state_color}">{state}</div>
-    <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_eng}</div>
-    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      能力代差 ×0.20 · 价格压缩 ×0.35<br>
-      部署动能 ×0.30 · 生态速度 ×0.15
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_osci_card(
+    "OPEN SOURCE COMPRESSION INDEX", osci, state, f"综合评分：{state_cn}",
+    bar_color=bar_color, state_detail=state_eng,
+    components_html="能力代差 ×0.20 · 价格压缩 ×0.35<br>部署动能 ×0.30 · 生态速度 ×0.15",
+    score_display=f"{osci:.0f}",
+), unsafe_allow_html=True)
 
 # =========================================================
 # 四张指标卡片
@@ -485,21 +456,13 @@ alert_map = {
         "box_class": "alert-box-red",
         "icon": "🔴",
         "title_color": "#ef4444",
-        "title": "结论：货币化能力恶化，需联动 Straw 1 财务数据确认传导",
-        "body": f'当前 OSCI = <span class="red"><b>{osci}</b></span>，进入危机区间。开源对闭源的商业侵蚀已可量化。注意：Straw 2 只监控开源压缩，CASCADE 事件（GPU订单取消/数据中心减值/ABS风险）需要 Straw 1 资本开支异常同步触发才能确认。当前建议：监控云厂商下一份财报的 AI 服务收入增速与 inference gross margin。'
+        "title": "结论：货币化能力恶化，需联动资本开支数据确认传导",
+        "body": f'当前 OSCI = <span class="red"><b>{osci}</b></span>，进入危机区间。开源对闭源的商业侵蚀已可量化。注意：本因子只监控开源商业化压缩，CASCADE 事件（GPU订单取消/数据中心减值/ABS风险）需要资本开支偏离同步触发才能确认。当前建议：监控云厂商下一份财报的 AI 服务收入增速与 inference gross margin。'
     }
 }
 
 alert = alert_map.get(state, alert_map["WATCH"])
-st.markdown(f"""
-<div class="{alert['box_class']}">
-  <div class="alert-icon">{alert['icon']}</div>
-  <div class="alert-text">
-    <div class="alert-title" style="color:{alert['title_color']};">{alert['title']}</div>
-    <div>{alert['body']}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
 # 下方面板：检测逻辑 + 数据图表
@@ -579,14 +542,14 @@ with rp:
         height=320,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#64748b", size=12),
+        font=dict(color="#94a3b8", size=12),
         margin=dict(l=10, r=60, t=30, b=10),
         xaxis=dict(
             range=[0, 105],
             showgrid=True,
             gridcolor="rgba(255,255,255,0.05)",
             zeroline=False,
-            tickfont=dict(color="#64748b", size=11),
+            tickfont=dict(color="#94a3b8", size=11),
         ),
         yaxis=dict(
             showgrid=False,
@@ -630,7 +593,7 @@ st.markdown(f"""
   <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px; letter-spacing:0.5px;">
     ⚠ 静态基准数据说明（能力代差指标）
   </div>
-  <div style="font-size:13px; color:#64748b; line-height:1.9;">
+  <div style="font-size:13px; color:#94a3b8; line-height:1.9;">
     <b style="color:#94a3b8;">当前数据：</b>
     闭源基准 = {BENCHMARK_DATA["closed"]["name"]}（MMLU {BENCHMARK_DATA["closed"]["mmlu"]} / HumanEval {BENCHMARK_DATA["closed"]["humaneval"]} / MATH {BENCHMARK_DATA["closed"]["math"]}）<br>
     <b style="color:#94a3b8;">对比模型：</b>
@@ -644,7 +607,4 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-st.markdown(
-    f'<div class="footer-text">实时数据：OpenRouter API · GitHub REST API · HuggingFace API &nbsp;|&nbsp; 静态数据：Benchmark 手动维护（{BENCHMARK_DATA["closed"]["updated"]}）&nbsp;|&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>',
-    unsafe_allow_html=True
-)
+render_footer(f'OpenRouter API · GitHub REST API · HuggingFace API · Benchmark 静态维护（{BENCHMARK_DATA["closed"]["updated"]}）')

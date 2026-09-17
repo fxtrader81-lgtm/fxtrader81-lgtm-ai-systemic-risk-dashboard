@@ -13,7 +13,7 @@ from typing import Optional
 _BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(color="#64748b", size=12),
+    font=dict(color="#94a3b8", size=12),
     margin=dict(l=10, r=10, t=10, b=10),
 )
 
@@ -21,7 +21,7 @@ _AXIS_STYLE = dict(
     showgrid=True,
     gridcolor="rgba(255,255,255,0.05)",
     zeroline=False,
-    tickfont=dict(color="#64748b", size=11),
+    tickfont=dict(color="#94a3b8", size=11),
 )
 
 
@@ -103,14 +103,14 @@ def build_growth_comparison_chart(
             tickvals=years,
             ticktext=[str(y) for y in years],
             showgrid=False, zeroline=False,
-            tickfont=dict(color="#64748b", size=11),
+            tickfont=dict(color="#94a3b8", size=11),
         ),
         yaxis=dict(
             title="增长率 (%)",
             gridcolor="rgba(255,255,255,0.05)",
             zeroline=True, zerolinecolor="rgba(255,255,255,0.08)",
-            tickfont=dict(color="#64748b"),
-            title_font=dict(color="#64748b", size=11),
+            tickfont=dict(color="#94a3b8"),
+            title_font=dict(color="#94a3b8", size=11),
         ),
     )
     return fig
@@ -172,7 +172,7 @@ def build_horizontal_bar(
     fig.update_layout(
         xaxis=dict(range=[0, 105], showgrid=True,
                    gridcolor="rgba(255,255,255,0.05)",
-                   zeroline=False, tickfont=dict(color="#64748b", size=11)),
+                   zeroline=False, tickfont=dict(color="#94a3b8", size=11)),
         yaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=15)),
         bargap=0.35,
     )
@@ -220,7 +220,7 @@ def build_line_chart(
         xaxis=dict(**_AXIS_STYLE, showgrid=False),
         yaxis=dict(**_AXIS_STYLE,
                    title=y_title,
-                   title_font=dict(color="#64748b", size=11)),
+                   title_font=dict(color="#94a3b8", size=11)),
     )
     return fig
 
@@ -279,7 +279,7 @@ def build_gpu_generation_bar(
         s = g.get("status", "")
         if s == "current": colors.append("#ef4444")
         elif s == "active": colors.append("#fbbf24")
-        elif s == "next":   colors.append("#475569")
+        elif s == "next":   colors.append("#94a3b8")
         else:               colors.append("#1e3a5f")
 
     fig = _base_fig(height=height)
@@ -311,7 +311,7 @@ def build_gpu_generation_bar(
         barmode="stack",
         xaxis=dict(showgrid=False, tickfont=dict(color="#94a3b8", size=11)),
         yaxis=dict(title="机架功耗 (kW)", **_AXIS_STYLE,
-                   title_font=dict(color="#64748b", size=11)),
+                   title_font=dict(color="#94a3b8", size=11)),
         margin=dict(l=10, r=10, t=30, b=10),
     )
     return fig

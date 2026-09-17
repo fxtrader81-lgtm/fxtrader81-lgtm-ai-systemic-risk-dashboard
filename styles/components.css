@@ -70,6 +70,9 @@
   letter-spacing: -4px;
 }
 
+.system-score-row { display:flex; align-items:baseline; gap:14px; }
+.system-score-scale { color:var(--text-dim); font-size:24px; font-weight:700; }
+
 .osci-desc,
 .system-score-desc {
   font-size: 15px;
@@ -337,7 +340,7 @@
 .factor-block { min-width:0; }
 .dashboard-conclusion, .factor-panel { min-height:390px; height:100%; }
 .factor-panel { padding:22px 26px; }
-.conclusion-eyebrow, .compact-title { color:var(--text-dark); font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
+.conclusion-eyebrow, .compact-title { color:var(--text-dim); font-size:13px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
 .conclusion-state { font-size:30px; font-weight:900; margin-bottom:10px; }
 .conclusion-copy { color:var(--text-soft); font-size:13px; line-height:1.68; }
 .conclusion-report p { margin:0 0 10px; }
@@ -345,7 +348,7 @@
 .conclusion-report b { color:var(--text-main); }
 .conclusion-report strong { color:var(--text-soft); font-weight:800; }
 .conclusion-report .conclusion-summary { font-size:15px; font-weight:750; color:var(--text-main); margin-bottom:14px; }
-.conclusion-note, .coverage-text { color:var(--text-dark); font-size:12px; }
+.conclusion-note, .coverage-text { color:var(--text-dim); font-size:13px; }
 .conclusion-note { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-soft); }
 .factor-panel .straw-row { padding:14px 0; gap:12px; }
 .factor-panel .straw-name { width:230px; }
@@ -357,7 +360,7 @@
 .source-status { background:rgba(255,255,255,.02); border-radius:9px; padding:10px; display:grid; gap:5px; }
 .source-status b { color:var(--text-soft); font-size:12px; }
 .source-status span { color:var(--blue); font-size:16px; font-weight:800; }
-.source-status small { color:var(--text-dark); font-size:10px; line-height:1.45; }
+.source-status small { color:var(--text-dim); font-size:11px; line-height:1.45; }
 
 @media (max-width:900px) {
   [data-testid="stHorizontalBlock"] { flex-wrap:wrap; }

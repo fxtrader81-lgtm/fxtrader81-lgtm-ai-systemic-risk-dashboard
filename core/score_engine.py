@@ -69,7 +69,7 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
     bar_w     = min(int(sys_score), 100)
 
     descs = {
-        "SAFE":     "各风险因子均处于正常区间，AI次贷危机系统性风险较低。",
+        "SAFE":     "各风险因子均处于正常区间，当前系统性风险较低。",
         "WATCH":    "部分风险因子出现早期信号，建议加强监测频率。",
         "WARNING":  "多项风险因子同步抬升，系统性风险已进入高危区间。",
         "CRITICAL": "风险因子叠加共振，需立即启动深度尽调与风险对冲。",
@@ -78,8 +78,8 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
     return f"""
 <div class="system-score-card">
   <div>
-    <div class="system-score-label">🌾 Compute-Dollar Risk Terminal · 系统总分</div>
-    <div class="system-score-num" style="color:{color};">{sys_score:.0f}</div>
+    <div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · 系统总分</div>
+    <div class="system-score-row"><div class="system-score-num" style="color:{color};">{sys_score:.0f}</div><div class="system-score-scale">/100</div></div>
     <div class="system-score-desc">{descs.get(state, '')}<br><span class="coverage-text">有效权重覆盖率 {coverage}%</span></div>
   </div>
   <div style="text-align:right;">
@@ -93,7 +93,7 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
 """
 
 
-STRAW_LABELS = {
+FACTOR_LABELS = {
     "straw1": "🌾 01 · 资本开支偏离",
     "straw2": "💻 02 · 开源商业化压缩",
     "straw3": "🏗 03 · 数据中心资产减值",
@@ -102,18 +102,28 @@ STRAW_LABELS = {
     "straw6": "📊 06 · 宏观市场预警",
 }
 
+FACTOR_PATHS = {
+    "straw1": "factor-capex-divergence",
+    "straw2": "factor-open-source",
+    "straw3": "factor-data-center-assets",
+    "straw4": "factor-energy",
+    "straw5": "factor-financing-loop",
+    "straw6": "factor-macro-market",
+}
+
 
 def render_straw_rows(scores: dict, results: dict | None = None) -> str:
     """
-    渲染六根稻草进度条列表 HTML。
+    渲染六项风险因子进度条列表 HTML。
     """
     rows = ""
-    for straw_id, label in STRAW_LABELS.items():
+    for straw_id, label in FACTOR_LABELS.items():
+        path = FACTOR_PATHS[straw_id]
         result = (results or {}).get(straw_id, {})
         score  = result.get("score") if results is not None else scores.get(straw_id, None)
         if score is None:
             score_txt  = "—"
-            color      = "#475569"
+            color      = "#94a3b8"
             state_txt  = "N/A"
             bar_w      = 0
         else:
@@ -124,13 +134,14 @@ def render_straw_rows(scores: dict, results: dict | None = None) -> str:
             bar_w     = min(int(score), 100)
 
         rows += f"""
-<div class="straw-row">
+<a class="straw-row factor-link" href="./{path}" target="_self" aria-label="查看{label}详情">
   <div class="straw-name">{label}</div>
   <div class="straw-bar-wrap">
     <div class="straw-bar-fill" style="width:{bar_w}%; background:{color};"></div>
   </div>
   <div class="straw-score" style="color:{color};">{score_txt}</div>
   <div class="straw-state" style="color:{color};">{state_txt}</div>
-</div>
+  <div class="factor-arrow">查看详情 →</div>
+</a>
 """
     return f'<div class="panel factor-panel"><div class="compact-title">风险因子</div>{rows}</div>'

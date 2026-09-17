@@ -5,7 +5,7 @@ from html import escape
 
 import streamlit as st
 
-from components.ui import load_css
+from components.ui import load_css, render_footer
 from config.thresholds import STATE_COLORS
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.score_engine import render_straw_rows, render_system_card
@@ -63,11 +63,11 @@ system = aggregate_factor_results(results)
 scores = {key: item["score"] for key, item in results.items() if item.get("available")}
 
 st.markdown(f"""<div class="dashboard-header"><div><div class="main-title">📡 Compute-Dollar Risk Terminal</div>
-<div class="sub-title">AI次贷危机监测系统 · 六个风险因子自动汇总</div></div>
+<div class="sub-title">美元—算力系统性风险监测 · 六维风险综合评估</div></div>
 <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span></div>""", unsafe_allow_html=True)
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
 
-color = STATE_COLORS.get(system["state"], "#64748b")
+color = STATE_COLORS.get(system["state"], "#94a3b8")
 st.markdown(f"""<div class="dashboard-grid">
 <div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>
 <div class="conclusion-state" style="color:{color};">{escape(system['state'])}</div>
@@ -86,4 +86,4 @@ st.markdown('<div class="source-strip"><div class="compact-title">数据覆盖�
 if st.button("刷新全部因子数据", use_container_width=False):
     st.cache_data.clear()
     st.rerun()
-st.markdown(f'<div class="footer-text">缺失值不填 0、不填 50 · 数据缓存 1 小时 · {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>', unsafe_allow_html=True)
+render_footer("六个风险因子自动汇总 · 缺失值不填 0、不填 50 · 数据缓存 1 小时")

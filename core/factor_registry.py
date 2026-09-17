@@ -17,6 +17,8 @@ import streamlit as st
 import yfinance as yf
 
 from config.thresholds import STRAW_WEIGHTS
+from core.macro_data import load_macro_snapshot
+from core.macro_risk import compute_macro_metrics
 from core.straw5_engine import load_straw5_analysis
 
 
@@ -33,10 +35,10 @@ class FactorResult:
 
 
 FACTOR_NAMES = {
-    "straw1": "AI资本开支循环",
-    "straw2": "开源压缩风险",
+    "straw1": "资本开支偏离",
+    "straw2": "开源商业化压缩",
     "straw3": "数据中心资产减值",
-    "straw4": "全球AI能源控制",
+    "straw4": "AI能源约束",
     "straw5": "AI融资闭环风险",
     "straw6": "宏观市场预警",
 }
@@ -260,29 +262,11 @@ def _yield_series(ticker: str) -> pd.Series:
 
 
 def _straw6() -> dict:
-    y10, y30 = _yield_series("^TNX"), _yield_series("^TYX")
-    sp = _single_close("^GSPC")
-    components = []
-    if not y10.empty:
-        level = float(y10.iloc[-1])
-        components.append((0.15, 0 if level < 3 else 33 if level < 4 else 67 if level < 5 else 100))
-        if len(y10) >= 3:
-            change = float(y10.iloc[-1] - y10.iloc[-3]) * 100
-            components.append((0.40, 0 if change < 50 else 33 if change < 100 else 67 if change < 150 else 100))
-    if not y10.empty and not y30.empty:
-        spread = (float(y30.iloc[-1]) - float(y10.iloc[-1])) * 100
-        components.append((0.25, 0 if spread > 20 else 33 if spread > 0 else 67 if spread > -30 else 100))
-    if len(y10) >= 12 and len(sp) >= 12:
-        y = y10.tail(12).reset_index(drop=True).diff().dropna()
-        s = sp.tail(12).reset_index(drop=True).pct_change().dropna()
-        corr = float(np.corrcoef(y, s)[0, 1])
-        if np.isfinite(corr):
-            components.append((0.20, 0 if corr > -0.3 else 33 if corr > -0.5 else 67 if corr > -0.7 else 100))
-    weight = sum(w for w, _ in components)
-    if weight < 0.55:
+    y10, y30, sp, source = load_macro_snapshot()
+    if y10.empty or y30.empty or sp.empty:
         return _unavailable("straw6", "美债与标普序列覆盖不足")
-    score = sum(w * value for w, value in components) / weight
-    return _result("straw6", score, weight, "美债水平、动量、期限利差与股债相关性", "Yahoo Finance（FRED备用源）")
+    metrics = compute_macro_metrics(y10, y30, sp)
+    return _result("straw6", metrics["composite"]["score"], 1.0, "美债水平、动量、期限利差与股债相关性", source)
 
 
 PROVIDERS: dict[str, Callable[[], dict]] = {
@@ -314,7 +298,7 @@ def load_factor_results() -> dict[str, dict]:
             analysis["score"],
             analysis["coverage"] / 100,
             f"期限错配、资本闭环、证券化传染与DCOI联动 · {analysis['confidence']}",
-            "SEC季度披露 · Yahoo Finance信用ETF代理 · Straw 3 DCOI",
+            "SEC季度披露 · Yahoo Finance信用ETF代理 · 数据中心资产减值指数",
         )
     except Exception as exc:
         results["straw5"] = _unavailable("straw5", f"数据源异常：{type(exc).__name__}")

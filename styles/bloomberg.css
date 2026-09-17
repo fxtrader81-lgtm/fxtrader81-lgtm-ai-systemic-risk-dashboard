@@ -29,7 +29,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     color: #cbd5e1 !important;
     margin: 0;
 }
-.timestamp-text { font-size: 13px; color: #475569; margin-bottom: 8px; display: block; }
+.timestamp-text { font-size: 13px; color: #94a3b8; margin-bottom: 8px; display: block; }
 .symbol-badge {
     display: inline-block;
     background: rgba(255,255,255,0.05);
@@ -55,11 +55,11 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     display: flex; align-items: center; justify-content: space-between;
 }
 .osci-left { display: flex; flex-direction: column; gap: 6px; }
-.osci-label { font-size: 13px; font-weight: 600; color: #475569; letter-spacing: 1.5px; text-transform: uppercase; }
+.osci-label { font-size: 13px; font-weight: 600; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; }
 .osci-score { font-size: 72px; font-weight: 800; line-height: 1; letter-spacing: -3px; }
 .osci-desc { font-size: 15px; color: #94a3b8; margin-top: 4px; }
 .osci-right { text-align: right; }
-.osci-state-label { font-size: 13px; color: #475569; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.osci-state-label { font-size: 13px; color: #94a3b8; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
 .osci-state { font-size: 28px; font-weight: 800; letter-spacing: 0.5px; }
 .osci-bar-wrap { margin-top: 12px; width: 280px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; }
 .osci-bar-fill { height: 6px; border-radius: 3px; transition: width 0.5s; }
@@ -164,7 +164,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     color: #cbd5e1 !important;
     flex: 1;
 }
-.t-arrow { font-size: 13px; color: #475569; }
+.t-arrow { font-size: 13px; color: #94a3b8; }
 .t-status { font-size: 15px !important; font-weight: 600; }
 
 /* ---- 数据源标签 ---- */
@@ -212,7 +212,7 @@ section[data-testid="stMain"] > div { background-color: #050816 !important; }
     margin-bottom: 28px;
 }
 .system-score-num { font-size: 96px; font-weight: 900; line-height: 1; letter-spacing: -4px; }
-.system-score-label { font-size: 13px; color: #475569; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+.system-score-label { font-size: 13px; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
 .system-score-state { font-size: 32px; font-weight: 800; }
 .system-score-desc { font-size: 15px; color: #94a3b8; margin-top: 8px; max-width: 420px; line-height: 1.6; }
 
@@ -222,4 +222,4 @@ footer { visibility: hidden; }
 .modebar { display: none !important; }
 
 /* ---- 页脚 ---- */
-.footer-text { margin-top: 14px; color: #1e293b; font-size: 11px; text-align: right; }
+.footer-text { margin-top: 14px; color: #94a3b8; font-size: 11px; text-align: right; }

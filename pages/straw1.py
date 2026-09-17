@@ -2,10 +2,9 @@ import streamlit as st
 import requests
 import yfinance as yf
 import plotly.graph_objects as go
-from datetime import datetime
 from config.api_keys import FMP_API_KEY, FMP_BASE
-from components.ui import load_css
-from core.alert_engine import render_alert, score_to_state
+from components.ui import load_css, render_footer, render_header
+from core.alert_engine import render_alert, render_osci_card, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
 
@@ -131,18 +130,7 @@ with col_input:
     symbol = st.text_input("股票代码", "NVDA")
 
 with col_title:
-    st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start;">
-  <div>
-    <div class="main-title">🌾 稻草一：AI资本开支循环检测</div>
-    <div class="sub-title">核心检测维度：资本开支扩张速度是否超过收入增长速度</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-    <span class="symbol-badge">标的：{symbol}</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    render_header("🌾 资本开支偏离", "核心监测维度：资本开支扩张速度是否超过收入增长速度", symbol=symbol)
 
 # =========================================================
 # 稳定获取：硬性 limit=5
@@ -228,30 +216,14 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         "SAFE": "#22c55e", "WATCH": "#fbbf24",
         "WARNING": "#f97316", "CRITICAL": "#ef4444",
     }[risk_state]
-    st.markdown(f"""
-<div class="osci-card">
-  <div class="osci-left">
-    <div class="osci-label">CAPEX–REVENUE RISK INDEX</div>
-    <div class="osci-score-row">
-      <div class="osci-score" style="color:{risk_color};">{risk_score:.0f}</div>
-      <div class="osci-scale">/100</div>
-    </div>
-    <div class="osci-desc">综合评分：资本开支增速与收入增速差为 {diff * 100:+.2f} 个百分点。</div>
-    <div class="osci-bar-wrap">
-      <div class="osci-bar-fill" style="width:{risk_score}%; background:{risk_color};"></div>
-    </div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">SYSTEM STATE</div>
-    <div class="osci-state" style="color:{risk_color};">{risk_state}</div>
-    <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_details[risk_state]}</div>
-    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      收入增长 {rev_growth * 100:.2f}% · 资本开支增长 {capex_growth * 100:.2f}%<br>
-      增速差 {diff * 100:+.2f} 个百分点 · 单因子评分
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(render_osci_card(
+        "CAPEX–REVENUE RISK INDEX", risk_score, risk_state,
+        f"综合评分：资本开支增速与收入增速差为 {diff * 100:+.2f} 个百分点。",
+        state_detail=state_details[risk_state],
+        components_html=(f"收入增长 {rev_growth * 100:.2f}% · 资本开支增长 {capex_growth * 100:.2f}%<br>"
+                         f"增速差 {diff * 100:+.2f} 个百分点 · 单因子评分"),
+        score_display=f"{risk_score:.0f}",
+    ), unsafe_allow_html=True)
 
     # ===== 三张核心指标卡片（状态仅在顶部总卡展示） =====
     c1, c2, c3 = st.columns(3)
@@ -355,7 +327,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         fig.update_layout(
             height=340,
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#64748b", size=12),
+            font=dict(color="#94a3b8", size=12),
             legend=dict(orientation="h", y=1.15, font=dict(size=12, color="#94a3b8"), bgcolor="rgba(0,0,0,0)"),
             margin=dict(l=10, r=95, t=10, b=10), # 完美放宽右边距至95，承托放大后的20字号
             annotations=annotations,
@@ -365,20 +337,19 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
                 ticktext=[str(y) for y in cy_list],
                 showgrid=False, 
                 zeroline=False,
-                tickfont=dict(color="#64748b", size=11)
+                tickfont=dict(color="#94a3b8", size=11)
             ),
             yaxis=dict(
                 title="增长率 (%)",
                 gridcolor="rgba(255,255,255,0.05)",
                 zeroline=True, zerolinecolor="rgba(255,255,255,0.08)",
-                tickfont=dict(color="#64748b"), title_font=dict(color="#64748b", size=11)
+                tickfont=dict(color="#94a3b8"), title_font=dict(color="#94a3b8", size=11)
             )
         )
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown(f'<div class="footer-text">数据来源：{data_source} · 实时采集 · 当前标的：{symbol}</div>',
-                unsafe_allow_html=True)
+    render_footer(f"{data_source} · 当前标的：{symbol}")
 
 else:
     st.error("财务数据加载失败。这通常不是股票代码错误，而是数据源密钥、限额或网络状态异常。")

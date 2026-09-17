@@ -1,8 +1,8 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from datetime import datetime
-from components.ui import load_css
+from components.ui import load_css, render_footer, render_header
+from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
 load_css()
@@ -30,7 +30,7 @@ GPU_GENERATIONS = [
 # 页面配置
 # =========================================================
 
-st.set_page_config(page_title="稻草三：数据中心资产减值", layout="wide")
+st.set_page_config(page_title="数据中心资产减值", layout="wide")
 
 # =========================================================
 # CSS
@@ -298,18 +298,7 @@ def score_power(power_data):
 # 顶部标题
 # =========================================================
 
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
-  <div>
-    <div class="main-title">🏗️ 稻草三：数据中心资产技术性减值</div>
-    <div class="sub-title">核心检测维度：AI时代GPU迭代速度是否已超出数据中心基础设施的金融折旧周期</div>
-  </div>
-  <div style="text-align:right; padding-top:4px;">
-    <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
-    <span class="symbol-badge">DCOI · 数据中心淘汰指数</span>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+render_header("🏗️ 数据中心资产减值", "核心监测维度：GPU迭代速度是否已超出数据中心基础设施的金融折旧周期", symbol="DCOI · 数据中心淘汰指数")
 
 # =========================================================
 # 数据加载
@@ -340,30 +329,12 @@ bar_color = bar_color_map.get(state_color, "#94a3b8")
 # DCOI 总分大卡片
 # =========================================================
 
-st.markdown(f"""
-<div class="osci-card">
-  <div class="osci-left">
-    <div class="osci-label">DATA CENTER OBSOLESCENCE INDEX</div>
-    <div style="display:flex; align-items:baseline; gap:12px;">
-      <div class="osci-score {state_color}">{dcoi}</div>
-      <div style="font-size:18px; color:#475569; font-weight:600;">/100</div>
-    </div>
-    <div class="osci-desc">综合评分：{state_cn}</div>
-    <div class="osci-bar-wrap">
-      <div class="osci-bar-fill" style="width:{dcoi}%; background:{bar_color};"></div>
-    </div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">SYSTEM STATE</div>
-    <div class="osci-state {state_color}">{state}</div>
-    <div style="margin-top:8px; font-size:14px; color:#64748b;">{state_eng}</div>
-    <div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">
-      GPU功率压力 ×0.25 · REIT估值 ×0.35<br>
-      液冷信号 ×0.25 · 电力压力 ×0.15
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_osci_card(
+    "DATA CENTER OBSOLESCENCE INDEX", dcoi, state, f"综合评分：{state_cn}",
+    bar_color=bar_color, state_detail=state_eng,
+    components_html="GPU功率压力 ×0.25 · REIT估值 ×0.35<br>液冷信号 ×0.25 · 电力压力 ×0.15",
+    score_display=f"{dcoi:.0f}",
+), unsafe_allow_html=True)
 
 # =========================================================
 # 四张指标卡片
@@ -473,25 +444,17 @@ alert_map = {
     "WARNING": {
         "box_class": "alert-box", "icon": "⚠️", "title_color": "#f97316",
         "title": "结论：风冷资产开始系统性折价，数据中心REIT估值承压",
-        "body": f'当前 DCOI = <span class="orange"><b>{dcoi}</b></span>，进入高危区间。市场正在重新定价 AI 基础设施资产：AI-ready液冷机房溢价扩大，传统风冷机房折价加剧。注意：这是资产端信号，尚未构成金融传导事件。需联动稻草一（CapEx异常）共同确认。'
+        "body": f'当前 DCOI = <span class="orange"><b>{dcoi}</b></span>，进入高危区间。市场正在重新定价 AI 基础设施资产：AI-ready液冷机房溢价扩大，传统风冷机房折价加剧。注意：这是资产端信号，尚未构成金融传导事件。需联动资本开支偏离共同确认。'
     },
     "CRITICAL": {
         "box_class": "alert-box-red", "icon": "🔴", "title_color": "#ef4444",
-        "title": "结论：AI基础设施技术性减值信号明确，需与稻草一联动确认传导",
-        "body": f'当前 DCOI = <span class="red"><b>{dcoi}</b></span>，进入危机区间。大量存量数据中心资产面临提前技术性报废：GPU迭代速度已远超机房设计寿命，液冷改造成本接近重建，REIT底层资产价值受损。注意：CASCADE事件（CMBS暴雷/信贷收缩）需要稻草一+三联动触发，Straw 3 单独不构成系统性金融危机。建议监控各大银行10-Q中对数据中心抵押贷款的拨备变化。'
+        "title": "结论：AI基础设施技术性减值信号明确，需与资本开支偏离联动确认传导",
+        "body": f'当前 DCOI = <span class="red"><b>{dcoi}</b></span>，进入危机区间。大量存量数据中心资产面临提前技术性报废：GPU迭代速度已远超机房设计寿命，液冷改造成本接近重建，REIT底层资产价值受损。注意：CASCADE事件（CMBS暴雷/信贷收缩）需要资本开支偏离与资产减值联动触发；本因子单独不构成系统性金融危机。建议监控各大银行10-Q中对数据中心抵押贷款的拨备变化。'
     }
 }
 
 alert = alert_map.get(state, alert_map["WATCH"])
-st.markdown(f"""
-<div class="{alert['box_class']}">
-  <div class="alert-icon">{alert['icon']}</div>
-  <div class="alert-text">
-    <div class="alert-title" style="color:{alert['title_color']};">{alert['title']}</div>
-    <div>{alert['body']}</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
 # 下方面板：检测逻辑 + GPU 功率密度图
@@ -581,12 +544,12 @@ with rp:
     fig.update_layout(
         height=310,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#64748b", size=12),
+        font=dict(color="#94a3b8", size=12),
         margin=dict(l=10, r=20, t=10, b=10),
         xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(color="#94a3b8", size=13)),
         yaxis=dict(
             title="机柜功率 (kW)", gridcolor="rgba(255,255,255,0.05)", zeroline=False,
-            tickfont=dict(color="#64748b", size=11), title_font=dict(color="#64748b", size=11),
+            tickfont=dict(color="#94a3b8", size=11), title_font=dict(color="#94a3b8", size=11),
         ),
         showlegend=False,
     )
@@ -607,8 +570,4 @@ with rp:
 # 页脚
 # =========================================================
 
-st.markdown("""
-<div class="footer-text">
-  数据来源：yfinance · 更新频率：每小时 · AOF 基准参数需人工校准 · 本页面仅供研究参考，不构成投资建议
-</div>
-""", unsafe_allow_html=True)
+render_footer("Yahoo Finance · 每小时缓存 · AOF 基准参数人工校准")
