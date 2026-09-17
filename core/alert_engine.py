@@ -64,33 +64,52 @@ def render_osci_card(
     state: str,
     desc: str,
     bar_color: str = None,
+    *,
+    state_detail: str = "",
+    components_html: str = "",
+    score_display: str = None,
 ) -> str:
     """
     渲染 Straw 顶部大分数卡片（OSCI 风格）。
     label   : e.g. "OSCI  开源压缩综合指数"
     score   : 0-100
     state   : SAFE/WATCH/WARNING/CRITICAL
-    desc    : 副标题说明
+    desc    : 左侧综合评分说明
+    state_detail   : 状态下方的英文解释
+    components_html: 状态解释下方的指标/权重信息（可含 <br>）
+    score_display  : 可选的分数字符串，用于保留各指数既有精度
     """
     color     = bar_color or STATE_COLORS.get(state, "#fbbf24")
     bar_width = min(int(score), 100)
+    display_score = score_display if score_display is not None else f"{score:g}"
+    detail_html = (
+        f'<div style="margin-top:8px; font-size:14px; color:#64748b;">{state_detail}</div>'
+        if state_detail else ""
+    )
+    components_block = (
+        '<div style="margin-top:16px; font-size:13px; color:#64748b; line-height:1.8;">'
+        f"{components_html}</div>"
+        if components_html else ""
+    )
 
     return f"""
 <div class="osci-card">
   <div class="osci-left">
     <div class="osci-label">{label}</div>
     <div class="osci-score-row">
-      <div class="osci-score" style="color:{color};">{score:.0f}</div>
+      <div class="osci-score" style="color:{color};">{display_score}</div>
       <div class="osci-scale">/100</div>
     </div>
     <div class="osci-desc">{desc}</div>
-  </div>
-  <div class="osci-right">
-    <div class="osci-state-label">当前状态</div>
-    <div class="osci-state" style="color:{color};">{state}</div>
     <div class="osci-bar-wrap">
       <div class="osci-bar-fill" style="width:{bar_width}%; background:{color};"></div>
     </div>
+  </div>
+  <div class="osci-right">
+    <div class="osci-state-label">SYSTEM STATE</div>
+    <div class="osci-state" style="color:{color};">{state}</div>
+    {detail_html}
+    {components_block}
   </div>
 </div>
 """

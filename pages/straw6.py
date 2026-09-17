@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import load_css
+from core.alert_engine import render_osci_card
 from core.score_engine import register_score
 
 # =========================================================
@@ -793,15 +794,31 @@ st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 top_metrics = compute_alert_metrics(y10, y30, sp500)
 top_composite = top_metrics["composite"]
 register_score("straw6", top_composite["score"])
-top_color = grade_to_color(top_composite["grade"])
-top_css = grade_to_css(top_composite["grade"])
-st.markdown(f"""<div class="alert-master-card">
-  <div><div class="alert-label">MACRO ALERT COMPOSITE</div>
-  <div style="display:flex;align-items:baseline;gap:12px;"><div class="alert-score {top_css}">{top_composite['score']}</div><div style="font-size:18px;color:#475569;">/100</div></div>
-  <div class="osci-desc">10Y水平 ×0.15 · 3M速率 ×0.40 · 期限利差 ×0.25 · 股债相关性 ×0.20</div></div>
-  <div class="osci-right"><div class="alert-label">SYSTEM STATE</div><div class="alert-state {top_css}">{top_composite['grade']}</div>
-  <div class="bar-wrap"><div class="bar-fill" style="width:{top_composite['score']}%;background:{top_color};"></div></div></div>
-</div>""", unsafe_allow_html=True)
+top_state_detail = {
+    "SAFE": "Rate environment remains supportive",
+    "WATCH": "Macro stress signals are emerging",
+    "WARNING": "Valuation compression risk is rising",
+    "CRITICAL": "Systemic market stress is elevated",
+}[top_composite["grade"]]
+top_state_cn = {
+    "SAFE": "利率环境处于正常区间，股市估值压力较小。",
+    "WATCH": "部分宏观预警信号出现，建议提高监测频率。",
+    "WARNING": "利率与期限结构压力上升，估值压缩风险显著。",
+    "CRITICAL": "多项宏观指标进入极端区间，系统性风险升高。",
+}[top_composite["grade"]]
+
+st.markdown(render_osci_card(
+    "MACRO ALERT COMPOSITE",
+    top_composite["score"],
+    top_composite["grade"],
+    f"综合评分：{top_state_cn}",
+    state_detail=top_state_detail,
+    components_html=(
+        "10Y水平 ×0.15 · 3M速率 ×0.40<br>"
+        "期限利差 ×0.25 · 股债相关性 ×0.20"
+    ),
+    score_display=f"{top_composite['score']:.1f}",
+), unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(y10, y30, sp500, show_hist_chart=True)

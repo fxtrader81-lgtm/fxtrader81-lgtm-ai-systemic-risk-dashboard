@@ -217,9 +217,22 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     }
     alert_title, alert_body = conclusions[risk_state]
 
+    state_details = {
+        "SAFE": "Revenue growth supports current investment",
+        "WATCH": "CapEx growth is beginning to outpace revenue",
+        "WARNING": "CapEx expansion is materially ahead of revenue",
+        "CRITICAL": "CapEx growth materially exceeds revenue",
+    }
+
     st.markdown(render_osci_card(
         "CAPEX–REVENUE RISK INDEX", risk_score, risk_state,
-        f"资本开支增速与收入增速差：{diff * 100:+.2f} 个百分点",
+        f"综合评分：资本开支增速与收入增速差为 {diff * 100:+.2f} 个百分点。",
+        state_detail=state_details[risk_state],
+        components_html=(
+            f"收入增长 {rev_growth * 100:.2f}% · 资本开支增长 {capex_growth * 100:.2f}%<br>"
+            f"增速差 {diff * 100:+.2f} 个百分点 · 单因子评分"
+        ),
+        score_display=f"{risk_score:.0f}",
     ), unsafe_allow_html=True)
 
     # ===== 三张核心指标卡片（状态仅在顶部总卡展示） =====
