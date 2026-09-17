@@ -402,23 +402,47 @@ def treasury_spread(y10: pd.Series, y30: pd.Series, period: str) -> pd.Series:
     return filter_by_period(spread, period)
 
 
-def add_spread_trace(fig, y10, y30, period):
+def add_spread_background(fig, y10, y30, period):
+    """Render the historical term spread as translucent green/red bars behind lines."""
     spread = treasury_spread(y10, y30, period)
     if spread.empty:
         return
-    fig.add_trace(go.Scatter(
+
+    spread_bps = spread * 100
+    colors = [
+        "rgba(34,197,94,0.24)" if value >= 0 else "rgba(239,68,68,0.30)"
+        for value in spread_bps.values
+    ]
+    fig.add_trace(go.Bar(
         x=spread.index,
-        y=spread.values,
-        customdata=(spread.values * 100).round(1),
+        y=spread_bps.values,
+        customdata=spread_bps.round(1),
         name=SPREAD_NAME,
-        line=dict(color=SPREAD_COLOR, width=2.2),
-        mode="lines",
+        marker=dict(color=colors, line=dict(width=0)),
+        opacity=0.82,
+        showlegend=False,
         hovertemplate="30Y−10Y利差: %{customdata:.1f} bps<extra></extra>",
-    ), secondary_y=True)
+    ))
+    fig.data[-1].update(yaxis="y3")
+
+    spread_limit = max(50.0, float(spread_bps.abs().max()) * 1.15)
+    fig.update_layout(
+        barmode="overlay",
+        yaxis3=dict(
+            overlaying="y",
+            side="right",
+            range=[-spread_limit, spread_limit],
+            showgrid=False,
+            showticklabels=False,
+            zeroline=True,
+            zerolinecolor="rgba(255,255,255,0.20)",
+            fixedrange=True,
+        ),
+    )
 
 
-def render_series_selector(scope: str, series_names: list[str]) -> set[str]:
-    """Explicit checkbox controls; Plotly's legend remains a visual color reference."""
+def render_series_selector(scope: str, series_names: list[str], compact: bool = False) -> set[str]:
+    """Explicit checkbox legend that controls the traces in the adjacent chart."""
     item_keys = [f"straw6_{scope}_series_{idx}" for idx in range(len(series_names))]
     for key in item_keys:
         if key not in st.session_state:
@@ -433,12 +457,12 @@ def render_series_selector(scope: str, series_names: list[str]) -> set[str]:
         for key in item_keys:
             st.session_state[key] = target
 
-    st.markdown('<div class="series-selector-title">显示指标</div>', unsafe_allow_html=True)
-    controls = st.columns(4)
+    st.markdown('<div class="series-selector-title">图例与显示开关</div>', unsafe_allow_html=True)
+    controls = st.columns(1 if compact else 4)
     controls[0].checkbox("全选", key=all_key, on_change=toggle_all_series)
     selected = set()
     for idx, name in enumerate(series_names):
-        col = controls[(idx + 1) % 4]
+        col = controls[0] if compact else controls[(idx + 1) % 4]
         label = f"{SERIES_MARKERS.get(name, '◻️')} {name}"
         if col.checkbox(label, key=item_keys[idx]):
             selected.add(name)
@@ -454,6 +478,9 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     visible_series = set(visible_series or [])
+    if SPREAD_NAME in visible_series:
+        add_spread_background(fig, y10, y30, period)
+
     for series, name in [
         (y10, "10Y Treasury"),
         (y30, "30Y Treasury"),
@@ -473,9 +500,6 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
             mode="lines",
             hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
         ), secondary_y=True)
-
-    if SPREAD_NAME in visible_series:
-        add_spread_trace(fig, y10, y30, period)
 
     for series, name in [
         (sp500, "S&P 500"),
@@ -504,14 +528,15 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
 
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 560
-    layout["title"] = dict(text="全资产双轴走势 · 股指起点=100 / 利率为实际百分比", font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["title"] = dict(text="全资产双轴走势 · 股指起点=100 / 利率实值 / 利差柱背景", font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["showlegend"] = False
     fig.update_layout(**layout)
     fig.update_yaxes(
         title_text="股票指数（起点=100）", secondary_y=False,
         showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False,
     )
     fig.update_yaxes(
-        title_text="美债收益率 / 利差（百分点）", secondary_y=True,
+        title_text="美债收益率 (%)", secondary_y=True,
         showgrid=False, zeroline=True, zerolinecolor="rgba(255,255,255,0.24)",
     )
     return fig
@@ -522,6 +547,9 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     visible_series = set(visible_series or [])
+    if SPREAD_NAME in visible_series:
+        add_spread_background(fig, y10, y30, period)
+
     for series, name in [(y10, "10Y Treasury"), (y30, "30Y Treasury")]:
         if name not in visible_series:
             continue
@@ -536,9 +564,6 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
             mode="lines",
             hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
         ), secondary_y=True)
-
-    if SPREAD_NAME in visible_series:
-        add_spread_trace(fig, y10, y30, period)
 
     for series, name in stock_pairs:
         if name not in visible_series:
@@ -561,6 +586,7 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 500
     layout["title"] = dict(text=title, font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["showlegend"] = False
     fig.update_layout(**layout)
     fig.update_yaxes(
         title_text="指数点位", secondary_y=False,
@@ -568,7 +594,7 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
         tickfont=dict(size=11), zeroline=False,
     )
     fig.update_yaxes(
-        title_text="美债收益率 / 利差（百分点）", secondary_y=True,
+        title_text="美债收益率 (%)", secondary_y=True,
         showgrid=False, tickfont=dict(size=11), zeroline=True,
         zerolinecolor="rgba(255,255,255,0.24)",
     )
@@ -624,12 +650,15 @@ def build_alert_history_chart(y10, sp500, period, selected_month=None):
         dt = pd.to_datetime(month + "-01")
         color = SEVERITY_COLOR.get(severity, "#94a3b8")
         active = month == selected_month
+        hit_y = np.linspace(y_min, y_max, 81)
+        marker_colors = ["rgba(255,255,255,0.001)"] * (len(hit_y) - 1) + [color]
+        marker_sizes = [14] * (len(hit_y) - 1) + [13 if active else 9]
         fig.add_trace(go.Scatter(
-            x=[dt, dt], y=[y_min, y_max],
+            x=[dt] * len(hit_y), y=hit_y,
             mode="lines+markers",
             line=dict(color=color, width=5.5 if active else 2.0, dash="solid" if active else "dot"),
-            marker=dict(size=[0, 13 if active else 8], color=color, symbol="diamond" if active else "circle"),
-            customdata=[[month], [month]],
+            marker=dict(size=marker_sizes, color=marker_colors, symbol="circle", line=dict(width=0)),
+            customdata=[[month]] * len(hit_y),
             name=event,
             showlegend=False,
             hovertemplate=(
@@ -661,7 +690,13 @@ def build_alert_history_chart(y10, sp500, period, selected_month=None):
     layout["title"] = dict(text="10Y国债收益率 × S&P500 · 悬停事件线查看详情 / 点击锁定", font=dict(size=14, color="#e2e8f0"), x=0.01)
     layout["clickmode"] = "event+select"
     layout["hovermode"] = "closest"
-    layout["hoverdistance"] = 24
+    layout["hoverdistance"] = 36
+    layout["hoverlabel"] = dict(
+        bgcolor="#111827",
+        bordercolor="#64748b",
+        font=dict(size=16, color="#f8fafc", family="'PingFang SC','Microsoft YaHei',sans-serif"),
+        align="left",
+    )
     fig.update_layout(**layout)
     fig.update_yaxes(title_text="收益率 (%)", secondary_y=False, showgrid=True, gridcolor="rgba(255,255,255,0.04)", zeroline=False, range=[y_min, y_max])
     fig.update_yaxes(title_text="S&P 500", secondary_y=True, showgrid=False, zeroline=False)
@@ -1019,13 +1054,16 @@ with tab_all:
         "10Y Treasury", "30Y Treasury", SPREAD_NAME,
         "S&P 500", "NASDAQ 100", "Dow Jones", "上证指数", "深证成指",
     ]
-    selected_all = render_series_selector("all", all_series)
-    fig_overview = build_overview_chart(
-        y10, y30, sp500, nasdaq, dow, shcomp, szcomp,
-        period=period, show_crashes=show_crashes, visible_series=selected_all,
-    )
-    st.plotly_chart(fig_overview, use_container_width=True, key="straw6_all_overview")
-    st.caption("勾选框控制指标显示；30Y−10Y利差按百分点绘制，悬停显示 bps；红色背景区为利差倒挂。")
+    chart_col, legend_col = st.columns([5.2, 1.3])
+    with legend_col:
+        selected_all = render_series_selector("all", all_series, compact=True)
+    with chart_col:
+        fig_overview = build_overview_chart(
+            y10, y30, sp500, nasdaq, dow, shcomp, szcomp,
+            period=period, show_crashes=show_crashes, visible_series=selected_all,
+        )
+        st.plotly_chart(fig_overview, use_container_width=True, key="straw6_all_overview")
+    st.caption("右侧勾选框控制指标；期限利差以背景柱显示：绿色为正利差、红色为倒挂，悬停显示 bps。")
 
     # 股灾事件索引
     if show_crashes:
@@ -1053,16 +1091,19 @@ with tab_all:
 # ─────────────────────────────────────────────
 with tab_us:
     us_series = ["10Y Treasury", "30Y Treasury", SPREAD_NAME, "S&P 500", "NASDAQ 100", "Dow Jones"]
-    selected_us = render_series_selector("us", us_series)
-    fig_us = build_dual_axis_chart(
-        y10, y30,
-        [(sp500, "S&P 500"), (nasdaq, "NASDAQ 100"), (dow, "Dow Jones")],
-        period=period, show_crashes=show_crashes,
-        title="美股三大指数（左轴）× 美债收益率山形背景（右轴）",
-        visible_series=selected_us,
-    )
-    st.plotly_chart(fig_us, use_container_width=True, key="straw6_us_markets")
-    st.caption("勾选框控制指标显示；所有数据线均为实线，使用颜色区分；红色背景区为期限利差倒挂。")
+    chart_col, legend_col = st.columns([5.2, 1.3])
+    with legend_col:
+        selected_us = render_series_selector("us", us_series, compact=True)
+    with chart_col:
+        fig_us = build_dual_axis_chart(
+            y10, y30,
+            [(sp500, "S&P 500"), (nasdaq, "NASDAQ 100"), (dow, "Dow Jones")],
+            period=period, show_crashes=show_crashes,
+            title="美股三大指数（左轴）× 美债收益率山形背景（右轴）",
+            visible_series=selected_us,
+        )
+        st.plotly_chart(fig_us, use_container_width=True, key="straw6_us_markets")
+    st.caption("右侧勾选框控制指标；所有数据线均为实线；期限利差背景柱绿色为正、红色为倒挂。")
 
     st.markdown("""
     <div class="panel">
@@ -1093,16 +1134,19 @@ with tab_us:
 # ─────────────────────────────────────────────
 with tab_cn:
     cn_series = ["10Y Treasury", "30Y Treasury", SPREAD_NAME, "上证指数", "深证成指"]
-    selected_cn = render_series_selector("cn", cn_series)
-    fig_cn = build_dual_axis_chart(
-        y10, y30,
-        [(shcomp, "上证指数"), (szcomp, "深证成指")],
-        period=period, show_crashes=show_crashes,
-        title="A股指数（左轴）× 美债收益率山形背景（右轴）",
-        visible_series=selected_cn,
-    )
-    st.plotly_chart(fig_cn, use_container_width=True, key="straw6_cn_markets")
-    st.caption("勾选框控制指标显示；所有数据线均为实线，使用颜色区分；红色背景区为期限利差倒挂。")
+    chart_col, legend_col = st.columns([5.2, 1.3])
+    with legend_col:
+        selected_cn = render_series_selector("cn", cn_series, compact=True)
+    with chart_col:
+        fig_cn = build_dual_axis_chart(
+            y10, y30,
+            [(shcomp, "上证指数"), (szcomp, "深证成指")],
+            period=period, show_crashes=show_crashes,
+            title="A股指数（左轴）× 美债收益率山形背景（右轴）",
+            visible_series=selected_cn,
+        )
+        st.plotly_chart(fig_cn, use_container_width=True, key="straw6_cn_markets")
+    st.caption("右侧勾选框控制指标；所有数据线均为实线；期限利差背景柱绿色为正、红色为倒挂。")
 
     st.markdown("""
     <div class="panel">
