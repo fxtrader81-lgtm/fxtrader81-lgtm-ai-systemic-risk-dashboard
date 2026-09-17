@@ -8,13 +8,13 @@ import streamlit as st
 from components.ui import load_css
 from config.thresholds import STATE_COLORS
 from core.factor_registry import aggregate_factor_results, load_factor_results
-from core.score_engine import render_straw_rows, render_system_card
+from core.score_engine import STRAW_LABELS, render_straw_rows, render_system_card
 
 load_css()
 
 def _conclusion(system, results):
     if not system["available"]:
-        return "当前有效数据覆盖不足，系统暂不输出方向性结论。请以右侧各因子的可用状态为准。"
+        return "当前有效数据覆盖不足，系统暂不输出方向性结论。"
     leaders = sorted((x for x in results.values() if x.get("available")), key=lambda x: x["score"], reverse=True)[:2]
     names = "、".join(x["name"] for x in leaders)
     messages = {
@@ -24,6 +24,22 @@ def _conclusion(system, results):
         "CRITICAL": "风险因子出现高位共振，应立即开展深度尽调与风险敞口评估。",
     }
     return f"{messages[system['state']]} 当前贡献较高的因子为：{names}。"
+
+
+def _factor_conclusion_rows(results):
+    rows = []
+    for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6"):
+        item = results[key]
+        label = STRAW_LABELS[key].split(" ", 1)[1]
+        if item.get("available"):
+            detail = f"{item['state']} · {item['detail']}"
+        else:
+            detail = f"N/A · {item['detail']}"
+        rows.append(
+            f'<div class="conclusion-factor-row"><b>{escape(label)}</b>'
+            f'<span>{escape(detail)}</span></div>'
+        )
+    return "".join(rows)
 
 with st.spinner("正在汇总六个风险因子…"):
     results = load_factor_results()
@@ -39,9 +55,10 @@ color = STATE_COLORS.get(system["state"], "#64748b")
 st.markdown(f"""<div class="dashboard-grid">
 <div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>
 <div class="conclusion-state" style="color:{color};">{escape(system['state'])}</div>
-<div class="conclusion-copy">{escape(_conclusion(system, results))}</div>
+<div class="conclusion-copy conclusion-summary">{escape(_conclusion(system, results))}</div>
+<div class="conclusion-factor-list">{_factor_conclusion_rows(results)}</div>
 <div class="conclusion-note">有效权重覆盖率 {system['coverage']}% · 缺失因子不按安全或中性分处理</div></div>
-<div class="factor-block"><div class="compact-title">六个风险因子</div>{render_straw_rows(scores, results=results)}</div>
+<div class="factor-block">{render_straw_rows(scores, results=results)}</div>
 </div>""", unsafe_allow_html=True)
 
 source_items = []

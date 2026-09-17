@@ -239,17 +239,29 @@ def _straw4() -> dict:
     return _result("straw4", score, weight, "电网、成本、GPU效率与能源市场信号", sources)
 
 
-def _yield_series(ticker: str) -> pd.Series:
-    frame = yf.download(ticker, period="2y", interval="1mo", progress=False, auto_adjust=True)
-    if frame.empty:
+def _single_close(ticker: str, period: str = "2y", interval: str = "1mo") -> pd.Series:
+    """Return one numeric close series across yfinance's flat/MultiIndex variants."""
+    frame = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "Close" not in frame.columns:
         return pd.Series(dtype=float)
-    series = frame["Close"].squeeze().dropna()
+    close = frame["Close"]
+    if isinstance(close, pd.DataFrame):
+        if close.empty:
+            return pd.Series(dtype=float)
+        close = close.iloc[:, 0]
+    return pd.to_numeric(close, errors="coerce").dropna()
+
+
+def _yield_series(ticker: str) -> pd.Series:
+    series = _single_close(ticker)
+    if series.empty:
+        return series
     return series / 10.0 if float(series.median()) > 15 else series
 
 
 def _straw6() -> dict:
     y10, y30 = _yield_series("^TNX"), _yield_series("^TYX")
-    sp = yf.download("^GSPC", period="2y", interval="1mo", progress=False, auto_adjust=True)["Close"].squeeze().dropna()
+    sp = _single_close("^GSPC")
     components = []
     if not y10.empty:
         level = float(y10.iloc[-1])

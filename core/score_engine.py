@@ -94,12 +94,12 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
 
 
 STRAW_LABELS = {
-    "straw1": "🌾 Straw 1 · AI资本开支循环",
-    "straw2": "💻 Straw 2 · 开源压缩风险",
-    "straw3": "🏗 Straw 3 · 数据中心资产减值",
-    "straw4": "⚡ Straw 4 · 全球AI能源控制",
-    "straw5": "🏦 Straw 5 · AI融资闭环风险",
-    "straw6": "📊 Straw 6 · 宏观市场预警",
+    "straw1": "🌾 01 · 资本开支偏离",
+    "straw2": "💻 02 · 开源商业化压缩",
+    "straw3": "🏗 03 · 数据中心资产减值",
+    "straw4": "⚡ 04 · AI能源约束",
+    "straw5": "🏦 05 · AI融资闭环风险",
+    "straw6": "📊 06 · 宏观市场预警",
 }
 
 
@@ -133,4 +133,4 @@ def render_straw_rows(scores: dict, results: dict | None = None) -> str:
   <div class="straw-state" style="color:{color};">{state_txt}</div>
 </div>
 """
-    return f'<div class="panel">{rows}</div>'
+    return f'<div class="panel factor-panel"><div class="compact-title">风险因子</div>{rows}</div>'

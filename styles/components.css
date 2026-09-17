@@ -333,14 +333,23 @@
 
 .dashboard-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; }
 .dashboard-conclusion, .source-strip { background:var(--bg-panel); border:1px solid var(--border-soft); border-radius:14px; padding:22px; }
-.dashboard-grid { display:grid; grid-template-columns:minmax(240px,.85fr) minmax(440px,1.45fr); gap:16px; align-items:stretch; }
+.dashboard-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; }
 .factor-block { min-width:0; }
-.dashboard-conclusion { min-height:278px; }
+.dashboard-conclusion, .factor-panel { min-height:390px; height:100%; }
+.factor-panel { padding:22px 26px; }
 .conclusion-eyebrow, .compact-title { color:var(--text-dark); font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
-.conclusion-state { font-size:30px; font-weight:900; margin-bottom:14px; }
-.conclusion-copy { color:var(--text-soft); font-size:16px; line-height:1.8; }
+.conclusion-state { font-size:30px; font-weight:900; margin-bottom:10px; }
+.conclusion-copy { color:var(--text-soft); font-size:15px; line-height:1.65; }
+.conclusion-summary { font-weight:700; color:var(--text-main); margin-bottom:12px; }
+.conclusion-factor-list { display:grid; gap:7px; }
+.conclusion-factor-row { display:grid; grid-template-columns:152px minmax(0,1fr); gap:10px; align-items:start; }
+.conclusion-factor-row b { color:var(--text-soft); font-size:12px; line-height:1.5; }
+.conclusion-factor-row span { color:var(--text-muted); font-size:12px; line-height:1.5; }
 .conclusion-note, .coverage-text { color:var(--text-dark); font-size:12px; }
-.conclusion-note { margin-top:22px; padding-top:14px; border-top:1px solid var(--border-soft); }
+.conclusion-note { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-soft); }
+.factor-panel .straw-row { padding:14px 0; gap:12px; }
+.factor-panel .straw-name { width:230px; }
+.factor-panel .straw-bar-wrap { flex:0 1 210px; width:210px; }
 .system-score-na { color:var(--text-faint); font-size:72px; font-weight:900; line-height:1; }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }
 .source-strip { margin-top:20px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
