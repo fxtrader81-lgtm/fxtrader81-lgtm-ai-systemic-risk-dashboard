@@ -17,6 +17,7 @@ import streamlit as st
 import yfinance as yf
 
 from config.thresholds import STRAW_WEIGHTS
+from core.straw5_engine import load_straw5_analysis
 
 
 @dataclass
@@ -36,7 +37,7 @@ FACTOR_NAMES = {
     "straw2": "开源压缩风险",
     "straw3": "数据中心资产减值",
     "straw4": "全球AI能源控制",
-    "straw5": "金融证券化风险",
+    "straw5": "AI融资闭环风险",
     "straw6": "宏观市场预警",
 }
 
@@ -293,13 +294,24 @@ def load_factor_results() -> dict[str, dict]:
                 results[straw_id] = future.result()
             except Exception as exc:
                 results[straw_id] = _unavailable(straw_id, f"数据源异常：{type(exc).__name__}")
-    results["straw5"] = _result("straw5", None, 0, "模块待建设，不参与当前总分", "待接入")
+    try:
+        dcoi = results.get("straw3", {}).get("score") if results.get("straw3", {}).get("available") else None
+        analysis = load_straw5_analysis(dcoi)
+        results["straw5"] = _result(
+            "straw5",
+            analysis["score"],
+            analysis["coverage"] / 100,
+            f"期限错配、资本闭环、证券化传染与DCOI联动 · {analysis['confidence']}",
+            "SEC季度披露 · Yahoo Finance信用ETF代理 · Straw 3 DCOI",
+        )
+    except Exception as exc:
+        results["straw5"] = _unavailable("straw5", f"数据源异常：{type(exc).__name__}")
     return results
 
 
 def aggregate_factor_results(results: dict[str, dict], minimum_coverage: float = 0.70) -> dict:
-    """Weighted system score, excluding Straw 5 until that factor is implemented."""
-    active = {key: weight for key, weight in STRAW_WEIGHTS.items() if key != "straw5"}
+    """Weighted system score across every available Straw factor."""
+    active = dict(STRAW_WEIGHTS)
     active_total = sum(active.values())
     available_weight = sum(weight for key, weight in active.items() if results.get(key, {}).get("available"))
     coverage = available_weight / active_total if active_total else 0

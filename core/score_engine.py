@@ -98,7 +98,7 @@ STRAW_LABELS = {
     "straw2": "💻 Straw 2 · 开源压缩风险",
     "straw3": "🏗 Straw 3 · 数据中心资产减值",
     "straw4": "⚡ Straw 4 · 全球AI能源控制",
-    "straw5": "🏦 Straw 5 · 金融证券化风险",
+    "straw5": "🏦 Straw 5 · AI融资闭环风险",
     "straw6": "📊 Straw 6 · 宏观市场预警",
 }
 
@@ -114,7 +114,7 @@ def render_straw_rows(scores: dict, results: dict | None = None) -> str:
         if score is None:
             score_txt  = "—"
             color      = "#475569"
-            state_txt  = "待建设" if straw_id == "straw5" else "N/A"
+            state_txt  = "N/A"
             bar_w      = 0
         else:
             state     = result.get("state") or score_to_state(score)

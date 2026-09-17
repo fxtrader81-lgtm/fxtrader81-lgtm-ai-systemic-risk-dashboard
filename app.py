@@ -46,7 +46,7 @@ straw_pages = [
 ]
 
 if (Path(__file__).parent / "pages" / "straw5.py").exists():
-    straw_pages.append(st.Page("pages/straw5.py", title="05 · 金融证券化风险", icon="🏦"))
+    straw_pages.append(st.Page("pages/straw5.py", title="05 · AI融资闭环风险", icon="🏦"))
 
 straw_pages.append(st.Page("pages/straw6.py", title="06 · 宏观市场预警", icon="📊"))
 

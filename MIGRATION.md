@@ -103,3 +103,17 @@ streamlit run app.py
 
 访问 http://localhost:8501
 左侧导航栏选择 Straw 页面。
+
+---
+
+## 已确认、暂缓执行的 UI 统一工作
+
+为控制当前开发成本，Straw 5 直接复用 `styles/base.css`、`styles/components.css`
+和 `styles/pages.css`，不新增视觉体系。待六个页面功能和指标稳定后，再集中完成：
+
+- 将顶部综合评分卡统一封装，删除页面内重复 HTML；
+- 将动态结论框统一封装；
+- 将数据新鲜度、覆盖率与低置信度状态统一封装；
+- 对六页做一次桌面端与窄屏回归检查。
+
+该项仍为未完成工作，不因 Straw 5 上线而关闭。

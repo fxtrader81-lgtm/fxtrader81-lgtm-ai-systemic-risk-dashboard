@@ -332,7 +332,7 @@
 .conclusion-note { margin-top:22px; padding-top:14px; border-top:1px solid var(--border-soft); }
 .system-score-na { color:var(--text-faint); font-size:72px; font-weight:900; line-height:1; }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }
-.source-strip { margin-top:20px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.source-strip { margin-top:20px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
 .source-strip > .compact-title { grid-column:1/-1; margin-bottom:2px; }
 .source-status { background:rgba(255,255,255,.02); border-radius:9px; padding:10px; display:grid; gap:5px; }
 .source-status b { color:var(--text-soft); font-size:12px; }

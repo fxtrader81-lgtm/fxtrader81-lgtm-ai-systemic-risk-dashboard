@@ -25,13 +25,13 @@ def _conclusion(system, results):
     }
     return f"{messages[system['state']]} 当前贡献较高的因子为：{names}。"
 
-with st.spinner("正在汇总五个已上线风险因子…"):
+with st.spinner("正在汇总六个风险因子…"):
     results = load_factor_results()
 system = aggregate_factor_results(results)
 scores = {key: item["score"] for key, item in results.items() if item.get("available")}
 
 st.markdown(f"""<div class="dashboard-header"><div><div class="main-title">📡 Compute-Dollar Risk Terminal</div>
-<div class="sub-title">AI次贷危机监测系统 · 五个已上线风险因子自动汇总</div></div>
+<div class="sub-title">AI次贷危机监测系统 · 六个风险因子自动汇总</div></div>
 <span class="timestamp-text">🕐 更新时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span></div>""", unsafe_allow_html=True)
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
 
@@ -40,12 +40,12 @@ st.markdown(f"""<div class="dashboard-grid">
 <div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>
 <div class="conclusion-state" style="color:{color};">{escape(system['state'])}</div>
 <div class="conclusion-copy">{escape(_conclusion(system, results))}</div>
-<div class="conclusion-note">有效权重覆盖率 {system['coverage']}% · Straw 5 待建设且不计入总分</div></div>
+<div class="conclusion-note">有效权重覆盖率 {system['coverage']}% · 缺失因子不按安全或中性分处理</div></div>
 <div class="factor-block"><div class="compact-title">六个风险因子</div>{render_straw_rows(scores, results=results)}</div>
 </div>""", unsafe_allow_html=True)
 
 source_items = []
-for key in ("straw1", "straw2", "straw3", "straw4", "straw6"):
+for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6"):
     item = results[key]
     availability = f"{item['coverage']:.0f}%" if item["available"] else "不可用"
     source_items.append(f'<div class="source-status"><b>{escape(item["name"])}</b><span>{availability}</span><small>{escape(item["source"])}</small></div>')
