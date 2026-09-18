@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-# Deployment refresh marker: reload shared score component
-
 # =========================================================
 # core/score_engine.py
 # 每个 Straw 计算完自己的分数后，注册到这里
@@ -104,46 +102,28 @@ FACTOR_LABELS = {
     "straw6": "📊 06 · 宏观市场预警",
 }
 
-FACTOR_PATHS = {
-    "straw1": "factor-capex-divergence",
-    "straw2": "factor-open-source",
-    "straw3": "factor-data-center-assets",
-    "straw4": "factor-energy",
-    "straw5": "factor-financing-loop",
-    "straw6": "factor-macro-market",
+FACTOR_FILES = {
+    "straw1": "pages/straw1.py", "straw2": "pages/straw2.py",
+    "straw3": "pages/straw3.py", "straw4": "pages/straw4.py",
+    "straw5": "pages/straw5.py", "straw6": "pages/straw6.py",
 }
 
 
-def render_straw_rows(scores: dict, results: dict | None = None) -> str:
-    """
-    渲染六项风险因子进度条列表 HTML。
-    """
-    rows = ""
+def render_factor_navigation(scores: dict, results: dict | None = None) -> None:
+    """Use Streamlit's native router so these links behave exactly like the sidebar."""
+    st.markdown('<div class="compact-title">风险因子 · 点击进入详情</div>', unsafe_allow_html=True)
     for straw_id, label in FACTOR_LABELS.items():
-        path = FACTOR_PATHS[straw_id]
         result = (results or {}).get(straw_id, {})
-        score  = result.get("score") if results is not None else scores.get(straw_id, None)
+        score = result.get("score") if results is not None else scores.get(straw_id)
         if score is None:
-            score_txt  = "—"
-            color      = "#94a3b8"
-            state_txt  = "N/A"
-            bar_w      = 0
+            score_txt, state, color, bar_w = "—", "N/A", "#94a3b8", 0
         else:
-            state     = result.get("state") or score_to_state(score)
-            color     = STATE_COLORS.get(state, "#fbbf24")
-            score_txt = f"{score:.0f}"
-            state_txt = state
-            bar_w     = min(int(score), 100)
-
-        rows += f"""
-<a class="straw-row factor-link" href="./{path}" target="_self" aria-label="查看{label}详情">
-  <div class="straw-name">{label}</div>
-  <div class="straw-bar-wrap">
-    <div class="straw-bar-fill" style="width:{bar_w}%; background:{color};"></div>
-  </div>
-  <div class="straw-score" style="color:{color};">{score_txt}</div>
-  <div class="straw-state" style="color:{color};">{state_txt}</div>
-  <div class="factor-arrow">查看详情 →</div>
-</a>
-"""
-    return f'<div class="panel factor-panel"><div class="compact-title">风险因子</div>{rows}</div>'
+            state = result.get("state") or score_to_state(score)
+            color = STATE_COLORS.get(state, "#fbbf24")
+            score_txt, bar_w = f"{score:.0f}", min(int(score), 100)
+        st.markdown(
+            f'<div class="factor-native-meta"><span>{score_txt} /100 · {state}</span>'
+            f'<div class="straw-bar-wrap"><div class="straw-bar-fill" style="width:{bar_w}%;background:{color};"></div></div></div>',
+            unsafe_allow_html=True,
+        )
+        st.page_link(FACTOR_FILES[straw_id], label=f"{label}　查看详情 →", use_container_width=True)

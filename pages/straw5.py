@@ -7,7 +7,7 @@ from html import escape
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.ui import load_css, metric_card, render_footer, render_header
+from components.ui import load_css, metric_card, render_data_freshness, render_footer, render_header
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
 from core.factor_registry import load_factor_results
@@ -212,12 +212,14 @@ with tab3:
         f'<td>{escape(item["period"])}</td><td>{escape(item["cadence"])}</td><td>{escape(item["note"])}</td></tr>'
         for item in SOURCES
     )
-    st.markdown(f"""
-<div class="panel"><div class="panel-title">📡 数据覆盖与新鲜度</div>
-<div class="metric-desc" style="margin-bottom:14px;">有效权重覆盖率 <b style="color:{color};">{analysis['coverage']}%</b> · {confidence_cn} · 静态基准期 {STATIC_INPUTS['as_of']} · 市场代理 {escape(market.get('updated') or '不可用')}</div>
+    render_data_freshness([
+        {"name": "信用市场代理", "source": "Yahoo Finance · HYG / HYXF", "updated_at": market.get("updated") or "不可用", "mode": "live" if market.get("updated") else "fallback"},
+        {"name": "融资结构证据", "source": "SEC公司披露与行业函件", "updated_at": STATIC_INPUTS["as_of"], "mode": "static"},
+        {"name": "抵押品脆弱度", "source": "数据中心资产减值指数联动", "updated_at": "每小时缓存", "mode": "live"},
+    ])
+    st.markdown(f"""<div class="panel"><div class="metric-desc">有效权重覆盖率 <b style="color:{color};">{analysis['coverage']}%</b> · {confidence_cn}</div>
 <table class="gpu-table"><thead><tr><th>数据项</th><th>期间</th><th>更新节奏</th><th>解释</th></tr></thead><tbody>{source_rows}</tbody></table>
-<div class="metric-sub" style="margin-top:14px;">下一次静态复核：CoreWeave / NVIDIA 下一期10-Q发布后。私人AI云披露不足时保留“未披露”，不会默认SAFE。</div>
-</div>""", unsafe_allow_html=True)
+<div class="metric-sub">私人AI云披露不足时保留“未披露”，不会默认SAFE。</div></div>""", unsafe_allow_html=True)
 
 if score is not None:
     register_score("straw5", score)

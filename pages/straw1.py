@@ -3,7 +3,7 @@ import requests
 import yfinance as yf
 import plotly.graph_objects as go
 from config.api_keys import FMP_API_KEY, FMP_BASE
-from components.ui import load_css, render_footer, render_header
+from components.ui import load_css, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
@@ -349,6 +349,10 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
+    render_data_freshness([
+        {"name": "公司财务数据", "source": f"{data_source} · {symbol}", "updated_at": "每小时缓存", "mode": "live"},
+        {"name": "评分口径", "source": "最近两个完整财年 · 收入与资本开支", "updated_at": "随财报更新", "mode": "live"},
+    ])
     render_footer(f"{data_source} · 当前标的：{symbol}")
 
 else:

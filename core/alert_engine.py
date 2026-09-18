@@ -80,8 +80,8 @@ def render_osci_card(
     score_display  : 可选的分数字符串，用于保留各指数既有精度
     """
     color     = bar_color or STATE_COLORS.get(state, "#fbbf24")
-    bar_width = min(int(score), 100)
-    display_score = score_display if score_display is not None else f"{score:g}"
+    bar_width = 0 if score is None else min(int(score), 100)
+    display_score = score_display if score_display is not None else ("N/A" if score is None else f"{score:g}")
     detail_html = (
         f'<div style="margin-top:8px; font-size:14px; color:#94a3b8;">{state_detail}</div>'
         if state_detail else ""

@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from components.ui import load_css, render_footer, render_header
+from components.ui import load_css, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -570,4 +570,8 @@ with rp:
 # 页脚
 # =========================================================
 
+render_data_freshness([
+    {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},
+    {"name": "GPU适配系数", "source": "NVIDIA规格与机架功率基准", "updated_at": "2026-09", "mode": "static"},
+])
 render_footer("Yahoo Finance · 每小时缓存 · AOF 基准参数人工校准")

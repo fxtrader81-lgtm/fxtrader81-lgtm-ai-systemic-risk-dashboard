@@ -17,7 +17,7 @@ import streamlit as st
 import yfinance as yf
 
 from config.thresholds import STRAW_WEIGHTS
-from core.macro_data import load_macro_snapshot
+from core.macro_data import load_macro_stress_snapshot
 from core.macro_risk import compute_macro_metrics
 from core.straw5_engine import load_straw5_analysis
 
@@ -262,11 +262,18 @@ def _yield_series(ticker: str) -> pd.Series:
 
 
 def _straw6() -> dict:
-    y10, y30, sp, source = load_macro_snapshot()
-    if y10.empty or y30.empty or sp.empty:
-        return _unavailable("straw6", "美债与标普序列覆盖不足")
-    metrics = compute_macro_metrics(y10, y30, sp)
-    return _result("straw6", metrics["composite"]["score"], 1.0, "美债水平、动量、期限利差与股债相关性", source)
+    series, source = load_macro_stress_snapshot()
+    metrics = compute_macro_metrics(
+        series["y10"], series["y3m"], series["sp500"],
+        series["stlfsi"], series["baa10y"], series["nfci"],
+    )
+    composite = metrics["composite"]
+    if composite["score"] is None:
+        return _unavailable("straw6", f"宏观压力序列覆盖不足（{composite['coverage']}%）")
+    return _result(
+        "straw6", composite["score"], composite["coverage"] / 100,
+        "金融压力、信用利差、金融条件、股市动量与期限曲线", source,
+    )
 
 
 PROVIDERS: dict[str, Callable[[], dict]] = {

@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
-from components.ui import load_css, render_footer, render_header
+from components.ui import load_css, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -607,4 +607,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+render_data_freshness([
+    {"name": "模型价格", "source": "OpenRouter API", "updated_at": "每小时缓存", "mode": "live"},
+    {"name": "开发者生态", "source": "GitHub REST · Hugging Face API", "updated_at": "每小时缓存", "mode": "live"},
+    {"name": "能力基准", "source": "季度人工复核", "updated_at": BENCHMARK_DATA["closed"]["updated"], "mode": "static"},
+])
 render_footer(f'OpenRouter API · GitHub REST API · HuggingFace API · Benchmark 静态维护（{BENCHMARK_DATA["closed"]["updated"]}）')

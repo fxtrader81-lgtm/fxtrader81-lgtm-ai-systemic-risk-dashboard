@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from io import StringIO
+
 import pandas as pd
 import requests
 import streamlit as st
@@ -12,7 +14,19 @@ from config.api_keys import FMP_API_KEY, FRED_API_KEY
 
 def _fred(series_id: str) -> pd.Series:
     if not FRED_API_KEY:
-        return pd.Series(dtype=float)
+        response = requests.get(
+            "https://fred.stlouisfed.org/graph/fredgraph.csv",
+            params={"id": series_id, "cosd": "1994-01-01"},
+            timeout=20,
+        )
+        response.raise_for_status()
+        frame = pd.read_csv(StringIO(response.text))
+        if frame.empty or series_id not in frame.columns:
+            return pd.Series(dtype=float)
+        dates = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
+        values = pd.to_numeric(frame[series_id], errors="coerce")
+        series = pd.Series(values.values, index=dates).dropna()
+        return series.resample("ME").last().dropna().sort_index()
     response = requests.get(
         "https://api.stlouisfed.org/fred/series/observations",
         params={"series_id": series_id, "api_key": FRED_API_KEY, "file_type": "json", "observation_start": "1994-01-01", "frequency": "m", "aggregation_method": "eop"},
@@ -77,3 +91,26 @@ def load_macro_snapshot() -> tuple[pd.Series, pd.Series, pd.Series, str]:
         sp500 = _yahoo("^GSPC")
         equity_source = "Yahoo Finance（标普500备用源）"
     return y10, y30, sp500, f"{yield_source} · {equity_source}"
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_macro_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
+    """Return the observed series used by the factor-06 stress model."""
+    y10, _y30, sp500, market_source = load_macro_snapshot()
+    series = {"y10": y10, "sp500": sp500}
+    missing = []
+    for key, fred_id in {
+        "y3m": "DGS3MO",
+        "stlfsi": "STLFSI4",
+        "baa10y": "BAA10Y",
+        "nfci": "NFCI",
+    }.items():
+        try:
+            series[key] = _fred(fred_id)
+        except Exception:
+            series[key] = pd.Series(dtype=float)
+            missing.append(fred_id)
+    source = f"{market_source} · FRED（DGS3MO、STLFSI4、BAA10Y、NFCI）"
+    if missing:
+        source += f" · 缺失：{', '.join(missing)}"
+    return series, source
