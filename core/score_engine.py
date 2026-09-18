@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# Deployment refresh marker: reload shared score component
+
 # =========================================================
 # core/score_engine.py
 # 每个 Straw 计算完自己的分数后，注册到这里
