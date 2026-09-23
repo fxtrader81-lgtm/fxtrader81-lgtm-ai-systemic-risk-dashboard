@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from components.ui import load_css, render_data_freshness, render_footer, render_header
+from components.ui import load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -343,17 +343,12 @@ st.markdown(render_osci_card(
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">AOF 资产淘汰 <span class="source-tag-warn static-data-badge">⚠ 静态基准</span></div>
-  <div class="metric-row">
-    <span class="metric-number {aof_color}">{AOF}x</span>
-    <span class="metric-arrow {aof_color}">{aof_arrow}</span>
-  </div>
-  <div class="metric-desc">
-    {CURRENT_DEPLOY_GPU} 机柜 {CURRENT_RACK_KW}kW ÷ 老机房上限 {LEGACY_RACK_LIMIT_KW}kW<br>
-    倍数越高，存量风冷机房技术性报废越严重
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card(
+        'AOF 资产淘汰 <span class="source-tag-warn static-data-badge">⚠ 静态基准</span>',
+        f"{AOF}x", aof_color, aof_arrow,
+        f"{CURRENT_DEPLOY_GPU} 机柜 {CURRENT_RACK_KW}kW ÷ 老机房上限 {LEGACY_RACK_LIMIT_KW}kW<br>"
+        "倍数越高，存量风冷机房技术性报废越严重",
+    ), unsafe_allow_html=True)
 
 with c2:
     if reit_data:
@@ -369,14 +364,8 @@ with c2:
     else:
         desc2    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
         display2 = "N/A"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">REIT 估值压力 <span class="source-tag">YF</span></div>
-  <div class="metric-row">
-    <span class="metric-number {reit_color}">{display2}</span>
-    <span class="metric-arrow {reit_color}">{reit_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc2}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('REIT 估值压力 <span class="source-tag">YF</span>', display2,
+                            reit_color, reit_arrow, desc2), unsafe_allow_html=True)
 
 with c3:
     if lc_data:
@@ -393,14 +382,8 @@ with c3:
     else:
         desc3    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
         display3 = "N/A"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">液冷加速信号 <span class="source-tag">YF</span></div>
-  <div class="metric-row">
-    <span class="metric-number {lc_color}">{display3}</span>
-    <span class="metric-arrow {lc_color}">{lc_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc3}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('液冷加速信号 <span class="source-tag">YF</span>', display3,
+                            lc_color, lc_arrow, desc3), unsafe_allow_html=True)
 
 with c4:
     if power_data:
@@ -417,14 +400,8 @@ with c4:
     else:
         desc4    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">电力基础设施 <span class="source-tag">YF</span></div>
-  <div class="metric-row">
-    <span class="metric-number {power_color}">{display4}</span>
-    <span class="metric-arrow {power_color}">{power_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc4}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('电力基础设施 <span class="source-tag">YF</span>', display4,
+                            power_color, power_arrow, desc4), unsafe_allow_html=True)
 
 # =========================================================
 # Alert 结论框
@@ -463,37 +440,22 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 lp, rp = st.columns([1, 1.5])
 
 with lp:
-    st.markdown("""<div class="panel">
-  <div class="panel-title">⚙️ 检测逻辑</div>
-  <div class="logic-step">
-    <div class="step-num">1</div>
-    <div class="step-text"><b>AOF 资产淘汰系数（×0.25）</b>：当前主流GPU机柜功率 ÷ 老机房设计上限，倍数越高代表存量机房技术性报废越严重</div>
-  </div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">AOF &lt; 1.5x</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">AOF 1.5–2.5x</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">AOF 2.5–3.5x</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">AOF &gt; 3.5x</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-  <div class="logic-step" style="margin-top:14px;">
-    <div class="step-num">2</div>
-    <div class="step-text"><b>REIT 估值压力（×0.35）</b>：EQIX/DLR 距52周高点跌幅，市场对底层资产的直接重定价信号</div>
-  </div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">距高点 &lt; 5%</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">距高点 5–15%</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">距高点 15–25%</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">距高点 &gt; 25%</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-  <div class="logic-step" style="margin-top:14px;">
-    <div class="step-num">3</div>
-    <div class="step-text"><b>液冷加速信号（×0.25）</b>：Vertiv/SMCI 营收增速，液冷厂商爆发 = 风冷淘汰加速</div>
-  </div>
-  <div class="logic-step" style="margin-top:6px;">
-    <div class="step-num">4</div>
-    <div class="step-text"><b>电力压力（×0.15）</b>：NEE/SO 相对强弱，电力需求旺盛是功率密度危机的物理证据</div>
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(logic_panel([
+        {"text": "<b>AOF 资产淘汰系数（×0.25）</b>：当前主流GPU机柜功率 ÷ 老机房设计上限，倍数越高代表存量机房技术性报废越严重", "thresholds": [
+            ("#22c55e", "AOF < 1.5x", "SAFE", "green"),
+            ("#fbbf24", "AOF 1.5–2.5x", "WATCH", "yellow"),
+            ("#f97316", "AOF 2.5–3.5x", "WARNING", "orange"),
+            ("#ef4444", "AOF > 3.5x", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>REIT 估值压力（×0.35）</b>：EQIX/DLR 距52周高点跌幅，市场对底层资产的直接重定价信号", "thresholds": [
+            ("#22c55e", "距高点 < 5%", "SAFE", "green"),
+            ("#fbbf24", "距高点 5–15%", "WATCH", "yellow"),
+            ("#f97316", "距高点 15–25%", "WARNING", "orange"),
+            ("#ef4444", "距高点 > 25%", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>液冷加速信号（×0.25）</b>：Vertiv/SMCI 营收增速，液冷厂商爆发 = 风冷淘汰加速"},
+        {"text": "<b>电力压力（×0.15）</b>：NEE/SO 相对强弱，电力需求旺盛是功率密度危机的物理证据"},
+    ]), unsafe_allow_html=True)
 
 with rp:
     st.markdown('<div class="panel"><div class="panel-title">⚡ GPU 功率密度代际跃迁（单机柜 kW）</div>', unsafe_allow_html=True)
@@ -558,10 +520,10 @@ with rp:
 
     st.markdown("""
 <div class="legend-row">
-  <div class="legend-item"><div class="legend-dot" style="background:#334155;"></div>历史世代（已淘汰）</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div>当前主力部署</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div>最新一代（在售）</div>
-  <div class="legend-item"><div class="legend-dot" style="background:#7c3aed;"></div>下一代（路线图）</div>
+  <div class="legend-item"><div class="legend-dot legend-dot-legacy"></div>历史世代（已淘汰）</div>
+  <div class="legend-item"><div class="legend-dot legend-dot-active"></div>当前主力部署</div>
+  <div class="legend-item"><div class="legend-dot legend-dot-current"></div>最新一代（在售）</div>
+  <div class="legend-item"><div class="legend-dot legend-dot-roadmap"></div>下一代（路线图）</div>
 </div>
 </div>
 """, unsafe_allow_html=True)

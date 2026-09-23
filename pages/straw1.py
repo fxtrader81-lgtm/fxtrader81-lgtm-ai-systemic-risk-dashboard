@@ -3,7 +3,7 @@ import requests
 import yfinance as yf
 import plotly.graph_objects as go
 from config.api_keys import FMP_API_KEY, FMP_BASE
-from components.ui import load_css, render_data_freshness, render_footer, render_header
+from components.ui import load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
@@ -229,26 +229,17 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     c1, c2, c3 = st.columns(3)
 
     with c1:
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">收入增长率 (YoY)</div>
-  <div class="metric-row"><span class="metric-number green">{rev_growth*100:.2f}%</span><span class="metric-arrow green">↗</span></div>
-  <div class="metric-desc">AI需求仍维持高增长。<br>当前收入扩张速度保持强劲.</div>
-</div>""", unsafe_allow_html=True)
+        st.markdown(metric_card("收入增长率 (YoY)", f"{rev_growth*100:.2f}%", "green", "↗",
+                                "AI需求仍维持高增长。<br>当前收入扩张速度保持强劲。"), unsafe_allow_html=True)
 
     with c2:
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">资本开支增长率 (YoY)</div>
-  <div class="metric-row"><span class="metric-number red">{capex_growth*100:.2f}%</span><span class="metric-arrow red">↗</span></div>
-  <div class="metric-desc">企业正在加速AI基础设施投入。<br>CapEx扩张速度持续提升.</div>
-</div>""", unsafe_allow_html=True)
+        st.markdown(metric_card("资本开支增长率 (YoY)", f"{capex_growth*100:.2f}%", "red", "↗",
+                                "企业正在加速AI基础设施投入。<br>CapEx扩张速度持续提升。"), unsafe_allow_html=True)
 
     with c3:
         ds = "+" if diff >= 0 else ""
-        st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">增速差 (CapEx - Revenue)</div>
-  <div class="metric-row"><span class="metric-number {risk_color_class}">{ds}{diff*100:.2f}%</span></div>
-  <div class="metric-desc">资本扩张速度已开始超过<br>收入增长速度。</div>
-</div>""", unsafe_allow_html=True)
+        st.markdown(metric_card("增速差 (CapEx - Revenue)", f"{ds}{diff*100:.2f}%", risk_color_class, "",
+                                "资本扩张速度已开始超过<br>收入增长速度。"), unsafe_allow_html=True)
 
     # ===== Alert =====
     st.markdown(render_alert(risk_state, alert_title, alert_body), unsafe_allow_html=True)
@@ -257,20 +248,18 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     lp, rp = st.columns([1, 1.5])
 
     with lp:
-        st.markdown("""<div class="panel">
-  <div class="panel-title">⚙️ 检测逻辑</div>
-  <div class="logic-step"><div class="step-num">1</div><div class="step-text">获取最新两个财年数据：收入、资本开支</div></div>
-  <div class="logic-step"><div class="step-num">2</div><div class="step-text">计算收入增长率 = (本期收入 - 上期收入) / 上期收入</div></div>
-  <div class="logic-step"><div class="step-num">3</div><div class="step-text">计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支</div></div>
-  <div class="logic-step"><div class="step-num">4</div><div class="step-text">计算增速差 = 资本开支增长率 - 收入增长率</div></div>
-  <div class="logic-step"><div class="step-num">5</div><div class="step-text">映射风险分数：Score = clamp(25 + 250 × 增速差, 0, 100)，再按统一四级阈值判断状态：</div></div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">增速差 &lt; 0%（Score &lt; 25）</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">0% ≤ 增速差 &lt; 10%（25 ≤ Score &lt; 50）</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">10% ≤ 增速差 &lt; 20%（50 ≤ Score &lt; 75）</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">增速差 ≥ 20%（Score ≥ 75）</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-</div>""", unsafe_allow_html=True)
+        st.markdown(logic_panel([
+            {"text": "获取最新两个财年数据：收入、资本开支"},
+            {"text": "计算收入增长率 = (本期收入 - 上期收入) / 上期收入"},
+            {"text": "计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支"},
+            {"text": "计算增速差 = 资本开支增长率 - 收入增长率"},
+            {"text": "映射风险分数：Score = clamp(25 + 250 × 增速差, 0, 100)，再按统一四级阈值判断状态：", "thresholds": [
+                ("#22c55e", "增速差 < 0%（Score < 25）", "SAFE", "green"),
+                ("#fbbf24", "0% ≤ 增速差 < 10%（25 ≤ Score < 50）", "WATCH", "yellow"),
+                ("#f97316", "10% ≤ 增速差 < 20%（50 ≤ Score < 75）", "WARNING", "orange"),
+                ("#ef4444", "增速差 ≥ 20%（Score ≥ 75）", "CRITICAL", "red"),
+            ]},
+        ]), unsafe_allow_html=True)
 
     with rp:
         st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)

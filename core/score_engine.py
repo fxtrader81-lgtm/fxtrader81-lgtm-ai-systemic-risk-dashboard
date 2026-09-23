@@ -18,7 +18,7 @@ from config.thresholds import STRAW_WEIGHTS, STATE_COLORS
 def register_score(straw_id: str, score: float):
     """
     在 Straw 页面末尾调用，把自己的分数写入 session_state。
-    straw_id: "straw1" ~ "straw6"
+    straw_id: "straw1" ~ "straw7"
     score:    0–100
     """
     if "straw_scores" not in st.session_state:
@@ -26,7 +26,7 @@ def register_score(straw_id: str, score: float):
     st.session_state["straw_scores"][straw_id] = round(score, 1)
 
 
-# ---- 系统总分 ------------------------------------------------
+# ---- AI结构性风险总分 ----------------------------------------
 
 def system_risk_score(scores: dict) -> float | None:
     """
@@ -51,7 +51,7 @@ def system_risk_score(scores: dict) -> float | None:
 
 def render_system_card(scores: dict, *, system_result: dict | None = None) -> str:
     """
-    返回系统总分大卡片 HTML。
+    返回AI结构性风险大卡片 HTML。
     scores: {"straw1": 82, ...}
     """
     raw_score = system_result.get("score") if system_result else system_risk_score(scores)
@@ -63,31 +63,31 @@ def render_system_card(scores: dict, *, system_result: dict | None = None) -> st
         sys_score, coverage = None, 0
     if sys_score is None:
         return f'''<div class="system-score-card system-score-unavailable">
-  <div><div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · 系统总分</div>
+  <div><div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · AI结构性风险</div>
   <div class="system-score-na">N/A</div><div class="system-score-desc">有效数据覆盖率 {coverage}%：不足以形成可信总分。</div></div>
-  <div class="system-score-meta">缺失数据不按安全或中性分处理</div></div>'''
+  <div class="system-score-meta">仅汇总因子01–05 · 缺失数据不按安全或中性分处理</div></div>'''
     state     = str((system_result or {}).get("state") or score_to_state(sys_score))
     color     = STATE_COLORS.get(state, "#fbbf24")
     bar_w     = min(int(sys_score), 100)
 
     descs = {
-        "SAFE":     "各风险因子均处于正常区间，当前系统性风险较低。",
-        "WATCH":    "部分风险因子出现早期信号，建议加强监测频率。",
-        "WARNING":  "多项风险因子同步抬升，系统性风险已进入高危区间。",
-        "CRITICAL": "风险因子叠加共振，需立即启动深度尽调与风险对冲。",
+        "SAFE":     "01–05结构因子处于正常区间；传导状态另见06与07。",
+        "WATCH":    "部分结构因子出现早期信号；传导状态另见06与07。",
+        "WARNING":  "多项结构因子同步抬升，但不等同于市场已经发生传导。",
+        "CRITICAL": "结构脆弱性处于高位；需结合信贷与市场确认判断CASCADE。",
     }
 
     return f"""
 <div class="system-score-card">
   <div>
-    <div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · 系统总分</div>
+    <div class="system-score-label">COMPUTE-DOLLAR RISK TERMINAL · AI结构性风险</div>
     <div class="system-score-row"><div class="system-score-num" style="color:{color};">{sys_score:.0f}</div><div class="system-score-scale">/100</div></div>
     <div class="system-score-desc">{descs.get(state, '')}<br><span class="coverage-text">有效权重覆盖率 {coverage}%</span></div>
   </div>
-  <div style="text-align:right;">
-    <div class="osci-state-label">系统状态</div>
+  <div class="system-score-right">
+    <div class="osci-state-label">结构状态</div>
     <div class="system-score-state" style="color:{color};">{state}</div>
-    <div class="osci-bar-wrap" style="width:320px; margin-top:14px;">
+    <div class="osci-bar-wrap system-score-bar">
       <div class="risk-bar-fill" style="width:{bar_w}%; background:{color};"></div>
     </div>
   </div>
@@ -100,14 +100,16 @@ FACTOR_LABELS = {
     "straw2": "💻 02 · 开源商业化压缩",
     "straw3": "🏗 03 · 数据中心资产减值",
     "straw4": "⚡ 04 · AI能源约束",
-    "straw5": "🏦 05 · AI融资闭环风险",
-    "straw6": "📊 06 · 宏观市场预警",
+    "straw5": "🏦 05 · AI融资结构脆弱性",
+    "straw6": "💳 06 · AI信贷与再融资压力",
+    "straw7": "📊 07 · 宏观与跨市场预警",
 }
 
 FACTOR_FILES = {
     "straw1": "pages/straw1.py", "straw2": "pages/straw2.py",
     "straw3": "pages/straw3.py", "straw4": "pages/straw4.py",
     "straw5": "pages/straw5.py", "straw6": "pages/straw6.py",
+    "straw7": "pages/straw7.py",
 }
 
 

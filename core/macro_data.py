@@ -95,14 +95,39 @@ def load_macro_snapshot() -> tuple[pd.Series, pd.Series, pd.Series, str]:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_macro_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
-    """Return the observed series used by the factor-06 stress model."""
+    """Return the observed series used by the factor-07 market model."""
     y10, _y30, sp500, market_source = load_macro_snapshot()
     series = {"y10": y10, "sp500": sp500}
     missing = []
     for key, fred_id in {
         "y3m": "DGS3MO",
         "stlfsi": "STLFSI4",
+    }.items():
+        try:
+            series[key] = _fred(fred_id)
+        except Exception:
+            series[key] = pd.Series(dtype=float)
+            missing.append(fred_id)
+    try:
+        series["vix"] = _yahoo("^VIX")
+    except Exception:
+        series["vix"] = pd.Series(dtype=float)
+        missing.append("VIX")
+    source = f"{market_source} · FRED（DGS3MO、STLFSI4） · Yahoo Finance（VIX）"
+    if missing:
+        source += f" · 缺失：{', '.join(missing)}"
+    return series, source
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_credit_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
+    """Return the source series used by the factor-06 credit model."""
+    series: dict[str, pd.Series] = {}
+    missing = []
+    for key, fred_id in {
+        "hy_oas": "BAMLH0A0HYM2",
         "baa10y": "BAA10Y",
+        "real_yield": "DFII10",
         "nfci": "NFCI",
     }.items():
         try:
@@ -110,7 +135,7 @@ def load_macro_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
         except Exception:
             series[key] = pd.Series(dtype=float)
             missing.append(fred_id)
-    source = f"{market_source} · FRED（DGS3MO、STLFSI4、BAA10Y、NFCI）"
+    source = "FRED（BAMLH0A0HYM2、BAA10Y、DFII10、NFCI）"
     if missing:
         source += f" · 缺失：{', '.join(missing)}"
     return series, source

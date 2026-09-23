@@ -36,6 +36,7 @@ body,
 .stApp,
 section[data-testid="stMain"] > div {
   background-color: var(--bg-page) !important;
+  overflow-x: hidden;
 }
 
 .block-container {

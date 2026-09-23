@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
-from components.ui import load_css, render_data_freshness, render_footer, render_header
+from components.ui import (load_css, logic_panel, metric_card, note_panel,
+                           render_data_freshness, render_footer, render_header,
+                           source_tag_row)
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -366,17 +368,12 @@ st.markdown(render_osci_card(
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">能力代差 <span class="source-tag-gray static-data-badge">⚠ 静态基准</span></div>
-  <div class="metric-row">
-    <span class="metric-number {cap_color}">{cap_gap_pct:+.1f}%</span>
-    <span class="metric-arrow {cap_color}">{cap_arrow}</span>
-  </div>
-  <div class="metric-desc">
-    {BENCHMARK_DATA["closed"]["name"]} vs {BENCHMARK_DATA["open"]["name"]}<br>
-    均分 {closed_avg:.1f} vs {open_avg:.1f} · 数据期 {BENCHMARK_DATA["closed"]["updated"]}
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card(
+        '能力代差 <span class="source-tag-gray static-data-badge">⚠ 静态基准</span>',
+        f"{cap_gap_pct:+.1f}%", cap_color, cap_arrow,
+        f'{BENCHMARK_DATA["closed"]["name"]} vs {BENCHMARK_DATA["open"]["name"]}<br>'
+        f'均分 {closed_avg:.1f} vs {open_avg:.1f} · 数据期 {BENCHMARK_DATA["closed"]["updated"]}',
+    ), unsafe_allow_html=True)
 
 with c2:
     if price_data_ok:
@@ -385,14 +382,8 @@ with c2:
     else:
         display_ratio = "N/A"
         desc2 = "OpenRouter 数据暂时无法获取<br>请稍后刷新重试"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">价格压缩 <span class="source-tag">OpenRouter</span></div>
-  <div class="metric-row">
-    <span class="metric-number {price_color}">{display_ratio}</span>
-    <span class="metric-arrow {price_color}">{price_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc2}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('价格压缩 <span class="source-tag">OpenRouter</span>', display_ratio,
+                            price_color, price_arrow, desc2), unsafe_allow_html=True)
 
 with c3:
     if deploy_data_ok:
@@ -401,14 +392,8 @@ with c3:
     else:
         stars_display = "N/A"
         desc3 = "GitHub API 数据暂时无法获取<br>请稍后刷新重试"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">部署动能 <span class="source-tag">GitHub</span></div>
-  <div class="metric-row">
-    <span class="metric-number {deploy_color}">{stars_display}</span>
-    <span class="metric-arrow {deploy_color}">{deploy_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc3}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('部署动能 <span class="source-tag">GitHub</span>', stars_display,
+                            deploy_color, deploy_arrow, desc3), unsafe_allow_html=True)
 
 with c4:
     if vel_data_ok:
@@ -417,14 +402,8 @@ with c4:
     else:
         dl_display = "N/A"
         desc4 = "HuggingFace 数据暂时无法获取<br>请稍后刷新重试"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">生态速度 <span class="source-tag">HuggingFace</span></div>
-  <div class="metric-row">
-    <span class="metric-number {vel_color}">{dl_display}</span>
-    <span class="metric-arrow {vel_color}">{vel_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc4}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('生态速度 <span class="source-tag">HuggingFace</span>', dl_display,
+                            vel_color, vel_arrow, desc4), unsafe_allow_html=True)
 
 # =========================================================
 # Alert 结论框
@@ -471,29 +450,22 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 lp, rp = st.columns([1, 1.5])
 
 with lp:
-    st.markdown(f"""<div class="panel">
-  <div class="panel-title">⚙️ 检测逻辑</div>
-
-  <div class="logic-step"><div class="step-num">1</div><div class="step-text"><b>能力代差（×0.20）</b>：对比闭源与开源顶级模型在 MMLU、HumanEval、MATH 三项 benchmark 的均值差距</div></div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">代差 &gt; 12%</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">代差 6–12%</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">代差 2–6%</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">代差 &lt; 2%</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-
-  <div class="logic-step" style="margin-top:14px;"><div class="step-num">2</div><div class="step-text"><b>价格压缩（×0.35）</b>：OpenRouter 实时价格，计算开源托管均价占闭源均价的比例</div></div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">开源价格 &gt; 70% 闭源</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">开源价格 45–70% 闭源</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">开源价格 25–45% 闭源</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">开源价格 &lt; 25% 闭源</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-
-  <div class="logic-step" style="margin-top:14px;"><div class="step-num">3</div><div class="step-text"><b>部署动能（×0.30）</b>：GitHub stars 总量作为企业本地化迁移意图的领先指标</div></div>
-  <div class="logic-step" style="margin-top:6px;"><div class="step-num">4</div><div class="step-text"><b>生态速度（×0.15）</b>：HuggingFace 顶级开源模型下载量，反映市场渗透加速度</div></div>
-
-</div>""", unsafe_allow_html=True)
+    st.markdown(logic_panel([
+        {"text": "<b>能力代差（×0.20）</b>：对比闭源与开源顶级模型在 MMLU、HumanEval、MATH 三项 benchmark 的均值差距", "thresholds": [
+            ("#22c55e", "代差 > 12%", "SAFE", "green"),
+            ("#fbbf24", "代差 6–12%", "WATCH", "yellow"),
+            ("#f97316", "代差 2–6%", "WARNING", "orange"),
+            ("#ef4444", "代差 < 2%", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>价格压缩（×0.35）</b>：OpenRouter 实时价格，计算开源托管均价占闭源均价的比例", "thresholds": [
+            ("#22c55e", "开源价格 > 70% 闭源", "SAFE", "green"),
+            ("#fbbf24", "开源价格 45–70% 闭源", "WATCH", "yellow"),
+            ("#f97316", "开源价格 25–45% 闭源", "WARNING", "orange"),
+            ("#ef4444", "开源价格 < 25% 闭源", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>部署动能（×0.30）</b>：GitHub stars 总量作为企业本地化迁移意图的领先指标"},
+        {"text": "<b>生态速度（×0.15）</b>：HuggingFace 顶级开源模型下载量，反映市场渗透加速度"},
+    ]), unsafe_allow_html=True)
 
 with rp:
     st.markdown('<div class="panel"><div class="panel-title">📊 指标分项评分（OSCI 构成）</div>', unsafe_allow_html=True)
@@ -565,16 +537,14 @@ with rp:
     src_vllm   = f"vLLM: {github_data['vllm']['stars']//1000}K ★"   if github_data and 'vllm'   in github_data else "vLLM: N/A"
     src_llama  = f"llama.cpp: {github_data['llama.cpp']['stars']//1000}K ★" if github_data and 'llama.cpp' in github_data else "llama.cpp: N/A"
 
-    st.markdown(f"""
-<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
-  <span class="source-tag">OpenRouter ✓</span>
-  <span class="source-tag">GitHub ✓</span>
-  <span class="source-tag">HuggingFace ✓</span>
-  <span class="source-tag-gray">{src_ollama}</span>
-  <span class="source-tag-gray">{src_vllm}</span>
-  <span class="source-tag-gray">{src_llama}</span>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(source_tag_row([
+        '<span class="source-tag">OpenRouter ✓</span>',
+        '<span class="source-tag">GitHub ✓</span>',
+        '<span class="source-tag">HuggingFace ✓</span>',
+        f'<span class="source-tag-gray">{src_ollama}</span>',
+        f'<span class="source-tag-gray">{src_vllm}</span>',
+        f'<span class="source-tag-gray">{src_llama}</span>',
+    ]), unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -586,26 +556,17 @@ with rp:
 # 底部注释：静态基准数据说明
 # =========================================================
 
-st.markdown(f"""
-<div style="margin-top: 28px; padding: 18px 22px; background: #0a0f1e;
-     border: 1px solid rgba(251,191,36,0.15); border-radius: 10px;
-     border-left: 3px solid #fbbf24;">
-  <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:10px; letter-spacing:0.5px;">
-    ⚠ 静态基准数据说明（能力代差指标）
-  </div>
-  <div style="font-size:13px; color:#94a3b8; line-height:1.9;">
-    <b style="color:#94a3b8;">当前数据：</b>
+st.markdown(note_panel("⚠ 静态基准数据说明（能力代差指标）", f"""
+    <b>当前数据：</b>
     闭源基准 = {BENCHMARK_DATA["closed"]["name"]}（MMLU {BENCHMARK_DATA["closed"]["mmlu"]} / HumanEval {BENCHMARK_DATA["closed"]["humaneval"]} / MATH {BENCHMARK_DATA["closed"]["math"]}）<br>
-    <b style="color:#94a3b8;">对比模型：</b>
+    <b>对比模型：</b>
     开源基准 = {BENCHMARK_DATA["open"]["name"]}（MMLU {BENCHMARK_DATA["open"]["mmlu"]} / HumanEval {BENCHMARK_DATA["open"]["humaneval"]} / MATH {BENCHMARK_DATA["open"]["math"]}）<br>
-    <b style="color:#94a3b8;">录入时间：</b>{BENCHMARK_DATA["closed"]["updated"]} &nbsp;·&nbsp;
-    <b style="color:#94a3b8;">建议更新频率：</b>每季度一次，或主要新模型发布后 &nbsp;·&nbsp;
-    <b style="color:#94a3b8;">更新位置：</b>代码顶部 BENCHMARK_DATA 字典<br>
-    <b style="color:#94a3b8;">权重说明：</b>能力代差仅占 OSCI 权重的 20%，且上限压至 60 分（商业粘性缓冲）。
+    <b>录入时间：</b>{BENCHMARK_DATA["closed"]["updated"]} &nbsp;·&nbsp;
+    <b>建议更新频率：</b>每季度一次，或主要新模型发布后 &nbsp;·&nbsp;
+    <b>更新位置：</b>代码顶部 BENCHMARK_DATA 字典<br>
+    <b>权重说明：</b>能力代差仅占 OSCI 权重的 20%，且上限压至 60 分（商业粘性缓冲）。
     Benchmark 追平不等于商业崩塌，企业迁移滞后周期约 12–18 个月。
-  </div>
-</div>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 render_data_freshness([
     {"name": "模型价格", "source": "OpenRouter API", "updated_at": "每小时缓存", "mode": "live"},

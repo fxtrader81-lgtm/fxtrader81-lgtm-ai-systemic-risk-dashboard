@@ -41,12 +41,11 @@ STRAW1_THRESHOLDS = {
     # diff < 0 → 健康
 }
 
-# System Risk Score 加权（后续 Dashboard 用）
+# AI结构性风险加权。因子06与07是传导/确认层，不混入结构总分。
 STRAW_WEIGHTS = {
-    "straw1": 0.20,
-    "straw2": 0.20,
-    "straw3": 0.15,
+    "straw1": 0.25,
+    "straw2": 0.15,
+    "straw3": 0.20,
     "straw4": 0.15,
-    "straw5": 0.15,
-    "straw6": 0.15,
+    "straw5": 0.25,
 }

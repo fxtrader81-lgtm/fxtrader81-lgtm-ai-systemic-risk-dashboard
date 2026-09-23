@@ -17,7 +17,8 @@ import streamlit as st
 import yfinance as yf
 
 from config.thresholds import STRAW_WEIGHTS
-from core.macro_data import load_macro_stress_snapshot
+from core.credit_risk import compute_credit_metrics
+from core.macro_data import load_credit_stress_snapshot, load_macro_stress_snapshot
 from core.macro_risk import compute_macro_metrics
 from core.straw5_engine import load_straw5_analysis
 
@@ -39,8 +40,9 @@ FACTOR_NAMES = {
     "straw2": "开源商业化压缩",
     "straw3": "数据中心资产减值",
     "straw4": "AI能源约束",
-    "straw5": "AI融资闭环风险",
-    "straw6": "宏观市场预警",
+    "straw5": "AI融资结构脆弱性",
+    "straw6": "AI信贷与再融资压力",
+    "straw7": "宏观与跨市场预警",
 }
 
 
@@ -262,17 +264,32 @@ def _yield_series(ticker: str) -> pd.Series:
 
 
 def _straw6() -> dict:
-    series, source = load_macro_stress_snapshot()
-    metrics = compute_macro_metrics(
-        series["y10"], series["y3m"], series["sp500"],
-        series["stlfsi"], series["baa10y"], series["nfci"],
+    series, source = load_credit_stress_snapshot()
+    metrics = compute_credit_metrics(
+        series["hy_oas"], series["real_yield"], series["nfci"],
+        baa_spread=series["baa10y"],
     )
     composite = metrics["composite"]
     if composite["score"] is None:
-        return _unavailable("straw6", f"宏观压力序列覆盖不足（{composite['coverage']}%）")
+        return _unavailable("straw6", f"信贷压力序列覆盖不足（{composite['coverage']}%）")
     return _result(
         "straw6", composite["score"], composite["coverage"] / 100,
-        "金融压力、信用利差、金融条件、股市动量与期限曲线", source,
+        "HY信用利差、10Y实际利率与NFCI；AI交易定价待可比数据齐备后计分", source,
+    )
+
+
+def _straw7() -> dict:
+    series, source = load_macro_stress_snapshot()
+    metrics = compute_macro_metrics(
+        series["y10"], series["y3m"], series["sp500"],
+        series["stlfsi"], series["vix"],
+    )
+    composite = metrics["composite"]
+    if composite["score"] is None:
+        return _unavailable("straw7", f"跨市场序列覆盖不足（{composite['coverage']}%）")
+    return _result(
+        "straw7", composite["score"], composite["coverage"] / 100,
+        "股票动量与回撤、VIX、利率冲击、市场压力与期限曲线", source,
     )
 
 
@@ -282,6 +299,7 @@ PROVIDERS: dict[str, Callable[[], dict]] = {
     "straw3": _straw3,
     "straw4": _straw4,
     "straw6": _straw6,
+    "straw7": _straw7,
 }
 
 
@@ -305,7 +323,7 @@ def load_factor_results() -> dict[str, dict]:
             analysis["score"],
             analysis["coverage"] / 100,
             f"期限错配、资本闭环、证券化传染与DCOI联动 · {analysis['confidence']}",
-            "SEC季度披露 · Yahoo Finance信用ETF代理 · 数据中心资产减值指数",
+            "SEC季度披露 · 数据中心资产减值指数",
         )
     except Exception as exc:
         results["straw5"] = _unavailable("straw5", f"数据源异常：{type(exc).__name__}")
@@ -313,13 +331,37 @@ def load_factor_results() -> dict[str, dict]:
 
 
 def aggregate_factor_results(results: dict[str, dict], minimum_coverage: float = 0.70) -> dict:
-    """Weighted system score across every available Straw factor."""
+    """Return structural score plus the credit/market transmission phase."""
     active = dict(STRAW_WEIGHTS)
     active_total = sum(active.values())
     available_weight = sum(weight for key, weight in active.items() if results.get(key, {}).get("available"))
     coverage = available_weight / active_total if active_total else 0
     if coverage < minimum_coverage or available_weight == 0:
-        return {"score": None, "state": "N/A", "coverage": round(coverage * 100), "available": False}
-    weighted = sum(results[key]["score"] * weight for key, weight in active.items() if results.get(key, {}).get("available"))
-    score = round(weighted / available_weight, 1)
-    return {"score": score, "state": state_for(score), "coverage": round(coverage * 100), "available": True}
+        base = {"score": None, "state": "N/A", "coverage": round(coverage * 100), "available": False}
+    else:
+        weighted = sum(results[key]["score"] * weight for key, weight in active.items() if results.get(key, {}).get("available"))
+        score = round(weighted / available_weight, 1)
+        base = {"score": score, "state": state_for(score), "coverage": round(coverage * 100), "available": True}
+
+    rank = {"N/A": -1, "SAFE": 0, "WATCH": 1, "WARNING": 2, "CRITICAL": 3}
+    s5 = results.get("straw5", {}).get("state", "N/A")
+    s6 = results.get("straw6", {}).get("state", "N/A")
+    s7 = results.get("straw7", {}).get("state", "N/A")
+    cascade = rank[s5] >= 2 and rank[s6] >= 2 and rank[s7] >= 1
+    critical = cascade and (rank[s5] >= 3 or rank[s6] >= 3) and rank[s7] >= 2
+    if critical:
+        phase = "危机传导期"
+    elif cascade:
+        phase = "CASCADE 联动"
+    elif base["available"] and rank[base["state"]] >= 2 and rank[s6] <= 1 and rank[s7] <= 1:
+        phase = "结构性积累期，尚未市场传导"
+    elif base["available"] and rank[base["state"]] >= 2 and rank[s7] >= 2 and rank[s6] <= 1:
+        phase = "结构高风险，市场承压但信贷未确认"
+    elif rank[s7] >= 2 and (not base["available"] or rank[base["state"]] <= 1):
+        phase = "宏观压力，AI体系暂时隔离"
+    elif rank[s6] >= 2:
+        phase = "融资压力观察期"
+    else:
+        phase = "常态监测"
+    return {**base, "phase": phase, "cascade": cascade, "critical_cascade": critical,
+            "credit_state": s6, "market_state": s7}

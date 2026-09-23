@@ -1,119 +1,46 @@
-# Compute-Dollar Risk Terminal — 迁移手册
-# 如何将现有 straw2.py ~ straw6.py 接入新架构
+# Compute-Dollar Risk Terminal — 公共组件迁移状态
 
-## 文件对应关系
+## 当前状态
 
-| 旧文件         | 新位置                   |
-|---------------|--------------------------|
-| app.py         | pages/straw1.py ✅ 已完成 |
-| straw2.py      | pages/straw2.py 🚧 待迁移 |
-| straw3.py      | pages/straw3.py 🚧 待迁移 |
-| straw4.py      | pages/straw4.py 🚧 待迁移 |
-| straw5.py      | pages/straw5.py 🚧 待迁移 |
-| straw6.py      | pages/straw6.py 🚧 待迁移 |
+七个风险因子页面与系统总览已接入统一设计系统。因子05监测融资结构脆弱性，因子06监测信贷与再融资压力，原宏观页面顺延为因子07并只承担跨市场确认。
 
----
+| 页面 | 公共CSS | 页眉 | 顶部评分卡 | 结论框 | 数据新鲜度 | 页脚 |
+|---|---|---|---|---|---|---|
+| 因子01 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子02 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子03 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子04 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子05 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子06 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 因子07 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 系统总览 | ✅ | ✅ | AI结构风险组件 | 总览结论组件 | 来源覆盖组件 | ✅ |
 
-## 迁移步骤（以任意 straw 为例）
+## 公共模块
 
-### 第一步：删除 CSS 块
-把文件顶部整段 `st.markdown("""<style>...</style>""", ...)` 删除。
-改为：
-```python
-from components.ui import load_css
-load_css()
-```
+- `components/ui.py`：CSS加载、普通页眉、总览页眉、普通指标卡、面板、检测逻辑、阈值行、说明框、数据新鲜度、页脚和Dashboard信息块。
+- `core/alert_engine.py`：四级状态、因子顶部评分卡和动态结论框。
+- `core/score_engine.py`：AI结构性总分、七因子导航和评分注册。
+- `core/credit_risk.py`：因子06信用利差、实际利率、NFCI与AI融资交易评分。
+- `core/macro_risk.py`：因子07股票、VIX、利率冲击和跨市场确认评分。
+- `styles/base.css`：颜色变量、全局背景、字体与Streamlit基础覆盖。
+- `styles/components.css`：评分卡、指标卡、结论框、Dashboard和响应式组件。
+- `styles/pages.css`：页面布局、阈值、历史事件、说明面板和窄屏适配。
 
-### 第二步：替换 API Keys 和 fetch()
-删除：
-```python
-API_KEY = "jDx2..."
-BASE = "https://..."
-def fetch(url): ...
-```
-改为：
-```python
-from core.data_loader import fmp_income, fmp_cashflow, fred_latest_value, ...
-```
-数据加载器清单：
-- FMP → fmp_income / fmp_cashflow / fmp_index_quote / fmp_historical
-- FRED → fred_series / fred_latest_value
-- yfinance → yf_history
-- GitHub → github_stars
-- HuggingFace → huggingface_downloads
-- OpenRouter → openrouter_models
+旧的 `styles/bloomberg.css` 已删除，避免与当前三层样式重复。
 
-### 第三步：替换 Alert HTML
-删除手写的 `<div class="alert-box">...</div>`。
-改为：
-```python
-from core.alert_engine import render_alert, render_osci_card
+## 页面开发约束
 
-st.markdown(render_alert(state, title, body), unsafe_allow_html=True)
-```
-state 取值：`"SAFE"` / `"WATCH"` / `"WARNING"` / `"CRITICAL"`
+1. 页面文件不得新增 `<style>` 块。
+2. 普通指标卡使用 `metric_card()`。
+3. 检测步骤与阈值使用 `logic_panel()`。
+4. 顶部综合评分使用 `render_osci_card()`。
+5. 动态结论使用 `render_alert()`。
+6. 数据来源和更新时间使用 `render_data_freshness()` 与 `render_footer()`。
+7. 页面特有图表可以保留在页面内；重复出现的布局应进入 `components/`。
 
-### 第四步：替换 go.Figure()（可选）
-如果图表类型已在 components/charts.py 中定义，直接调用：
-```python
-from components.charts import build_growth_comparison_chart, build_horizontal_bar
-
-fig = build_horizontal_bar(categories, scores, weights, reference_line=osci)
-st.plotly_chart(fig, use_container_width=True)
-```
-如果当前图表类型尚未抽象（如 Straw3 的 GPU 世代图），先保留 go.Figure()，
-后续可逐步移入 components/charts.py。
-
-### 第五步：末尾注册评分
-```python
-from core.score_engine import register_score
-register_score("straw2", osci)  # 把当前 Straw 的综合分传入
-```
-Dashboard 会自动汇总。
-
----
-
-## 特殊说明
-
-### Straw2（开源压缩）
-- 数据源：openrouter_models() / github_stars() / huggingface_downloads()
-- 评分：OSCI 总分直接 register_score("straw2", osci)
-
-### Straw3（数据中心减值）
-- 数据源：yf_history()（REIT/CMBS/相关ETF）
-- GPU 世代图：使用 components/charts.py 的 build_gpu_generation_bar()
-
-### Straw4（能源控制）
-- 数据源：EIA API（不在 data_loader 内，可直接调用或添加 eia_series() 函数）
-- 添加方式：在 core/data_loader.py 末尾仿照 fred_series() 写一个 eia_series()
-
-### Straw6（宏观预警）
-- 数据源：fred_series(["DGS10","DGS30"]) + fmp_index_quote + yf_history
-- Tab 结构（ALL/US/CN）保持不变
-- 双 Y 轴图：使用 components/charts.py 的 build_dual_axis_chart()
-
----
-
-## 如何运行
+## 验证命令
 
 ```bash
-cd compute_dollar
+PYTHONPYCACHEPREFIX=/tmp/codex-pycache python3 -m compileall app.py components config core pages
 streamlit run app.py
 ```
-
-访问 http://localhost:8501
-左侧导航栏选择 Straw 页面。
-
----
-
-## 已确认、暂缓执行的 UI 统一工作
-
-为控制当前开发成本，Straw 5 直接复用 `styles/base.css`、`styles/components.css`
-和 `styles/pages.css`，不新增视觉体系。待六个页面功能和指标稳定后，再集中完成：
-
-- 将顶部综合评分卡统一封装，删除页面内重复 HTML；
-- 将动态结论框统一封装；
-- 将数据新鲜度、覆盖率与低置信度状态统一封装；
-- 对六页做一次桌面端与窄屏回归检查。
-
-该项仍为未完成工作，不因 Straw 5 上线而关闭。

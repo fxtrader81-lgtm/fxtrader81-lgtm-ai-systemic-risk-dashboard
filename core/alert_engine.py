@@ -83,11 +83,11 @@ def render_osci_card(
     bar_width = 0 if score is None else min(int(score), 100)
     display_score = score_display if score_display is not None else ("N/A" if score is None else f"{score:g}")
     detail_html = (
-        f'<div style="margin-top:8px; font-size:14px; color:#94a3b8;">{state_detail}</div>'
+        f'<div class="osci-state-detail">{state_detail}</div>'
         if state_detail else ""
     )
     components_block = (
-        '<div style="margin-top:16px; font-size:13px; color:#94a3b8; line-height:1.8;">'
+        '<div class="osci-components">'
         f"{components_html}</div>"
         if components_html else ""
     )

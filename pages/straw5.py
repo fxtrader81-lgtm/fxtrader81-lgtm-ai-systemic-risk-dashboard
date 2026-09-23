@@ -1,4 +1,4 @@
-"""AI financing loop and securitization contagion risk."""
+"""Factor 05 — structural AI financing vulnerability."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from html import escape
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.ui import load_css, metric_card, render_data_freshness, render_footer, render_header
+from components.ui import (coverage_panel, load_css, logic_panel, metric_card,
+                           render_data_freshness, render_footer, render_header)
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
 from core.factor_registry import load_factor_results
@@ -15,7 +16,7 @@ from core.score_engine import register_score
 from core.straw5_engine import SOURCES, STATIC_INPUTS, load_straw5_analysis, state_for
 
 
-st.set_page_config(page_title="AI融资闭环风险", layout="wide")
+st.set_page_config(page_title="AI融资结构脆弱性", layout="wide")
 load_css()
 
 
@@ -102,12 +103,12 @@ def _duration_figure() -> go.Figure:
 
 
 render_header(
-    "🏦 AI融资闭环风险",
+    "🏦 AI融资结构脆弱性",
     "核心监测维度：押在AI基础设施上的债务，在资本闭环与资产减值叠加下能否安全到期",
-    symbol="AFSI · AI FINANCING STRESS",
+    symbol="AFVI · AI FINANCING VULNERABILITY",
 )
 
-with st.spinner("正在读取SEC季度基准、信用ETF代理与数据中心资产减值指数…"):
+with st.spinner("正在读取SEC季度基准、融资结构证据与数据中心资产减值指数…"):
     factor_results = load_factor_results()
     dcoi_score = factor_results.get("straw3", {}).get("score") if factor_results.get("straw3", {}).get("available") else None
     analysis = load_straw5_analysis(dcoi_score)
@@ -115,20 +116,15 @@ with st.spinner("正在读取SEC季度基准、信用ETF代理与数据中心资
 score = analysis["score"]
 state = analysis["state"]
 color = STATE_COLORS.get(state, "#94a3b8")
-market = analysis["market"]
 confidence_cn = {"NORMAL": "正常置信度", "LOW CONFIDENCE": "低置信度", "INSUFFICIENT": "覆盖不足"}[analysis["confidence"]]
-market_line = (
-    f"HYG 3M {market['metrics']['hyg_3m_return']:+.1%} · HYXF相对 {market['metrics']['hyxf_relative']:+.1%}"
-    if market["score"] is not None else "HYG/HYXF 当前不可用"
-)
 
 st.markdown(render_osci_card(
-    "AFSI · AI FINANCING STRESS INDEX",
+    "AFVI · AI FINANCING VULNERABILITY INDEX",
     score,
     state,
     f"综合评分：期限错配与资本闭环是结构主因；有效权重覆盖率 {analysis['coverage']}%。",
-    state_detail=f"{confidence_cn} · {market_line}",
-    components_html="期限错配 ×0.35 · 资本闭环 ×0.25<br>证券化传染 ×0.25 · 抵押品脆弱度 ×0.15",
+    state_detail=f"{confidence_cn} · 本页不使用信用市场价格，市场触发由因子06负责",
+    components_html="期限错配 ×0.35 · 资本闭环 ×0.25<br>证券化与契约结构 ×0.20 · 抵押品脆弱度 ×0.20",
     score_display=f"{score:.1f}",
 ), unsafe_allow_html=True)
 
@@ -137,34 +133,32 @@ cols = st.columns(4)
 cards = [
     _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限", "⚠ 静态披露"),
     _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠", "⚠ 静态披露"),
-    _component_card("证券化传染 ×0.25", components["securitization"], "结构风险 + HYG/HYXF市场代理", "◐ 静态+实时"),
-    _component_card("抵押品脆弱度 ×0.15", components["collateral"], "直接引用数据中心资产减值指数，不重复评分"),
+    _component_card("证券化与契约结构 ×0.20", components["securitization"], "偿还期限、契约与尾部再融资结构", "⚠ 静态披露"),
+    _component_card("抵押品脆弱度 ×0.20", components["collateral"], "直接引用数据中心资产减值指数，不重复计算底层信号"),
 ]
 for column, card in zip(cols, cards):
     with column:
         st.markdown(card, unsafe_allow_html=True)
 
-straw1_state = factor_results.get("straw1", {}).get("state", "N/A")
-straw3_state = factor_results.get("straw3", {}).get("state", "N/A")
-cascade = (
-    (state == "CRITICAL" and straw1_state in {"WARNING", "CRITICAL"})
-    or (state in {"WARNING", "CRITICAL"} and straw3_state == "CRITICAL")
-)
+credit_state = factor_results.get("straw6", {}).get("state", "N/A")
+market_state = factor_results.get("straw7", {}).get("state", "N/A")
+cascade = state in {"WARNING", "CRITICAL"} and credit_state in {"WARNING", "CRITICAL"} and market_state in {"WATCH", "WARNING", "CRITICAL"}
+critical_cascade = cascade and (state == "CRITICAL" or credit_state == "CRITICAL") and market_state in {"WARNING", "CRITICAL"}
 if cascade:
-    title = "CASCADE：融资压力与上游风险已形成联动"
-    body = f"融资闭环为 {state}，资本开支偏离为 {straw1_state}，资产减值为 {straw3_state}。应优先检查再融资、抵押品折价与容量兜底的共同敞口。"
+    title = "CRITICAL CASCADE：融资结构、信用与市场同步恶化" if critical_cascade else "CASCADE：融资结构脆弱性已向信用和市场传导"
+    body = f"融资结构={state}，信贷与再融资={credit_state}，宏观市场确认={market_state}。应优先检查再融资、抵押品折价与容量兜底的共同敞口。"
 else:
     title = {
         "SAFE": "融资结构尚未形成系统性压力",
         "WATCH": "结构性错配已出现，尚未触发级联预警",
-        "WARNING": "融资闭环风险升高，但级联条件尚未同时满足",
-        "CRITICAL": "融资风险处于高位，等待上游因子确认级联",
+        "WARNING": "融资结构风险升高，但信用与市场尚未同时确认",
+        "CRITICAL": "融资结构处于高位，等待外部信用与市场确认",
     }.get(state, "数据覆盖不足，暂不形成风险结论")
     body = (
-        f"当前 AFSI {score:.1f}/100；资本开支偏离={straw1_state}，资产减值={straw3_state}。"
-        "融资闭环因子单独不会触发 CASCADE；只有与资本开支偏离或抵押品减值共同恶化时才升级。"
+        f"当前 AFVI {score:.1f}/100；信贷与再融资={credit_state}，宏观市场确认={market_state}。"
+        "只有05达到WARNING、06达到WARNING且07至少WATCH时才触发CASCADE。"
     )
-st.markdown(render_alert("CRITICAL" if cascade else state, title, body), unsafe_allow_html=True)
+st.markdown(render_alert("CRITICAL" if critical_cascade else "WARNING" if cascade else state, title, body), unsafe_allow_html=True)
 
 left, right = st.columns(2)
 with left:
@@ -178,24 +172,20 @@ with right:
 
 tab1, tab2, tab3 = st.tabs(["检测逻辑", "实体与结构证据", "数据覆盖与来源"])
 with tab1:
-    st.markdown(f"""
-<div class="panel">
-  <div class="panel-title">⚙️ AFSI 评分逻辑</div>
-  <div class="logic-step"><div class="step-num">1</div><div class="step-text"><b>期限错配（35%）</b>：合同WAL与GPU寿命、设施租约及债务尾部期限的缺口。</div></div>
-  <div class="logic-step"><div class="step-num">2</div><div class="step-text"><b>资本闭环（25%）</b>：投资者、供应商、容量兜底方与信用支持方是否重叠。</div></div>
-  <div class="logic-step"><div class="step-num">3</div><div class="step-text"><b>证券化传染（25%）</b>：40%结构证据 + 60% HYG/HYXF市场代理。ETF不是AI数据中心ABS直接利差。</div></div>
-  <div class="logic-step"><div class="step-num">4</div><div class="step-text"><b>抵押品脆弱度（15%）</b>：直接引用数据中心资产减值指数；前者看资产是否过时，本页看债务有多少依赖这些资产。</div></div>
-  <div class="logic-step"><div class="step-num">5</div><div class="step-text"><b>缺失值政策</b>：按可用权重重算；覆盖≥75%正常，50–75%标注LOW CONFIDENCE，低于50%输出N/A。</div></div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e"></div><div class="t-label">0–24.9</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24"></div><div class="t-label">25–49.9</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316"></div><div class="t-label">50–74.9</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444"></div><div class="t-label">75–100</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(logic_panel([
+        {"text": "<b>期限错配（35%）</b>：合同WAL与GPU寿命、设施租约及债务尾部期限的缺口。"},
+        {"text": "<b>资本闭环（25%）</b>：投资者、供应商、容量兜底方与信用支持方是否重叠。"},
+        {"text": "<b>证券化与契约结构（20%）</b>：预期偿还、法定最终到期、契约和担保结构；不再混入HYG/HYXF价格。"},
+        {"text": "<b>抵押品脆弱度（20%）</b>：直接引用数据中心资产减值指数；前者看资产是否过时，本页看债务有多少依赖这些资产。"},
+        {"text": "<b>缺失值政策</b>：按可用权重重算；覆盖≥75%正常，50–75%标注LOW CONFIDENCE，低于50%输出N/A。", "thresholds": [
+            ("#22c55e", "0–24.9", "SAFE", "green"),
+            ("#fbbf24", "25–49.9", "WATCH", "yellow"),
+            ("#f97316", "50–74.9", "WARNING", "orange"),
+            ("#ef4444", "75–100", "CRITICAL", "red"),
+        ]},
+    ], title="⚙️ AFSI 评分逻辑"), unsafe_allow_html=True)
 
 with tab2:
-    market_value = market_line if market["score"] is not None else f"不可用：{market.get('error') or '未知原因'}"
     st.markdown(f"""
 <div class="panel"><div class="panel-title">📋 当前覆盖实体与证据链</div>
 <table class="gpu-table"><thead><tr><th>对象</th><th>可观察结构</th><th>本页用途</th><th>状态</th></tr></thead><tbody>
@@ -203,7 +193,7 @@ with tab2:
 <tr><td>NVIDIA ↔ CoreWeave</td><td>股权、GPU供应、容量与信用支持角色重叠</td><td>资本闭环</td><td class="gpu-gen-active">已覆盖</td></tr>
 <tr><td>Helios / Galaxy</td><td>15年基础租约与剩余容量购买安排</td><td>长期承诺样本</td><td class="gpu-gen-active">已覆盖</td></tr>
 <tr><td>数据中心证券化</td><td>约5年预期偿还、25–30年法定最终到期的行业结构</td><td>尾部再融资风险</td><td class="gpu-gen-active">行业代理</td></tr>
-<tr><td>HYG / HYXF</td><td>{escape(market_value)}</td><td>信用市场传染代理</td><td>{'已更新 '+escape(market['updated']) if market['updated'] else 'N/A'}</td></tr>
+<tr><td>市场价格信号</td><td>已迁移至因子06：AI信贷与再融资压力</td><td>避免结构与市场重复计分</td><td class="gpu-gen-active">已拆分</td></tr>
 </tbody></table></div>""", unsafe_allow_html=True)
 
 with tab3:
@@ -213,15 +203,14 @@ with tab3:
         for item in SOURCES
     )
     render_data_freshness([
-        {"name": "信用市场代理", "source": "Yahoo Finance · HYG / HYXF", "updated_at": market.get("updated") or "不可用", "mode": "live" if market.get("updated") else "fallback"},
         {"name": "融资结构证据", "source": "SEC公司披露与行业函件", "updated_at": STATIC_INPUTS["as_of"], "mode": "static"},
         {"name": "抵押品脆弱度", "source": "数据中心资产减值指数联动", "updated_at": "每小时缓存", "mode": "live"},
     ])
-    st.markdown(f"""<div class="panel"><div class="metric-desc">有效权重覆盖率 <b style="color:{color};">{analysis['coverage']}%</b> · {confidence_cn}</div>
-<table class="gpu-table"><thead><tr><th>数据项</th><th>期间</th><th>更新节奏</th><th>解释</th></tr></thead><tbody>{source_rows}</tbody></table>
-<div class="metric-sub">私人AI云披露不足时保留“未披露”，不会默认SAFE。</div></div>""", unsafe_allow_html=True)
+    evidence_table = f'<table class="gpu-table"><thead><tr><th>数据项</th><th>期间</th><th>更新节奏</th><th>解释</th></tr></thead><tbody>{source_rows}</tbody></table>'
+    st.markdown(coverage_panel(analysis["coverage"], confidence_cn, color, evidence_table,
+                               "私人AI云披露不足时保留“未披露”，不会默认SAFE。"), unsafe_allow_html=True)
 
 if score is not None:
     register_score("straw5", score)
 
-render_footer("SEC公司披露与行业函件（季度静态维护） · Yahoo Finance HYG/HYXF（小时缓存） · 数据中心资产减值指数")
+render_footer("SEC公司披露与行业函件（季度静态维护） · 数据中心资产减值指数 · 市场价格信号见因子06")

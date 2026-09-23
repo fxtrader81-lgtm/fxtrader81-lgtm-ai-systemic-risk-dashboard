@@ -2,7 +2,9 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 from config.api_keys import EIA_API_KEY
-from components.ui import freshness_badge, load_css, render_data_freshness, render_footer, render_header
+from components.ui import (counter_card, freshness_badge, load_css, logic_panel,
+                           metric_card, render_data_freshness, render_footer,
+                           render_header, section_intro, source_tag_row)
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -392,17 +394,9 @@ with c1:
     pjm_r   = INFRA_DATA["pjm_reserve_margin_pct"]
     ercot_r = INFRA_DATA["ercot_reserve_margin_pct"]
     fresh1  = freshness_badge(INFRA_DATA["updated"])
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">基础设施约束 {fresh1}</div>
-  <div class="metric-row">
-    <span class="metric-number {infra_color}">{queue}mo</span>
-    <span class="metric-arrow {infra_color}">{infra_arrow}</span>
-  </div>
-  <div class="metric-desc">
-    并网排队 {queue}月 · 变压器交期 {xfmr}月<br>
-    PJM储备率 {pjm_r}% · ERCOT {ercot_r}%
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card(f"基础设施约束 {fresh1}", f"{queue}mo", infra_color, infra_arrow,
+                            f"并网排队 {queue}月 · 变压器交期 {xfmr}月<br>"
+                            f"PJM储备率 {pjm_r}% · ERCOT {ercot_r}%"), unsafe_allow_html=True)
 
 # 卡片2：能源成本压力（EIA 实时）
 with c2:
@@ -412,18 +406,11 @@ with c2:
     opex  = ENERGY_COST_DATA["inference_energy_opex_pct"]
     fresh2_cn  = freshness_badge(ENERGY_COST_DATA["updated"])   # 中国价格静态
     eia_period = eia_result.get("period", "")
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">能源成本压力 {us_price_tag_html}</div>
-  <div class="metric-row">
-    <span class="metric-number {cost_color}">{ppp:.3f}</span>
-    <span class="metric-arrow {cost_color}">{cost_arrow}</span>
-  </div>
-  <div class="metric-desc">
-    中美电价PPP比值（越低美国越贵）<br>
-    美国 ${us_p:.4f}/kWh（{us_price_source[:20]}…） · 中国西部 ${cn_p}/kWh{fresh2_cn}<br>
-    推理电力占OpEx {opex}%
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card(
+        f"能源成本压力 {us_price_tag_html}", f"{ppp:.3f}", cost_color, cost_arrow,
+        f"中美电价PPP比值（越低美国越贵）<br>美国 ${us_p:.4f}/kWh（{us_price_source[:20]}…） · "
+        f"中国西部 ${cn_p}/kWh{fresh2_cn}<br>推理电力占OpEx {opex}%",
+    ), unsafe_allow_html=True)
 
 # 卡片3：GPU效率对冲（静态）
 with c3:
@@ -432,17 +419,9 @@ with c3:
     gain      = round(b200_eff / h100_eff, 2)
     rubin_eff = GPU_EFFICIENCY_DATA["Rubin"]["tflops_per_watt"]
     fresh3    = freshness_badge(GPU_EFFICIENCY_DATA["updated"])
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">GPU效率对冲 {fresh3}</div>
-  <div class="metric-row">
-    <span class="metric-number {eff_color}">{gain}x</span>
-    <span class="metric-arrow {eff_arrow}">{eff_arrow}</span>
-  </div>
-  <div class="metric-desc">
-    B200 vs H100 每瓦性能倍数<br>
-    B200={b200_eff}x · Rubin预估={rubin_eff}x（H100基准=1.0）
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card(f"GPU效率对冲 {fresh3}", f"{gain}x", eff_color, eff_arrow,
+                            f"B200 vs H100 每瓦性能倍数<br>B200={b200_eff}x · "
+                            f"Rubin预估={rubin_eff}x（H100基准=1.0）"), unsafe_allow_html=True)
 
 # 卡片4：市场信号
 with c4:
@@ -458,14 +437,8 @@ with c4:
     else:
         desc4    = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
         display4 = "N/A"
-    st.markdown(f"""<div class="metric-card">
-  <div class="metric-label">核电市场信号 <span class="source-tag">Yahoo 实时</span></div>
-  <div class="metric-row">
-    <span class="metric-number {mkt_color}">{display4}</span>
-    <span class="metric-arrow {mkt_color}">{mkt_arrow}</span>
-  </div>
-  <div class="metric-desc">{desc4}</div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(metric_card('核电市场信号 <span class="source-tag">Yahoo 实时</span>', display4,
+                            mkt_color, mkt_arrow, desc4), unsafe_allow_html=True)
 
 # =========================================================
 # Alert 结论框
@@ -518,40 +491,20 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 lp, rp = st.columns([1, 1.5])
 
 with lp:
-    st.markdown(f"""<div class="panel">
-  <div class="panel-title">⚙️ 检测逻辑</div>
-
-  <div class="logic-step">
-    <div class="step-num">1</div>
-    <div class="step-text"><b>基础设施约束（×0.40）</b>：并网排队周期（45%权重）+ 变压器交期（30%）+ 电网储备率（25%）。物理瓶颈是最难用钱解决的约束。</div>
-  </div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">排队 &lt;12月 · 储备率 &gt;20%</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#fbbf24;"></div><div class="t-label">排队 12-24月 · 储备率 15-20%</div><div class="t-arrow">→</div><div class="t-status yellow">WATCH</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#f97316;"></div><div class="t-label">排队 24-36月 · 储备率 10-15%</div><div class="t-arrow">→</div><div class="t-status orange">WARNING</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">排队 &gt;36月 · 储备率 &lt;10%</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-
-  <div class="logic-step" style="margin-top:14px;">
-    <div class="step-num">2</div>
-    <div class="step-text"><b>能源成本压力（×0.25）</b>：中美电价PPP比值 + 推理电力占OpEx比例。美国电价现已接入 EIA API 实时数据，每24小时自动刷新。</div>
-  </div>
-  <div class="threshold-block">
-    <div class="threshold-row"><div class="t-dot" style="background:#22c55e;"></div><div class="t-label">PPP &gt; 0.45 · OpEx电力 &lt;10%</div><div class="t-arrow">→</div><div class="t-status green">SAFE</div></div>
-    <div class="threshold-row"><div class="t-dot" style="background:#ef4444;"></div><div class="t-label">PPP &lt; 0.25 · OpEx电力 &gt;30%</div><div class="t-arrow">→</div><div class="t-status red">CRITICAL</div></div>
-  </div>
-
-  <div class="logic-step" style="margin-top:14px;">
-    <div class="step-num">3</div>
-    <div class="step-text"><b>GPU效率对冲（×0.20）</b>：B200 vs H100每瓦性能倍数。效率革命是真实的反制力量，倍数越高说明热力学压力越小。</div>
-  </div>
-
-  <div class="logic-step" style="margin-top:6px;">
-    <div class="step-num">4</div>
-    <div class="step-text"><b>市场信号（×0.15）</b>：核电（CEG/VST）股价在52周区间的位置。市场对电力稀缺性的实时定价。</div>
-  </div>
-
-</div>""", unsafe_allow_html=True)
+    st.markdown(logic_panel([
+        {"text": "<b>基础设施约束（×0.40）</b>：并网排队周期（45%权重）+ 变压器交期（30%）+ 电网储备率（25%）。物理瓶颈是最难用钱解决的约束。", "thresholds": [
+            ("#22c55e", "排队 <12月 · 储备率 >20%", "SAFE", "green"),
+            ("#fbbf24", "排队 12-24月 · 储备率 15-20%", "WATCH", "yellow"),
+            ("#f97316", "排队 24-36月 · 储备率 10-15%", "WARNING", "orange"),
+            ("#ef4444", "排队 >36月 · 储备率 <10%", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>能源成本压力（×0.25）</b>：中美电价PPP比值 + 推理电力占OpEx比例。美国电价接入 EIA API，每24小时自动刷新。", "thresholds": [
+            ("#22c55e", "PPP > 0.45 · OpEx电力 <10%", "SAFE", "green"),
+            ("#ef4444", "PPP < 0.25 · OpEx电力 >30%", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>GPU效率对冲（×0.20）</b>：B200 vs H100每瓦性能倍数。效率革命是真实的反制力量，倍数越高说明热力学压力越小。"},
+        {"text": "<b>市场信号（×0.15）</b>：核电（CEG/VST）股价在52周区间的位置。市场对电力稀缺性的实时定价。"},
+    ]), unsafe_allow_html=True)
 
 with rp:
     st.markdown('<div class="panel"><div class="panel-title">📊 ESRI分项评分构成 · 能源风险传导链</div>', unsafe_allow_html=True)
@@ -601,74 +554,44 @@ with rp:
     ceg_pos_str = f"CEG: {energy_stocks['CEG']['price_pos_pct']:.0f}% 52w位" if energy_stocks and 'CEG' in energy_stocks else "CEG: N/A"
     vst_pos_str = f"VST: {energy_stocks['VST']['price_pos_pct']:.0f}% 52w位" if energy_stocks and 'VST' in energy_stocks else "VST: N/A"
     eia_tag = f'<span class="source-tag">EIA ✓ {eia_result.get("period","")}</span>' if eia_result["price_usd"] else '<span class="source-tag-warn">EIA 不可用</span>'
-    st.markdown(f"""
-<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
-  <span class="source-tag">Yahoo Finance ✓</span>
-  {eia_tag}
-  <span class="source-tag-warn static-data-badge">基础设施数据 静态维护</span>
-  <span class="source-tag-warn static-data-badge">效率数据 静态维护</span>
-  <span class="source-tag-gray">AECR={aecr}%</span>
-  <span class="source-tag-gray">{ceg_pos_str}</span>
-  <span class="source-tag-gray">{vst_pos_str}</span>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown(source_tag_row([
+        '<span class="source-tag">Yahoo Finance ✓</span>', eia_tag,
+        '<span class="source-tag-warn static-data-badge">基础设施数据 静态维护</span>',
+        '<span class="source-tag-warn static-data-badge">效率数据 静态维护</span>',
+        f'<span class="source-tag-gray">AECR={aecr}%</span>',
+        f'<span class="source-tag-gray">{ceg_pos_str}</span>',
+        f'<span class="source-tag-gray">{vst_pos_str}</span>',
+    ]), unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================================================
 # 反证模块
 # =========================================================
 
-st.markdown("""
-<div style="margin-top:24px; margin-bottom:8px;">
-  <div style="font-size:18px; font-weight:700; color:#e2e8f0; margin-bottom:4px;">
-    🛡️ 反证模块（Counter Signals）— 能源风险对冲因素
-  </div>
-  <div style="font-size:14px; color:#94a3b8;">
-    以下信号若持续增强，将系统性降低能源约束因子的风险等级
-  </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(section_intro("🛡️ 反证模块（Counter Signals）— 能源风险对冲因素",
+                          "以下信号若持续增强，将系统性降低能源约束因子的风险等级"), unsafe_allow_html=True)
 
 cc1, cc2, cc3 = st.columns(3)
 
 with cc1:
-    st.markdown("""<div class="counter-card">
-  <div class="counter-title">Counter A · 全球借电体系扩张</div>
-  <div class="counter-body">
-    中东AI园区（阿联酋 1.5GW · 沙特 2GW）、加拿大水电数据中心、北欧地热数据中心持续扩张。
-    若海外AI专用电力容量占比超过40%，说明美国成功绕过本土瓶颈，能源约束缓解。
-    <br><br>
-    <span style="color:#fbbf24; font-size:13px;">当前海外占比：</span>
-    <span style="color:#ffffff; font-weight:700;">""" + f"{round(offshore/(us_cap+offshore)*100,1)}%" + """</span>
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(counter_card("Counter A · 全球借电体系扩张",
+                             "中东AI园区（阿联酋 1.5GW · 沙特 2GW）、加拿大水电数据中心、北欧地热数据中心持续扩张。"
+                             "若海外AI专用电力容量占比超过40%，说明美国成功绕过本土瓶颈，能源约束缓解。",
+                             label="当前海外占比：", value=f"{round(offshore/(us_cap+offshore)*100,1)}%"), unsafe_allow_html=True)
 
 with cc2:
     rubin_gain = round(GPU_EFFICIENCY_DATA["Rubin"]["tflops_per_watt"] /
                        GPU_EFFICIENCY_DATA["H100"]["tflops_per_watt"], 1)
-    st.markdown(f"""<div class="counter-card">
-  <div class="counter-title">Counter B · GPU效率革命</div>
-  <div class="counter-body">
-    Blackwell→Rubin路线图显示每瓦性能持续翻倍。若Rubin量产后每瓦性能达到H100的{rubin_gain}x，
-    相同算力需求下电力消耗大幅下降，热力学压力系统性缓解。
-    <br><br>
-    <span style="color:#fbbf24; font-size:13px;">路线图效率增益：</span>
-    <span style="color:#ffffff; font-weight:700;">H100→Rubin={rubin_gain}x</span>
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(counter_card("Counter B · GPU效率革命",
+                             f"Blackwell→Rubin路线图显示每瓦性能持续翻倍。若Rubin量产后每瓦性能达到H100的{rubin_gain}x，"
+                             "相同算力需求下电力消耗大幅下降，热力学压力系统性缓解。",
+                             label="路线图效率增益：", value=f"H100→Rubin={rubin_gain}x"), unsafe_allow_html=True)
 
 with cc3:
-    st.markdown("""<div class="counter-card">
-  <div class="counter-title">Counter C · 独立能源系统（Behind-the-Meter）</div>
-  <div class="counter-body">
-    微软重启三里岛核电站（835MW）、谷歌签署SMR协议、Meta自建天然气电站。
-    科技巨头脱离公共电网建立私有能源系统，若此趋势加速，公共电网压力下降，
-    并网排队瓶颈对AI扩张的约束力减弱。
-    <br><br>
-    <span style="color:#fbbf24; font-size:13px;">观察信号：</span>
-    <span style="color:#ffffff; font-weight:700;">SMR商业化进程 · 核电PPA签约量</span>
-  </div>
-</div>""", unsafe_allow_html=True)
+    st.markdown(counter_card("Counter C · 独立能源系统（Behind-the-Meter）",
+                             "微软重启三里岛核电站（835MW）、谷歌签署SMR协议、Meta自建天然气电站。"
+                             "科技巨头脱离公共电网建立私有能源系统，若此趋势加速，公共电网压力下降，并网排队瓶颈对AI扩张的约束力减弱。",
+                             label="观察信号：", value="SMR商业化进程 · 核电PPA签约量"), unsafe_allow_html=True)
 
 # =========================================================
 # 底部注释：数据说明（含EIA实时状态）

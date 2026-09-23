@@ -8,6 +8,7 @@ from __future__ import annotations
 import streamlit as st
 from pathlib import Path
 from datetime import date, datetime
+from html import escape
 
 
 # ---- CSS 加载 ------------------------------------------------
@@ -23,11 +24,7 @@ def load_css():
             chunks.append((styles_dir / filename).read_text(encoding="utf-8"))
         st.markdown(f"<style>{chr(10).join(chunks)}</style>", unsafe_allow_html=True)
     except FileNotFoundError as exc:
-        fallback = styles_dir / "bloomberg.css"
-        if fallback.exists():
-            st.markdown(f"<style>{fallback.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-        else:
-            st.warning(f"⚠️ 样式文件未找到：{exc.filename}")
+        st.warning(f"⚠️ 样式文件未找到：{exc.filename}")
 
 
 # ---- 页眉 ----------------------------------------------------
@@ -47,10 +44,10 @@ def render_header(
     """
     time_str = f'<span class="timestamp-text">🕐 更新时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span>' if show_time else ""
     badge    = f'<span class="symbol-badge">标的：{symbol}</span>' if symbol else ""
-    right    = f'<div style="text-align:right; padding-top:4px;">{time_str}{badge}</div>' if (time_str or badge) else ""
+    right    = f'<div class="page-header-meta">{time_str}{badge}</div>' if (time_str or badge) else ""
 
     st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px;">
+<div class="page-header">
   <div>
     <div class="main-title">{title}</div>
     <div class="sub-title">{subtitle}</div>
@@ -58,6 +55,22 @@ def render_header(
   {right}
 </div>
 """, unsafe_allow_html=True)
+
+
+def dashboard_header(
+    title: str,
+    subtitle: str,
+    *,
+    updated_at: str | None = None,
+) -> str:
+    """Return the overview header using the shared header layout."""
+    timestamp = updated_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return (
+        '<div class="dashboard-header"><div>'
+        f'<div class="main-title">{escape(title)}</div>'
+        f'<div class="sub-title">{escape(subtitle)}</div></div>'
+        f'<span class="timestamp-text">🕐 更新时间：{escape(timestamp)}</span></div>'
+    )
 
 
 # ---- Metric 卡片 ---------------------------------------------
@@ -68,12 +81,14 @@ def metric_card(
     color_class: str,
     arrow: str = "",
     desc: str = "",
+    extra_class: str = "",
 ) -> str:
     """
     返回单个 KPI 卡片 HTML。
     color_class: "green" / "red" / "yellow" / "orange" / "gray"
     """
-    return f"""<div class="metric-card">
+    classes = f"metric-card {extra_class}".strip()
+    return f"""<div class="{classes}">
   <div class="metric-label">{label}</div>
   <div class="metric-row">
     <span class="metric-number {color_class}">{value}</span>
@@ -94,6 +109,13 @@ def panel_close() -> str:
     return "</div>"
 
 
+def panel(title: str, body: str, *, extra_class: str = "") -> str:
+    """Return a complete shared panel instead of repeating wrapper markup."""
+    classes = f"panel {extra_class}".strip()
+    title_html = f'<div class="panel-title">{title}</div>' if title else ""
+    return f'<div class="{classes}">{title_html}{body}</div>'
+
+
 # ---- 检测逻辑步骤 --------------------------------------------
 
 def logic_step(num: int, text: str) -> str:
@@ -107,6 +129,67 @@ def threshold_row(dot_color: str, label: str, status: str, status_class: str) ->
   <div class="t-arrow">→</div>
   <div class="t-status {status_class}">{status}</div>
 </div>"""
+
+
+def logic_panel(steps: list[dict], *, title: str = "⚙️ 检测逻辑") -> str:
+    """Render numbered methodology steps and their optional threshold rows."""
+    blocks = []
+    for index, step in enumerate(steps, start=1):
+        step_class = " logic-step-separated" if index > 1 else ""
+        blocks.append(
+            f'<div class="logic-step{step_class}"><div class="step-num">{index}</div>'
+            f'<div class="step-text">{step["text"]}</div></div>'
+        )
+        thresholds = step.get("thresholds", [])
+        if thresholds:
+            rows = "".join(threshold_row(*row) for row in thresholds)
+            blocks.append(f'<div class="threshold-block">{rows}</div>')
+    return panel(title, "".join(blocks), extra_class="logic-panel")
+
+
+def source_tag_row(tags: list[str]) -> str:
+    """Wrap source/status tags with one responsive shared layout."""
+    return f'<div class="source-tag-row">{"".join(tags)}</div>'
+
+
+def note_panel(title: str, body: str, *, tone: str = "warning") -> str:
+    """Render a reusable explanatory note with a semantic tone."""
+    safe_tone = tone if tone in {"warning", "info", "neutral"} else "neutral"
+    return (
+        f'<div class="note-panel note-panel-{safe_tone}">'
+        f'<div class="note-panel-title">{title}</div>'
+        f'<div class="note-panel-body">{body}</div></div>'
+    )
+
+
+def section_intro(title: str, subtitle: str = "") -> str:
+    subtitle_html = f'<div class="section-intro-subtitle">{subtitle}</div>' if subtitle else ""
+    return f'<div class="section-intro"><div class="section-intro-title">{title}</div>{subtitle_html}</div>'
+
+
+def counter_card(title: str, body: str, *, label: str = "", value: str = "") -> str:
+    meta = ""
+    if label or value:
+        meta = f'<div class="counter-meta"><span>{label}</span><b>{value}</b></div>'
+    return f'<div class="counter-card"><div class="counter-title">{title}</div><div class="counter-body">{body}{meta}</div></div>'
+
+
+def two_column_info_panel(title: str, items: list[dict]) -> str:
+    """Render paired explanatory blocks used by market interpretation panels."""
+    columns = []
+    for item in items:
+        color_class = item.get("color_class", "blue")
+        columns.append(
+            '<div class="info-column">'
+            f'<div class="info-column-title {color_class}">{item["title"]}</div>'
+            f'<div class="info-column-body">{item["body"]}</div></div>'
+        )
+    return panel(title, f'<div class="info-grid">{"".join(columns)}</div>')
+
+
+def spacer(size: str = "sm") -> str:
+    safe_size = size if size in {"xs", "sm", "md", "lg"} else "sm"
+    return f'<div class="ui-spacer ui-spacer-{safe_size}" aria-hidden="true"></div>'
 
 
 # ---- 数据新鲜度与页脚 ----------------------------------------
@@ -153,4 +236,36 @@ def render_footer(sources: str, *, updated_at: str | None = None, note: str = "�
     st.markdown(
         f'<div class="footer-text">数据来源：{sources}<span>数据截至：{timestamp}</span><span>{note}</span></div>',
         unsafe_allow_html=True,
+    )
+
+
+def dashboard_conclusion(state: str, color: str, report_html: str, coverage: float) -> str:
+    """Return the shared dashboard conclusion block."""
+    return (
+        '<div class="dashboard-conclusion"><div class="conclusion-eyebrow">综合结论</div>'
+        f'<div class="conclusion-state" style="color:{color};">{escape(state)}</div>'
+        f'<div class="conclusion-copy conclusion-report">{report_html}</div>'
+        f'<div class="conclusion-note">有效权重覆盖率 {coverage}% · 缺失因子不按安全或中性分处理</div></div>'
+    )
+
+
+def source_strip(items: list[dict], *, title: str = "数据覆盖与来源") -> str:
+    """Return the shared dashboard source coverage strip."""
+    cards = []
+    for item in items:
+        cards.append(
+            '<div class="source-status">'
+            f'<b>{escape(str(item["name"]))}</b>'
+            f'<span>{escape(str(item["availability"]))}</span>'
+            f'<small>{escape(str(item["source"]))}</small></div>'
+        )
+    return f'<div class="source-strip"><div class="compact-title">{escape(title)}</div>{"".join(cards)}</div>'
+
+
+def coverage_panel(coverage: float, confidence: str, color: str, table_html: str, note: str) -> str:
+    """Render coverage confidence together with its evidence table."""
+    return (
+        '<div class="panel"><div class="metric-desc">有效权重覆盖率 '
+        f'<b class="coverage-value" style="color:{color};">{coverage}%</b> · {escape(confidence)}</div>'
+        f'{table_html}<div class="metric-sub">{escape(note)}</div></div>'
     )
