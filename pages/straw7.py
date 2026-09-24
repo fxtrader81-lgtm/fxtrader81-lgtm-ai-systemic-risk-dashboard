@@ -1,5 +1,5 @@
 """
-因子07：宏观与跨市场预警看板
+宏观与跨市场预警看板
 
 数据源:
   - FRED API  : 美国国债收益率 (DGS10, DGS30)
@@ -240,7 +240,7 @@ def build_history_rows(stress: dict[str, pd.Series]) -> list[dict]:
                 continue
             item = metrics[key]
             unit = item["unit"]
-            raw = f'{item["value"]:+.2f}{unit}'
+            raw = f'{item["value"]:.2f}{unit}' if key in {"equity_drawdown", "volatility"} else f'{item["value"]:+.2f}{unit}'
             contribution = item["score"] * definition["weight"]
             components.append(f'{definition["label"]} {raw} → {item["score"]}/100 ×{definition["weight"]:.2f} = {contribution:.1f}')
         composite = metrics["composite"]
@@ -748,6 +748,9 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         "curve": "SAFE ≥+30bp｜WATCH 0–+30bp｜WARNING −50–0bp｜CRITICAL <−50bp",
     }
     icons = ["📉", "📉", "🌪", "📈", "🌡", "📐"]
+    metric_notes = {
+        "equity_drawdown": "市场确认项：当前月末点位相对近六个月最高月末<br>",
+    }
     for column, icon, (key, definition) in zip(columns, icons, COMPONENTS.items()):
         item = metrics.get(key)
         with column:
@@ -755,10 +758,12 @@ def render_alert_system(stress, y30, show_hist_chart=True):
                 st.markdown(metric_card(f"{icon} {definition['label']} ×{definition['weight']:.2f}", "N/A", "gray", "", "数据缺失，不按 SAFE 处理"), unsafe_allow_html=True)
             else:
                 css = grade_to_css(item["grade"])
-                value = f"{item['value']:+.2f}{item['unit']}"
+                value = (f"{item['value']:.2f}{item['unit']}"
+                         if key in {"equity_drawdown", "volatility"}
+                         else f"{item['value']:+.2f}{item['unit']}")
                 st.markdown(metric_card(
                     f"{icon} {definition['label']} ×{definition['weight']:.2f}", value, css, "",
-                    f"当前 {item['grade']}<br>{thresholds[key]}",
+                    f"当前 {item['grade']}<br>{metric_notes.get(key, '')}{thresholds[key]}",
                 ), unsafe_allow_html=True)
 
     st.markdown(spacer("sm"), unsafe_allow_html=True)
@@ -853,8 +858,8 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown(panel("⚙️ 预警逻辑、阈值与数据口径", """
-          <div class="history-help">因子07只回答“市场是否已开始确认和放大压力”。股票动量、六个月回撤、VIX、10Y利率冲击和STLFSI均由时间序列现场计算；信用利差、实际利率和NFCI已迁移至因子06，避免重复计分。汇总采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作低权重背景，不可单独触发高危。阈值必须继续做滚动样本外检验，当前状态不是因果概率。</div>
-          <div class="boundary-note">⚠️ <b>边界声明</b>：模型同时覆盖脆弱性与压力确认，但无法提前预测9·11、COVID等外生冲击；这类事件即使事前为SAFE，也应被解释为模型边界，而不是篡改历史分数。</div>
+          <div class="history-help">本风险因子用于判断市场压力是否已经进入跨资产确认阶段，不承担单独预测外生冲击的功能。标普500三个月收益、当前月末点位距近六个月最高月末的跌幅、VIX、10Y收益率三个月变化和STLFSI均由真实时间序列动态计算；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测，避免重复计分。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景，不能单独触发高风险状态。当前状态表示市场确认强度，不应解读为事件发生概率。</div>
+          <div class="boundary-note">⚠️ <b>边界声明</b>：该指标用于识别市场压力确认，无法提前预测9·11、COVID等外生冲击；这类事件即使事前为SAFE，也应被解释为模型边界，而不是篡改历史分数。</div>
         """), unsafe_allow_html=True)
 
 
@@ -926,7 +931,7 @@ st.markdown(render_osci_card(
     "MACRO ALERT COMPOSITE", top_composite["score"], top_composite["grade"],
     f"综合评分：{top_state_cn}", bar_color=top_color,
     state_detail=top_state_detail,
-    components_html="标普动量 ×0.30 · 六个月回撤 ×0.20 · VIX ×0.20<br>10Y利率冲击 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
+    components_html="标普三个月收益 ×0.30 · 距六个月高点跌幅 ×0.20 · VIX ×0.20<br>10Y收益率三个月变化 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
 ), unsafe_allow_html=True)
 
@@ -1012,9 +1017,9 @@ with tab_us:
 
     st.markdown(two_column_info_panel("📖 美股 × 美债联动解读", [
         {"title": "📈 收益率上行 × 股市表现", "color_class": "blue", "body": """
-            <b class="green">温和上行（&lt;50bps/3M）</b>：通常伴随经济复苏，股市可同步上涨<br>
-            <b class="orange">快速上行（50-150bps/3M）</b>：开始压制估值，科技股/成长股首当其冲<br>
-            <b class="red">急速上行（&gt;150bps/3M）</b>：历史上几乎无例外触发股市调整 20%+"""},
+            <b class="green">三个月温和上行（&lt;50bp）</b>：通常伴随经济复苏，股市可同步上涨<br>
+            <b class="orange">三个月快速上行（50–150bp）</b>：开始压制估值，科技股/成长股首当其冲<br>
+            <b class="red">三个月急速上行（&gt;150bp）</b>：需要重点评估估值压缩风险"""},
         {"title": "🏔️ 山形图 × 折线图观察重点", "color_class": "green", "body": """
             <b class="yellow">红色区域</b>：30Y-10Y倒挂，历史上先于衰退出现<br>
             <b class="red">收益率峰值</b>：通常在加息末期，股市往往同期底部<br>

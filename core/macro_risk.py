@@ -1,4 +1,4 @@
-"""Auditable market-confirmation scoring shared by factor 07 and the dashboard."""
+"""Auditable cross-market confirmation scoring shared by the market dashboard."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import pandas as pd
 
 
 COMPONENTS = {
-    "equity_momentum": {"label": "标普500三个月收益", "weight": 0.30, "unit": "%/3M"},
-    "equity_drawdown": {"label": "标普500六个月回撤", "weight": 0.20, "unit": "%"},
+    "equity_momentum": {"label": "标普500三个月收益", "weight": 0.30, "unit": "%"},
+    "equity_drawdown": {"label": "标普500距六个月高点", "weight": 0.20, "unit": "%"},
     "volatility": {"label": "VIX波动率", "weight": 0.20, "unit": ""},
-    "rate_shock": {"label": "10Y收益率三个月变化", "weight": 0.15, "unit": "bps/3M"},
+    "rate_shock": {"label": "10Y收益率三个月变化", "weight": 0.15, "unit": "bp"},
     "financial_stress": {"label": "金融市场压力 STLFSI", "weight": 0.10, "unit": ""},
-    "curve": {"label": "10Y−3M期限利差", "weight": 0.05, "unit": "bps"},
+    "curve": {"label": "10Y−3M期限利差", "weight": 0.05, "unit": "bp"},
 }
 
 
@@ -70,7 +70,7 @@ def compute_macro_metrics(
     result: dict[str, dict] = {}
     if len(sp500) >= 4:
         value = float(sp500.iloc[-1] / sp500.iloc[-4] - 1) * 100
-        result["equity_momentum"] = _item(value, _falling(value, 0.0, -5.0, -12.0), "%/3M")
+        result["equity_momentum"] = _item(value, _falling(value, 0.0, -5.0, -12.0), "%")
     if len(sp500) >= 2:
         window = sp500.iloc[-6:]
         value = float(window.iloc[-1] / window.max() - 1) * 100
@@ -80,14 +80,14 @@ def compute_macro_metrics(
         result["volatility"] = _item(value, _ascending(value, 20.0, 25.0, 35.0), "")
     if len(y10) >= 4:
         value = float(y10.iloc[-1] - y10.iloc[-4]) * 100
-        result["rate_shock"] = _item(value, _ascending(value, 40.0, 80.0, 140.0), "bps/3M")
+        result["rate_shock"] = _item(value, _ascending(value, 40.0, 80.0, 140.0), "bp")
     if not stlfsi.empty:
         value = float(stlfsi.iloc[-1])
         result["financial_stress"] = _item(value, _ascending(value, 0.0, 0.32, 0.83), "")
     common = y10.index.intersection(y3m.index)
     if len(common):
         value = float(y10.loc[common[-1]] - y3m.loc[common[-1]]) * 100
-        result["curve"] = _item(value, _falling(value, 30.0, 0.0, -50.0), "bps")
+        result["curve"] = _item(value, _falling(value, 30.0, 0.0, -50.0), "bp")
 
     available_weight = sum(COMPONENTS[key]["weight"] for key in result)
     if available_weight < 0.65:
