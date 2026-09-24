@@ -119,10 +119,14 @@ def _stress_chart(series: dict[str, pd.Series]) -> go.Figure:
         height=720,
         paper_bgcolor="#0b1120",
         plot_bgcolor="#0b1120",
-        font=dict(color="#cbd5e1", family="Arial, PingFang SC, Microsoft YaHei"),
+        font=dict(color="#e2e8f0", size=14, family="Arial, PingFang SC, Microsoft YaHei"),
         margin=dict(l=40, r=20, t=55, b=30),
         hovermode="x unified",
-        legend=dict(orientation="h", y=1.08, x=0),
+        legend=dict(
+            orientation="h", y=1.08, x=0,
+            font=dict(color="#f8fafc", size=15, family="Arial, PingFang SC, Microsoft YaHei"),
+            bgcolor="rgba(11,17,32,.88)",
+        ),
     )
     fig.update_xaxes(gridcolor="rgba(255,255,255,.05)")
     fig.update_yaxes(gridcolor="rgba(255,255,255,.05)", zeroline=False)

@@ -5,7 +5,7 @@ from html import escape
 import streamlit as st
 
 from components.ui import (dashboard_conclusion, dashboard_header, load_css,
-                           metric_card, render_footer, source_strip)
+                           render_footer, source_strip)
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.score_engine import render_factor_navigation, render_system_card
@@ -78,32 +78,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
-
-credit, market = results["straw6"], results["straw7"]
-credit_color = {"SAFE": "green", "WATCH": "yellow", "WARNING": "orange", "CRITICAL": "red"}.get(credit["state"], "gray")
-market_color = {"SAFE": "green", "WATCH": "yellow", "WARNING": "orange", "CRITICAL": "red"}.get(market["state"], "gray")
-phase_color = "red" if system.get("critical_cascade") else "orange" if system.get("cascade") else "yellow" if "压力" in system.get("phase", "") else "blue"
-credit_score_text = "N/A" if credit["score"] is None else f'{credit["score"]:.0f}/100'
-market_score_text = "N/A" if market["score"] is None else f'{market["score"]:.0f}/100'
-phase_full = system.get("phase", "常态监测")
-phase_short = {
-    "结构性积累期，尚未市场传导": "结构性积累",
-    "结构高风险，市场承压但信贷未确认": "传导待确认",
-    "宏观压力，AI体系暂时隔离": "宏观压力隔离",
-    "融资压力观察期": "融资压力观察",
-    "CASCADE 联动": "CASCADE",
-    "危机传导期": "危机传导",
-}.get(phase_full, phase_full)
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.markdown(metric_card("06 · AI信贷与再融资压力", credit["state"], credit_color,
-                            desc=f"{credit_score_text} · 外部融资触发层"), unsafe_allow_html=True)
-with c2:
-    st.markdown(metric_card("07 · 宏观与跨市场预警", market["state"], market_color,
-                            desc=f"{market_score_text} · 市场确认放大层"), unsafe_allow_html=True)
-with c3:
-    st.markdown(metric_card("系统传导阶段", phase_short, phase_color,
-                            desc=f"{phase_full}<br>CASCADE要求05与06均达WARNING，且07至少WATCH"), unsafe_allow_html=True)
 
 color = STATE_COLORS.get(system["state"], "#94a3b8")
 conclusion_col, factor_col = st.columns(2, gap="medium")

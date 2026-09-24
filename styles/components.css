@@ -358,11 +358,14 @@
 .factor-panel .straw-row { padding:14px 0; gap:12px; }
 .factor-panel .straw-name { width:230px; }
 .factor-panel .straw-bar-wrap { flex:0 1 210px; width:210px; }
-.factor-native-meta { display:flex; align-items:center; gap:12px; margin:8px 2px 3px; color:var(--text-dim); font-size:12px; }
-.factor-native-meta > span { min-width:105px; font-weight:750; }
+.factor-native-meta { display:flex; align-items:center; gap:12px; margin:10px 2px 5px; color:var(--text-muted); font-size:14px; }
+.factor-native-meta > span { min-width:128px; font-weight:800; }
 .factor-native-meta .straw-bar-wrap { height:6px; flex:1; }
 .factor-native-meta .straw-bar-fill { height:6px; }
-[data-testid="stPageLink"] a { min-height:42px; border:1px solid var(--border-soft); border-radius:9px; color:var(--text-soft); background:rgba(255,255,255,.018); }
+[data-testid="stPageLink"] a { min-height:46px; border:1px solid var(--border-mid); border-radius:9px; color:#f8fafc !important; background:rgba(255,255,255,.028); font-size:16px !important; font-weight:750 !important; opacity:1 !important; }
+[data-testid="stPageLink"] a p,
+[data-testid="stPageLink"] a span,
+[data-testid="stPageLink"] a div { color:#f8fafc !important; opacity:1 !important; font-size:16px !important; font-weight:750 !important; }
 [data-testid="stPageLink"] a:hover { border-color:rgba(96,165,250,.38); background:rgba(96,165,250,.07); }
 .system-score-na { color:var(--text-faint); font-size:72px; font-weight:900; line-height:1; }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }
