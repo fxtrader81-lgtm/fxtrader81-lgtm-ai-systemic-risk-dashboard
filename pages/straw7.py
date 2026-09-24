@@ -931,7 +931,7 @@ st.markdown(render_osci_card(
     "MACRO ALERT COMPOSITE", top_composite["score"], top_composite["grade"],
     f"综合评分：{top_state_cn}", bar_color=top_color,
     state_detail=top_state_detail,
-    components_html="标普三个月收益 ×0.30 · 距六个月高点跌幅 ×0.20 · VIX ×0.20<br>10Y收益率三个月变化 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
+    components_html="标普三个月收益 ×0.30 · 距近六个月高点跌幅 ×0.20 · VIX ×0.20<br>10Y收益率三个月变化 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
 ), unsafe_allow_html=True)
 

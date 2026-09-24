@@ -7,7 +7,7 @@ import pandas as pd
 
 COMPONENTS = {
     "equity_momentum": {"label": "标普500三个月收益", "weight": 0.30, "unit": "%"},
-    "equity_drawdown": {"label": "标普500距六个月高点", "weight": 0.20, "unit": "%"},
+    "equity_drawdown": {"label": "标普500距近六个月高点", "weight": 0.20, "unit": "%"},
     "volatility": {"label": "VIX波动率", "weight": 0.20, "unit": ""},
     "rate_shock": {"label": "10Y收益率三个月变化", "weight": 0.15, "unit": "bp"},
     "financial_stress": {"label": "金融市场压力 STLFSI", "weight": 0.10, "unit": ""},
