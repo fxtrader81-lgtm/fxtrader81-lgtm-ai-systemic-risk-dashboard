@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from components.ui import (load_css, logic_panel, metric_card, panel,
+from components.ui import (load_css, logic_panel, metric_card, model_evidence_panel, panel,
                            render_data_freshness, render_footer, render_header,
                            spacer)
 from config.thresholds import STATE_COLORS
@@ -228,7 +228,7 @@ for row in history_rows:
     )
 st.markdown(
     '<div class="panel"><div class="panel-title">📋 历史信用事件复盘</div>'
-    '<div class="history-help">全部状态只使用事件前三个月已经可获得的数据。早期事件数据覆盖不足时显示N/A，不补写安全分。</div>'
+    '<div class="history-help">按事件前三个月的观察值、以当前数据版本重建状态；NFCI等历史值可能修订，因此不能称为当时实际可见的实时评分。早期数据不足时显示N/A，不补写安全分。</div>'
     '<table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差</th><th>实际利率</th><th>NFCI</th><th>事前状态</th><th>覆盖率</th></tr></thead>'
     f'<tbody>{"".join(body)}</tbody></table></div>', unsafe_allow_html=True,
 )
@@ -240,6 +240,13 @@ st.markdown(logic_panel([
     {"text": "<b>AI融资交易温度（10%）</b>：只有可比较的最终定价与市场表现齐备时才计分。"},
     {"text": "<b>覆盖政策</b>：有效权重不足75%时输出N/A；缺失指标绝不按SAFE或零分处理。"},
 ], title="⚙️ CFRI评分逻辑"), unsafe_allow_html=True)
+
+st.markdown(model_evidence_panel(
+    sample="独立信用危机样本数尚未完成核实；历史事件表是案例复盘，不是命中率样本。",
+    validation="尚无可可靠展示的独立样本外命中率及置信区间。",
+    boundary="广泛信用指标是AI融资环境的代理，不能代表单笔AI债券；突发外生冲击不在可预测范围内。",
+    calibration="当前切点为探索性规则，尚未完成按历史发布版本的独立样本外校准。",
+), unsafe_allow_html=True)
 
 render_data_freshness([
     {"name": "高收益信用利差", "source": "FRED · BAMLH0A0HYM2", "updated_at": _latest_date(series["hy_oas"]), "mode": "live"},

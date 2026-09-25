@@ -58,9 +58,9 @@ def _conclusion_report(system, results):
             f'AI信贷与再融资压力为 <strong>{escape(_state_text(s6))}</strong>，依据信用利差、实际利率与金融条件判断融资窗口。</p>'
         ),
         (
-            '<p><b>市场确认：</b>宏观与跨市场预警为 '
+            '<p><b>市场确认：</b>宏观与跨市场传导确认为 '
             f'<strong>{escape(_state_text(s7))}</strong>，依据股票动量与回撤、VIX、利率冲击、金融市场压力与期限曲线判断。'
-            f'当前阶段为 <strong>{escape(system.get("phase", "常态监测"))}</strong>；外生冲击仍需独立监测。</p>'
+            f'当前阶段为 <strong>{escape(system.get("phase", "常态监测"))}</strong>；07表示当前市场确认强度，不是未来回调概率。外生冲击仍需独立监测。</p>'
         ),
     ]
     return "".join(paragraphs)

@@ -1,5 +1,5 @@
 """
-宏观与跨市场预警看板
+宏观与跨市场传导确认看板
 
 数据源:
   - FRED API  : 美国国债收益率 (DGS10, DGS30)
@@ -23,19 +23,20 @@ from datetime import datetime, timedelta
 from copy import deepcopy
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
-from components.ui import (load_css, metric_card, panel, render_data_freshness,
+from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
                            two_column_info_panel)
 from core.alert_engine import render_alert, render_osci_card
 from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
 from core.macro_risk import COMPONENTS, compute_macro_metrics
+from core.market_history import build_history_rows, event_validation_scope
 from core.score_engine import register_score
 
 # =========================================================
 # 页面配置
 # =========================================================
 st.set_page_config(
-    page_title="宏观与跨市场预警",
+    page_title="宏观与跨市场传导确认",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -49,20 +50,20 @@ load_css()
 # 股灾事件数据库（内置）
 # =========================================================
 CRASH_EVENTS = [
-    {"date": "1997-10-01", "label": "Asian Crisis", "event": "亚洲金融危机", "desc": "危机由东南亚扩散至香港及全球市场，标普500随后最大收盘回撤约6.9%，六个月后回升约17.7%。", "severity": "WATCH", "kind": "金融传导"},
-    {"date": "1998-08-01", "label": "LTCM / Russia", "event": "俄罗斯违约与LTCM危机", "desc": "俄罗斯主权违约和LTCM高杠杆头寸冲击全球流动性，标普500随后最大回撤约9.9%，六个月后回升约15.7%。", "severity": "WATCH", "kind": "金融传导"},
-    {"date": "2000-03-01", "label": "Dot-com Peak", "event": "科网泡沫见顶", "desc": "美国科技股估值在纳斯达克泡沫顶点后进入长期重估，标普500随后六个月最大回撤约11.2%、十二个月约26.8%。", "severity": "CRITICAL", "kind": "估值周期"},
-    {"date": "2001-09-01", "label": "9/11 Attack", "event": "9·11袭击", "desc": "纽约和华盛顿遭遇恐怖袭击，美国股市暂停交易并于9月17日复市，随后三个月最大回撤约11.6%、十二个月约27.0%。", "severity": "CRITICAL", "kind": "外生冲击"},
-    {"date": "2002-10-01", "label": "Post 9/11 Bottom", "event": "科网熊市低点", "desc": "美国科技股熊市在长期去杠杆后接近周期底部，随后六个月最大回撤仅约2.7%、期末上涨约10.0%；这是市场底部，不是预警事件。", "severity": "SAFE", "kind": "周期底部"},
-    {"date": "2007-08-01", "label": "Subprime Starts", "event": "次贷风险显性化", "desc": "欧美按揭相关基金暂停赎回，信用与银行间融资压力开始外溢，标普500随后六个月最大回撤约12.5%。", "severity": "WARNING", "kind": "信用周期"},
-    {"date": "2008-09-01", "label": "Lehman Collapse", "event": "雷曼破产", "desc": "雷曼兄弟在美国申请破产并冻结全球融资链，标普500随后三个月最大回撤约39.9%、六个月约46.0%。", "severity": "CRITICAL", "kind": "金融传导"},
-    {"date": "2010-05-01", "label": "Flash Crash", "event": "闪电崩盘", "desc": "美国市场结构和流动性异常引发盘中快速下跌，按日收盘口径随后三个月最大回撤约12.3%；盘中跌幅需另行观察。", "severity": "WARNING", "kind": "市场结构"},
-    {"date": "2011-08-01", "label": "US Downgrade", "event": "美国评级下调", "desc": "美国主权评级下调叠加欧洲债务压力推升全球避险交易，标普500随后最大回撤约8.4%，六个月后上涨约12.1%。", "severity": "WATCH", "kind": "政策信用"},
-    {"date": "2015-08-01", "label": "China Crash", "event": "中国市场冲击", "desc": "A股下跌和人民币汇率调整冲击全球风险偏好，标普500随后六个月最大回撤约7.2%、期末下跌约2.7%。", "severity": "WATCH", "kind": "跨市场传导"},
-    {"date": "2018-10-01", "label": "Fed Tightening", "event": "紧缩抛售", "desc": "美联储加息与缩表预期压缩美国股票估值，标普500四季度最大回撤约19.6%；事件起点按2018年10月计。", "severity": "WARNING", "kind": "紧缩周期"},
-    {"date": "2020-02-01", "label": "COVID Crash", "event": "新冠冲击", "desc": "疫情由公共卫生事件演变为全球流动性冲击，标普500随后最大回撤约33.6%，但六个月内基本收复跌幅。", "severity": "CRITICAL", "kind": "外生冲击"},
-    {"date": "2022-01-01", "label": "Rate Hike Cycle", "event": "快速加息周期", "desc": "高通胀和紧缩预期重估美国久期资产，标普500随后六个月最大回撤约23.1%、十二个月约25.0%。", "severity": "CRITICAL", "kind": "紧缩周期"},
-    {"date": "2023-03-01", "label": "SVB Crisis", "event": "硅谷银行事件", "desc": "美国加州硅谷银行因久期错配和挤兑倒闭并冲击区域银行，但标普500随后六个月最大回撤仅约1.6%、期末上涨约13.8%；属于银行业压力事件。", "severity": "SAFE", "kind": "银行业压力"},
+    {"date": "1997-10-01", "label": "Asian Crisis", "event": "亚洲金融危机", "desc": "金融危机由东南亚扩散至香港，并冲击全球风险资产。", "kind": "金融传导"},
+    {"date": "1998-08-01", "label": "LTCM / Russia", "event": "俄罗斯违约与LTCM危机", "desc": "俄罗斯主权违约与LTCM高杠杆头寸冲击全球融资流动性。", "kind": "金融传导"},
+    {"date": "2000-03-01", "label": "Dot-com Peak", "event": "科网泡沫见顶", "desc": "美国科技股估值见顶，市场进入长期盈利与估值重估。", "kind": "估值周期"},
+    {"date": "2001-09-01", "label": "9/11 Attack", "event": "9·11袭击", "desc": "美国纽约和华盛顿遭遇恐怖袭击，股市暂停交易并于9月17日复市。", "kind": "外生冲击"},
+    {"date": "2002-10-01", "label": "Post 9/11 Bottom", "event": "科网熊市低点", "desc": "美国科技股熊市在去杠杆后接近周期底部，不属于风险发生前的预警事件。", "kind": "周期底部"},
+    {"date": "2007-08-01", "label": "Subprime Starts", "event": "次贷风险显性化", "desc": "欧美按揭相关基金暂停赎回，信用与银行间融资压力开始外溢。", "kind": "信用周期"},
+    {"date": "2008-09-01", "label": "Lehman Collapse", "event": "雷曼破产", "desc": "雷曼兄弟在美国申请破产，全球融资链与银行间信用迅速收缩。", "kind": "金融传导"},
+    {"date": "2010-05-01", "label": "Flash Crash", "event": "闪电崩盘", "desc": "美国股市盘中流动性与交易结构异常，指数短时间急跌。", "kind": "市场结构"},
+    {"date": "2011-08-01", "label": "US Downgrade", "event": "美国评级下调", "desc": "美国主权评级下调叠加欧洲债务压力，推动全球避险交易。", "kind": "政策信用"},
+    {"date": "2015-08-01", "label": "China Crash", "event": "中国市场冲击", "desc": "中国A股下跌和人民币汇率调整冲击全球风险偏好。", "kind": "跨市场传导"},
+    {"date": "2018-10-01", "label": "Fed Tightening", "event": "紧缩抛售", "desc": "美联储加息与缩表预期压缩美国股票估值。", "kind": "紧缩周期"},
+    {"date": "2020-02-01", "label": "COVID Crash", "event": "新冠冲击", "desc": "疫情由公共卫生事件演变为全球市场与流动性冲击。", "kind": "外生冲击"},
+    {"date": "2022-01-01", "label": "Rate Hike Cycle", "event": "快速加息周期", "desc": "高通胀与紧缩预期推动美国长久期资产重估。", "kind": "紧缩周期"},
+    {"date": "2023-03-01", "label": "SVB Crisis", "event": "硅谷银行事件", "desc": "美国加州硅谷银行因久期错配与存款外流倒闭，冲击区域银行。", "kind": "银行业压力"},
 ]
 
 HISTORY_EVENTS = [(item["date"][:7], item["event"], item["desc"], item["kind"]) for item in CRASH_EVENTS]
@@ -209,61 +210,6 @@ def compute_alert_metrics(stress: dict[str, pd.Series]) -> dict:
         stress["y10"], stress["y3m"], stress["sp500"],
         stress["stlfsi"], stress["vix"],
     )
-
-
-def build_history_rows(stress: dict[str, pd.Series]) -> list[dict]:
-    """Calculate T-3 month warning state and post-event drawdown from source series."""
-    rows = []
-    sp500 = stress["sp500"]
-    y10 = stress["y10"]
-    for month, event, description, kind in HISTORY_EVENTS:
-        event_end = pd.Timestamp(month) + pd.offsets.MonthEnd(0)
-        warning_as_of = event_end - pd.DateOffset(months=3)
-        history = {
-            key: values[pd.to_datetime(values.index) <= warning_as_of] if not values.empty else values
-            for key, values in stress.items()
-        }
-        if history["y10"].empty or history["sp500"].empty:
-            rows.append({"month": month, "event": event, "description": description, "kind": kind, "available": False})
-            continue
-
-        metrics = compute_alert_metrics(history)
-        event_window = sp500[(sp500.index >= event_end) & (sp500.index <= event_end + pd.DateOffset(months=12))]
-        if event_window.empty:
-            drawdown = np.nan
-        else:
-            drawdown = float((event_window / event_window.cummax() - 1).min())
-        components = []
-        for key, definition in COMPONENTS.items():
-            if key not in metrics:
-                components.append(f'{definition["label"]} N/A（未计入）')
-                continue
-            item = metrics[key]
-            unit = item["unit"]
-            raw = f'{item["value"]:.2f}{unit}' if key in {"equity_drawdown", "volatility"} else f'{item["value"]:+.2f}{unit}'
-            contribution = item["score"] * definition["weight"]
-            components.append(f'{definition["label"]} {raw} → {item["score"]}/100 ×{definition["weight"]:.2f} = {contribution:.1f}')
-        composite = metrics["composite"]
-        composite_score = composite.get("score")
-        if composite_score is None:
-            components.append("汇总：有效权重不足，未生成评分")
-        else:
-            components.append(f'汇总：主触发 {composite.get("dominant", 0):.0f} ×0.65 + 压力广度 {composite.get("breadth", 0):.1f} ×0.35 = {composite_score:.1f}')
-        rows.append({
-            "month": month,
-            "event": event,
-            "description": description,
-            "kind": kind,
-            "available": True,
-            "as_of": warning_as_of.strftime("%Y-%m"),
-            "y10": f'{float(y10[y10.index <= event_end].iloc[-1]):.2f}%' if not y10[y10.index <= event_end].empty else "N/A",
-            "drawdown": "N/A" if np.isnan(drawdown) else f"{drawdown:.0%}",
-            "score": composite["score"],
-            "state": composite["grade"],
-            "coverage": composite["coverage"],
-            "components": " · ".join(components),
-        })
-    return rows
 
 
 def grade_to_color(grade: str) -> str:
@@ -633,7 +579,7 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
     for row in history_rows:
         month, event = row["month"], row["event"]
         severity = row.get("state", "N/A")
-        dt = pd.to_datetime(month + "-01")
+        dt = pd.Period(month, freq="M").to_timestamp("M")
         color = SEVERITY_COLOR.get(severity, "#94a3b8")
         active = month == selected_month
         hit_y = np.linspace(y_min, y_max, 81)
@@ -648,7 +594,8 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
             name=event,
             showlegend=False,
             hovertemplate=(
-                f"<b>{month} · {event}</b><br>当时评分: {row.get('score', 'N/A')}/100 · {severity}<br>"
+                f"<b>{month} · {event}</b><br>事件月末确认强度: "
+                f"{('N/A' if row.get('score') is None else str(row['score']) + '/100')} · {severity}<br>"
                 f"10Y: {row.get('y10', 'N/A')}<br>事件窗口最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
             ),
         ), secondary_y=False)
@@ -673,7 +620,7 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
 
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 470
-    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 悬停事件线查看详情 / 点击锁定", font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 事件线标记月末确认 / 点击锁定", font=dict(size=14, color="#e2e8f0"), x=0.01)
     layout["clickmode"] = "event+select"
     layout["hovermode"] = "closest"
     layout["hoverdistance"] = 36
@@ -731,10 +678,10 @@ def render_alert_system(stress, y30, show_hist_chart=True):
     composite  = metrics["composite"]
     master_score = composite["score"]
     master_grade = composite["grade"]
-    history_rows = build_history_rows(stress)
+    history_rows = build_history_rows(stress, HISTORY_EVENTS)
 
     st.markdown(
-        '<div class="alert-system-heading">🚨 Alert System · 预警系统</div>',
+        '<div class="alert-system-heading">🚨 市场传导确认 · 探索性状态</div>',
         unsafe_allow_html=True,
     )
 
@@ -779,14 +726,14 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         "WATCH": {
             "box": "alert-box", "icon": "👁",
             "title_color": "#fbbf24",
-            "title": "结论：预警信号出现，建议关注但无需行动",
+            "title": "结论：市场压力初步出现",
             "body": "至少一项市场确认指标越过切点，但尚未形成广泛共振。应观察股票回撤、VIX、利率冲击与市场压力是否继续同时恶化。",
         },
         "WARNING": {
             "box": "alert-box-orange", "icon": "⚠️",
             "title_color": "#f97316",
             "title": "结论：多项市场压力信号正在共振",
-            "body": "股票趋势、波动率或利率冲击中的多项信号进入高风险区。请结合下方事前三个月评分与事后十二个月回撤验证，不把单一事件当成确定性预测。",
+            "body": "股票趋势、波动率或利率冲击中的多项信号进入高风险区。下方历史状态按事件月末重建，用于确认市场传导，而非证明事前预测。",
         },
         "CRITICAL": {
             "box": "alert-box-red", "icon": "🔴",
@@ -825,13 +772,13 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。评分统一使用事件前三个月可获得的数据，避免用事后信息倒推；回撤为事件发生后十二个月内的最大月末峰谷回撤。事件颜色与列表均取同一动态评分。</div>
+          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色和列表均为事件月末的市场确认状态，不能当成事前预测；回撤是事件月末后十二个月内的最大月末峰谷回撤。历史压力序列按当前版本重建，可能包含修订值。</div>
           <div class="history-header">
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
             <div class="history-header-drawdown">事件窗口回撤</div>
-            <div class="history-header-score">事前评分</div>
+            <div class="history-header-score">当月确认</div>
           </div>
         """, unsafe_allow_html=True)
 
@@ -845,22 +792,30 @@ def render_alert_system(stress, y30, show_hist_chart=True):
               <div class="h-date history-cell-date">{date}</div>
               <div class="h-event"><b>{event}</b>
                 <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
-                <small><b>{row.get('kind', '')}</b> · {row['description']}</small>
-                <small>预警观察日：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
+                <small><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
+                <small>{row.get('scope', '')}</small>
+                <small>确认观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
                 <small class="history-calculation">{row.get('components', '该事件时点的源数据不足，未生成评分。')}</small>
               </div>
               <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
               <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}</div>
-              <div class="history-score history-cell-score" style="color:{color};">{row.get('score', 'N/A')}/100</div>
+              <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</div>
             </div>
             """, unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown(panel("⚙️ 预警逻辑、阈值与数据口径", """
-          <div class="history-help">本风险因子用于判断市场压力是否已经进入跨资产确认阶段，不承担单独预测外生冲击的功能。标普500三个月收益、当前月末点位距近六个月最高月末的跌幅、VIX、10Y收益率三个月变化和STLFSI均由真实时间序列动态计算；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测，避免重复计分。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景，不能单独触发高风险状态。当前状态表示市场确认强度，不应解读为事件发生概率。</div>
-          <div class="boundary-note">⚠️ <b>边界声明</b>：该指标用于识别市场压力确认，无法提前预测9·11、COVID等外生冲击；这类事件即使事前为SAFE，也应被解释为模型边界，而不是篡改历史分数。</div>
+        st.markdown(panel("⚙️ 确认逻辑、阈值与数据口径", """
+          <div class="history-help">本风险因子识别已经传导到市场的压力，不是下跌前的预测模型。标普500三个月收益、当前月末点位距近六个月最高月末的跌幅、VIX、10Y收益率三个月变化和STLFSI由时间序列计算；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景。切点仍是探索性规则，当前状态不代表回调概率。</div>
+          <div class="boundary-note">⚠️ <b>边界声明</b>：该指标用于识别已发生的市场压力，无法提前预测9·11、COVID等外生冲击；外生事件应标为模型边界，不将事件月末状态改写成事前预测。</div>
         """), unsafe_allow_html=True)
+
+    st.markdown(model_evidence_panel(
+        sample="19个领先压力信号起点中，5条正例归属2008、2020、2022三轮独立下跌；不是19次独立危机。",
+        validation="2017年后21个重叠联合信号月中7个月随后回调，样本表观比例33.3%；不作为预测概率，独立样本置信区间尚不可估。",
+        boundary="三轮下跌的07月末确认均晚于标普500自近期高点下跌5%；外生冲击不在预测范围内，市场底部不纳入预警验证。",
+        calibration="当前结果足以支持分层设计，不足以确定精确阈值；历史STLFSI4存在回填，尚未完成发布版本的样本外校准。",
+    ), unsafe_allow_html=True)
 
 
 # =========================================================
@@ -886,8 +841,8 @@ with st.spinner("正在从 FRED · FMP · Yahoo Finance 拉取数据..."):
 # =========================================================
 
 render_header(
-    "📡 宏观与跨市场预警",
-    "核心监测维度：股市与债市压力是否同步上升，并形成跨市场风险共振",
+    "📡 宏观与跨市场传导确认",
+    "核心监测维度：融资与宏观压力是否已经传导到股票、波动率及跨资产市场",
     symbol="MACRO ALERT",
 )
 
@@ -914,22 +869,22 @@ top_composite = top_metrics["composite"]
 if top_composite["score"] is not None:
     register_score("straw7", top_composite["score"])
 top_state_detail = {
-    "SAFE": "Rate environment remains supportive",
-    "WATCH": "Macro stress signals are emerging",
-    "WARNING": "Valuation compression risk is rising",
-    "CRITICAL": "Systemic market stress is elevated",
-}.get(top_composite["grade"], "Source coverage is insufficient; missing data is not scored as SAFE")
+    "SAFE": "当前未观察到广泛市场确认",
+    "WATCH": "市场压力出现，需继续观察",
+    "WARNING": "跌势与跨市场压力正在传导",
+    "CRITICAL": "多项市场压力已进入极端区间",
+}.get(top_composite["grade"], "数据覆盖不足；缺失值不按SAFE处理")
 top_state_cn = {
     "SAFE": "金融压力与市场动量尚未形成风险触发。",
-    "WATCH": "至少一项先行或确认信号触发，建议提高监测频率。",
-    "WARNING": "关键压力信号显著恶化，股市回撤风险上升。",
-    "CRITICAL": "多项宏观指标进入极端区间，系统性风险升高。",
+    "WATCH": "市场压力开始显现，尚未形成广泛共振。",
+    "WARNING": "多项市场信号恶化，跌势传导正在确认。",
+    "CRITICAL": "多项市场指标已处极端压力区间。",
 }.get(top_composite["grade"], f"有效数据覆盖率 {top_composite['coverage']}%，暂不生成风险结论。")
 
 top_color = grade_to_color(top_composite["grade"])
 st.markdown(render_osci_card(
-    "MACRO ALERT COMPOSITE", top_composite["score"], top_composite["grade"],
-    f"综合评分：{top_state_cn}", bar_color=top_color,
+    "MARKET TRANSMISSION · EXPLORATORY", top_composite["score"], top_composite["grade"],
+    f"市场确认强度：{top_state_cn}", bar_color=top_color,
     state_detail=top_state_detail,
     components_html="标普三个月收益 ×0.30 · 距近六个月高点跌幅 ×0.20 · VIX ×0.20<br>10Y收益率三个月变化 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
@@ -937,7 +892,7 @@ st.markdown(render_osci_card(
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(stress, y30, show_hist_chart=True)
-history_rows_by_month = {row["month"]: row for row in build_history_rows(stress)}
+history_rows_by_month = {row["month"]: row for row in build_history_rows(stress, HISTORY_EVENTS)}
 for event in CRASH_EVENTS:
     event["warning_state"] = history_rows_by_month.get(event["date"][:7], {}).get("state", "N/A")
 
@@ -975,7 +930,7 @@ with tab_all:
     if show_crashes:
         st.markdown("""
         <div class="panel">
-          <div class="panel-title">📌 历史股灾事件索引</div>
+        <div class="panel-title">📌 历史市场事件索引</div>
         """, unsafe_allow_html=True)
         cols = st.columns(3)
         for i, ev in enumerate(CRASH_EVENTS):
@@ -988,9 +943,9 @@ with tab_all:
                 <div class="event-index-row">
                   <div class="event-index-bar" style="background:{color};"></div>
                   <div>
-                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']} · 事前{warning_state}</div>
-                    <div class="event-index-copy">{ev['desc']}</div>
-                    <div class="event-index-meta">事件类型：{ev['kind']} · 事后12个月最大回撤：{drawdown}</div>
+                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']} · 当月确认{warning_state}</div>
+                    <div class="event-index-copy">{event_row.get('summary', ev['desc'])}</div>
+                    <div class="event-index-meta">{event_validation_scope(ev['kind'])} · 后续12个月最大回撤：{drawdown}</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)

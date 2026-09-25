@@ -42,7 +42,7 @@ FACTOR_NAMES = {
     "straw4": "AI能源约束",
     "straw5": "AI融资结构脆弱性",
     "straw6": "AI信贷与再融资压力",
-    "straw7": "宏观与跨市场预警",
+    "straw7": "宏观与跨市场传导确认",
 }
 
 
@@ -289,7 +289,7 @@ def _straw7() -> dict:
         return _unavailable("straw7", f"跨市场序列覆盖不足（{composite['coverage']}%）")
     return _result(
         "straw7", composite["score"], composite["coverage"] / 100,
-        "股票动量与回撤、VIX、利率冲击、市场压力与期限曲线", source,
+        "市场传导确认强度：股票动量与回撤、VIX、利率冲击、市场压力与期限曲线；非下跌预测概率", source,
     )
 
 

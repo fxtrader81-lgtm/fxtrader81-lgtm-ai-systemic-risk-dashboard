@@ -49,7 +49,7 @@ if (Path(__file__).parent / "pages" / "straw5.py").exists():
 
 factor_pages.extend([
     st.Page("pages/straw6.py", title="06 · AI信贷与再融资压力", icon="💳", url_path="factor-credit-refinancing"),
-    st.Page("pages/straw7.py", title="07 · 宏观与跨市场预警", icon="📊", url_path="factor-macro-market"),
+    st.Page("pages/straw7.py", title="07 · 宏观与跨市场传导确认", icon="📊", url_path="factor-macro-market"),
 ])
 
 pg = st.navigation({"监测总览": [dashboard_page], "风险因子": factor_pages})

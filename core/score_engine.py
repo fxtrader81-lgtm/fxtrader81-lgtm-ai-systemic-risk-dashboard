@@ -102,7 +102,7 @@ FACTOR_LABELS = {
     "straw4": "⚡ 04 · AI能源约束",
     "straw5": "🏦 05 · AI融资结构脆弱性",
     "straw6": "💳 06 · AI信贷与再融资压力",
-    "straw7": "📊 07 · 宏观与跨市场预警",
+    "straw7": "📊 07 · 宏观与跨市场传导确认",
 }
 
 FACTOR_FILES = {

@@ -162,6 +162,21 @@ def note_panel(title: str, body: str, *, tone: str = "warning") -> str:
     )
 
 
+def model_evidence_panel(*, sample: str, validation: str, boundary: str, calibration: str) -> str:
+    """Use the same visible evidence disclosure on both transmission pages."""
+    fields = (
+        ("独立样本", sample),
+        ("验证结果", validation),
+        ("模型边界", boundary),
+        ("阈值校准", calibration),
+    )
+    rows = "".join(
+        f'<div class="model-evidence-row"><b>{escape(label)}</b><span>{escape(value)}</span></div>'
+        for label, value in fields
+    )
+    return panel("📎 模型说明", f'<div class="model-evidence-grid">{rows}</div>')
+
+
 def section_intro(title: str, subtitle: str = "") -> str:
     subtitle_html = f'<div class="section-intro-subtitle">{subtitle}</div>' if subtitle else ""
     return f'<div class="section-intro"><div class="section-intro-title">{title}</div>{subtitle_html}</div>'
