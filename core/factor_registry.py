@@ -327,6 +327,11 @@ def load_factor_results() -> dict[str, dict]:
         )
     except Exception as exc:
         results["straw5"] = _unavailable("straw5", f"数据源异常：{type(exc).__name__}")
+    # Keep presentation names in this cached result tied to the current
+    # registry revision; changing the function body also invalidates older
+    # Streamlit cache entries after a deployment.
+    for straw_id, item in results.items():
+        item["name"] = FACTOR_NAMES[straw_id]
     return results
 
 

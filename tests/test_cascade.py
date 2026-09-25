@@ -2,7 +2,7 @@
 
 import unittest
 
-from core.factor_registry import aggregate_factor_results
+from core.factor_registry import FACTOR_NAMES, aggregate_factor_results
 
 
 def readings(state5="WARNING", state6="WARNING", state7="WATCH"):
@@ -20,6 +20,9 @@ def readings(state5="WARNING", state6="WARNING", state7="WATCH"):
 
 
 class CascadeTests(unittest.TestCase):
+    def test_factor_07_uses_confirmation_name(self):
+        self.assertEqual(FACTOR_NAMES["straw7"], "宏观与跨市场传导确认")
+
     def test_requires_05_and_06_warning_plus_07_watch(self):
         self.assertTrue(aggregate_factor_results(readings())["cascade"])
         self.assertFalse(aggregate_factor_results(readings(state5="WATCH"))["cascade"])
