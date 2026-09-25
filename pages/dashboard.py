@@ -5,10 +5,12 @@ from html import escape
 import streamlit as st
 
 from components.ui import (dashboard_conclusion, dashboard_header, load_css,
-                           render_footer, source_strip)
+                           render_footer, source_strip, transmission_chain_panel)
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
+from core.macro_data import load_macro_stress_snapshot
 from core.score_engine import render_factor_navigation, render_system_card
+from core.transmission_phase import market_phase_from_series
 
 load_css()
 
@@ -67,7 +69,12 @@ def _conclusion_report(system, results):
 
 with st.spinner("正在汇总七个风险因子…"):
     results = load_factor_results()
-system = aggregate_factor_results(results)
+try:
+    market_series, _ = load_macro_stress_snapshot()
+    observed_market_phase = market_phase_from_series(market_series)
+except Exception:
+    observed_market_phase = None
+system = aggregate_factor_results(results, market_phase_result=observed_market_phase)
 scores = {key: item["score"] for key, item in results.items() if item.get("available")}
 
 st.markdown(
@@ -78,6 +85,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
+st.markdown(transmission_chain_panel(system["phase"], system["phase_nodes"]), unsafe_allow_html=True)
 
 color = STATE_COLORS.get(system["state"], "#94a3b8")
 conclusion_col, factor_col = st.columns(2, gap="medium")

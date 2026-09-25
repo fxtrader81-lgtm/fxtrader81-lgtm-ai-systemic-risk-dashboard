@@ -394,6 +394,9 @@
   margin-top: 8px;
 }
 
+.table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.table-scroll .gpu-table { min-width:960px; }
+
 .gpu-table th {
   font-size: 12px;
   color: var(--text-dark);

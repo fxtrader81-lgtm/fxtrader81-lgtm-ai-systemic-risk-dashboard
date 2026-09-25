@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from core.macro_risk import COMPONENTS, compute_macro_metrics
+from core.transmission_phase import market_phase_from_series
 
 
 def event_validation_scope(kind: str) -> str:
@@ -51,8 +52,10 @@ def build_history_rows(
         )
         # Subsequent peak-to-trough drawdown is an observed outcome, not input
         # to the event-month confirmation score.
-        event_window = sp500[(sp500.index >= event_end) & (sp500.index <= event_end + pd.DateOffset(months=12))]
+        outcome_end = (pd.Period(month, freq="M") + 6).to_timestamp("M")
+        event_window = sp500[(sp500.index >= event_end) & (sp500.index <= outcome_end)]
         drawdown = float((event_window / event_window.cummax() - 1).min()) if not event_window.empty else np.nan
+        phase = market_phase_from_series(history)
         components = []
         for key, definition in COMPONENTS.items():
             if key not in metrics:
@@ -78,11 +81,12 @@ def build_history_rows(
             "y10": f'{float(y10_at_event.iloc[-1]):.2f}%' if not y10_at_event.empty else "N/A",
             "drawdown": "N/A" if np.isnan(drawdown) else f"{drawdown:.0%}",
             "summary": (
-                f'{description} 按事件月末后12个月的月末点位计算，标普500最大峰谷回撤为{drawdown:.0%}。'
+                f'{description} 按事件月末后6个月的月末点位计算，标普500最大峰谷回撤为{drawdown:.0%}。'
                 if not np.isnan(drawdown) else description
             ),
             "score": composite["score"],
             "state": composite["grade"],
+            "phase": phase["label"],
             "coverage": composite["coverage"],
             "components": " · ".join(components),
         })

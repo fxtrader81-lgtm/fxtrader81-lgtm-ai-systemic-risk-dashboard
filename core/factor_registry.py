@@ -21,6 +21,7 @@ from core.credit_risk import compute_credit_metrics
 from core.macro_data import load_credit_stress_snapshot, load_macro_stress_snapshot
 from core.macro_risk import compute_macro_metrics
 from core.straw5_engine import load_straw5_analysis
+from core.transmission_phase import market_phase, system_phase
 
 
 @dataclass
@@ -335,7 +336,8 @@ def load_factor_results() -> dict[str, dict]:
     return results
 
 
-def aggregate_factor_results(results: dict[str, dict], minimum_coverage: float = 0.70) -> dict:
+def aggregate_factor_results(results: dict[str, dict], minimum_coverage: float = 0.70,
+                             market_phase_result: dict | None = None) -> dict:
     """Return structural score plus the credit/market transmission phase."""
     active = dict(STRAW_WEIGHTS)
     active_total = sum(active.values())
@@ -354,19 +356,7 @@ def aggregate_factor_results(results: dict[str, dict], minimum_coverage: float =
     s7 = results.get("straw7", {}).get("state", "N/A")
     cascade = rank[s5] >= 2 and rank[s6] >= 2 and rank[s7] >= 1
     critical = cascade and (rank[s5] >= 3 or rank[s6] >= 3) and rank[s7] >= 2
-    if critical:
-        phase = "危机传导期"
-    elif cascade:
-        phase = "CASCADE 联动"
-    elif base["available"] and rank[base["state"]] >= 2 and rank[s6] <= 1 and rank[s7] <= 1:
-        phase = "结构性积累期，尚未市场传导"
-    elif base["available"] and rank[base["state"]] >= 2 and rank[s7] >= 2 and rank[s6] <= 1:
-        phase = "结构高风险，市场承压但信贷未确认"
-    elif rank[s7] >= 2 and (not base["available"] or rank[base["state"]] <= 1):
-        phase = "宏观压力，AI体系暂时隔离"
-    elif rank[s6] >= 2:
-        phase = "融资压力观察期"
-    else:
-        phase = "常态监测"
-    return {**base, "phase": phase, "cascade": cascade, "critical_cascade": critical,
-            "credit_state": s6, "market_state": s7}
+    observed_phase = system_phase(s5, s6, market_phase_result or market_phase(s7))
+    return {**base, "phase": observed_phase["label"], "phase_key": observed_phase["key"],
+            "phase_nodes": observed_phase["nodes"], "cascade": cascade,
+            "critical_cascade": critical, "credit_state": s6, "market_state": s7}

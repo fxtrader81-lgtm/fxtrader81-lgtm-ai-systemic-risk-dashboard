@@ -30,7 +30,21 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertEqual(row["state"], expected["composite"]["grade"])
         self.assertEqual(row["scope"], "机制案例；不等于独立验证样本")
         self.assertIn(row["drawdown"], row["summary"])
+        self.assertIn("6个月", row["summary"])
+        self.assertIn("phase", row)
         self.assertLess(row["score"], compute_macro_metrics(**self.stress)["composite"]["score"])
+
+    def test_six_month_outcome_excludes_seventh_month(self):
+        dates = pd.date_range("2020-01-31", periods=13, freq="ME")
+        stress = {
+            "y10": pd.Series([2.0] * 13, index=dates),
+            "y3m": pd.Series([1.5] * 13, index=dates),
+            "sp500": pd.Series([100.0] * 11 + [80.0, 50.0], index=dates),
+            "stlfsi": pd.Series([-0.5] * 13, index=dates),
+            "vix": pd.Series([15.0] * 13, index=dates),
+        }
+        row = build_history_rows(stress, [("2020-06", "测试", "测试描述", "金融传导")])[0]
+        self.assertEqual(row["drawdown"], "-20%")
 
     def test_external_shock_and_bottom_are_not_validation_samples(self):
         self.assertIn("模型边界", event_validation_scope("外生冲击"))

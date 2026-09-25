@@ -23,12 +23,13 @@ from datetime import datetime, timedelta
 from copy import deepcopy
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
-from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
+from components.ui import (load_css, market_phase_card, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
                            two_column_info_panel)
-from core.alert_engine import render_alert, render_osci_card
+from core.alert_engine import render_alert
 from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
 from core.macro_risk import COMPONENTS, compute_macro_metrics
+from core.transmission_phase import market_phase_from_series
 from core.market_history import build_history_rows, event_validation_scope
 from core.score_engine import register_score
 
@@ -595,8 +596,9 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
             showlegend=False,
             hovertemplate=(
                 f"<b>{month} · {event}</b><br>事件月末确认强度: "
+                f"{row.get('phase', '数据不足')} · "
                 f"{('N/A' if row.get('score') is None else str(row['score']) + '/100')} · {severity}<br>"
-                f"10Y: {row.get('y10', 'N/A')}<br>事件窗口最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
+                f"10Y: {row.get('y10', 'N/A')}<br>后续6个月最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
             ),
         ), secondary_y=False)
         fig.add_annotation(
@@ -772,13 +774,13 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色和列表均为事件月末的市场确认状态，不能当成事前预测；回撤是事件月末后十二个月内的最大月末峰谷回撤。历史压力序列按当前版本重建，可能包含修订值。</div>
+          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色表示事件月末的市场确认强度，阶段描述表示当时市场侧位置，均不能当成事前预测；回撤是事件月末后六个月内的最大月末峰谷回撤。历史压力序列按当前版本重建，可能包含修订值。</div>
           <div class="history-header">
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">事件窗口回撤</div>
-            <div class="history-header-score">当月确认</div>
+            <div class="history-header-drawdown">后续6个月回撤</div>
+            <div class="history-header-score">当月确认强度</div>
           </div>
         """, unsafe_allow_html=True)
 
@@ -792,7 +794,7 @@ def render_alert_system(stress, y30, show_hist_chart=True):
               <div class="h-date history-cell-date">{date}</div>
               <div class="h-event"><b>{event}</b>
                 <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
-                <small><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
+                <small><b>{row.get('kind', '')}</b> · 当月市场阶段：{row.get('phase', '数据不足')}。{row.get('summary', row['description'])}</small>
                 <small>{row.get('scope', '')}</small>
                 <small>确认观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
                 <small class="history-calculation">{row.get('components', '该事件时点的源数据不足，未生成评分。')}</small>
@@ -863,32 +865,14 @@ with ctrl_col3:
 
 st.markdown(spacer("xs"), unsafe_allow_html=True)
 
-# 综合评分固定置顶，避免用户在三个 Tab 中反复寻找。
+# 市场侧阶段置顶；数值评分仅作为可审计的辅助信息。
 top_metrics = compute_alert_metrics(stress)
 top_composite = top_metrics["composite"]
 if top_composite["score"] is not None:
     register_score("straw7", top_composite["score"])
-top_state_detail = {
-    "SAFE": "当前未观察到广泛市场确认",
-    "WATCH": "市场压力出现，需继续观察",
-    "WARNING": "跌势与跨市场压力正在传导",
-    "CRITICAL": "多项市场压力已进入极端区间",
-}.get(top_composite["grade"], "数据覆盖不足；缺失值不按SAFE处理")
-top_state_cn = {
-    "SAFE": "金融压力与市场动量尚未形成风险触发。",
-    "WATCH": "市场压力开始显现，尚未形成广泛共振。",
-    "WARNING": "多项市场信号恶化，跌势传导正在确认。",
-    "CRITICAL": "多项市场指标已处极端压力区间。",
-}.get(top_composite["grade"], f"有效数据覆盖率 {top_composite['coverage']}%，暂不生成风险结论。")
-
-top_color = grade_to_color(top_composite["grade"])
-st.markdown(render_osci_card(
-    "MARKET TRANSMISSION · EXPLORATORY", top_composite["score"], top_composite["grade"],
-    f"市场确认强度：{top_state_cn}", bar_color=top_color,
-    state_detail=top_state_detail,
-    components_html="标普三个月收益 ×0.30 · 距近六个月高点跌幅 ×0.20 · VIX ×0.20<br>10Y收益率三个月变化 ×0.15 · STLFSI ×0.10 · 期限曲线 ×0.05",
-    score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
-), unsafe_allow_html=True)
+current_market_phase = market_phase_from_series(stress)
+st.markdown(market_phase_card(current_market_phase, top_composite["score"],
+                              top_composite["grade"], top_composite["coverage"]), unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(stress, y30, show_hist_chart=True)
@@ -943,9 +927,9 @@ with tab_all:
                 <div class="event-index-row">
                   <div class="event-index-bar" style="background:{color};"></div>
                   <div>
-                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']} · 当月确认{warning_state}</div>
+                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']} · {event_row.get('phase', '数据不足')}</div>
                     <div class="event-index-copy">{event_row.get('summary', ev['desc'])}</div>
-                    <div class="event-index-meta">{event_validation_scope(ev['kind'])} · 后续12个月最大回撤：{drawdown}</div>
+                    <div class="event-index-meta">当月强度{warning_state} · {event_validation_scope(ev['kind'])} · 后续6个月最大回撤：{drawdown}</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)

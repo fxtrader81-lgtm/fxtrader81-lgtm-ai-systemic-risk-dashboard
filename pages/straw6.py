@@ -14,6 +14,7 @@ from components.ui import (load_css, logic_panel, metric_card, model_evidence_pa
                            spacer)
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
+from core.credit_history import build_credit_history_rows
 from core.credit_risk import COMPONENTS, compute_credit_metrics
 from core.macro_data import load_credit_stress_snapshot
 from core.score_engine import register_score
@@ -38,13 +39,13 @@ CREDIT_EVENTS = [
 
 AI_DEALS = [
     {
-        "date": "2026-09-21",
+        "date": "2026-09-24",
         "issuer": "SoftBank Group",
-        "purpose": "拟为OpenAI后续投资及相关融资安排发行多币种债券",
-        "size": "约111.5亿美元（待最终发行确认）",
-        "pricing": "等待最终收益率、国债利差、认购倍数与二级市场表现",
-        "status": "观察中",
-        "source": "https://www.reuters.com/business/media-telecom/softbank-group-launches-over-10-billion-bonds-openai-investment-term-sheet-shows-2026-09-21/",
+        "purpose": "美元债100亿美元及欧元债10亿欧元；主要用于OpenAI后续100亿美元投资",
+        "size": "合计约111亿美元等值；预计9月29日发行",
+        "pricing": "美元债3.5/5.5/7.5年票息8.625%/9.250%/9.750%；欧元债4/6年为7.125%/8.000%",
+        "status": "条款已公布；待认购及二级市场验证",
+        "source": "https://group.softbank/en/news/press/20260924",
     }
 ]
 
@@ -58,40 +59,6 @@ def _latest_date(series: pd.Series) -> str | None:
         return None
     stamp = min(pd.Timestamp(series.dropna().index[-1]).normalize(), pd.Timestamp.now().normalize())
     return stamp.strftime("%Y-%m-%d")
-
-
-def _as_of(series: pd.Series, month: str) -> pd.Series:
-    if series is None or series.empty:
-        return pd.Series(dtype=float)
-    cutoff = pd.Period(month, freq="M") - 3
-    indexed = series.copy()
-    indexed.index = pd.to_datetime(indexed.index).to_period("M")
-    return indexed[indexed.index <= cutoff]
-
-
-def _history_rows(series: dict[str, pd.Series]) -> list[dict]:
-    rows = []
-    for month, event, description in CREDIT_EVENTS:
-        metrics = compute_credit_metrics(
-            _as_of(series["hy_oas"], month),
-            _as_of(series["real_yield"], month),
-            _as_of(series["nfci"], month),
-            baa_spread=_as_of(series["baa10y"], month),
-        )
-        composite = metrics["composite"]
-        credit = metrics.get("credit_spread")
-        rows.append({
-            "month": month,
-            "event": event,
-            "description": description,
-            "score": composite["score"],
-            "state": composite["grade"],
-            "coverage": composite["coverage"],
-            "credit": "N/A" if not credit else f"{credit['value']:.0f}bp · {credit.get('proxy', '')}",
-            "real": "N/A" if "real_rate" not in metrics else f"{metrics['real_rate']['value']:.2f}%",
-            "nfci": "N/A" if "financial_conditions" not in metrics else f"{metrics['financial_conditions']['value']:+.2f}",
-        })
-    return rows
 
 
 def _stress_chart(series: dict[str, pd.Series]) -> go.Figure:
@@ -151,13 +118,13 @@ if score is not None:
     register_score("straw6", score)
 
 summary = {
-    "SAFE": "广泛信用利差与融资条件尚未显示系统性收紧。",
+    "SAFE": "广泛信用代理尚未显示同步收紧；不代表AI债务安全。",
     "WATCH": "实际融资成本或信用条件已出现早期压力。",
     "WARNING": "信用利差、实际利率或金融条件正在显著压缩再融资空间。",
     "CRITICAL": "信用市场与融资条件已进入危机级收紧区间。",
 }.get(state, "有效数据覆盖不足，暂不输出方向性判断。")
 st.markdown(render_osci_card(
-    "CFRI · AI CREDIT & REFINANCING PRESSURE",
+    "CFRI · 探索性信用压力指标",
     score, state, f"综合评分：{summary}",
     bar_color=STATE_COLORS.get(state, "#94a3b8"),
     state_detail=f"有效权重覆盖率 {composite['coverage']}% · AI交易定价尚未纳入评分",
@@ -171,7 +138,7 @@ for column, key in zip(columns, COMPONENTS):
     item = metrics.get(key)
     with column:
         if item is None:
-            desc = "等待足够的发行定价与二级市场数据" if key == "ai_deal" else "数据缺失，不按SAFE处理"
+            desc = "已有发行票息；待可比利差、认购及二级市场数据" if key == "ai_deal" else "数据缺失，不按SAFE处理"
             st.markdown(metric_card(f"{definition['label']} ×{definition['weight']:.2f}", "N/A", "gray", desc=desc), unsafe_allow_html=True)
             continue
         if key == "credit_spread":
@@ -190,14 +157,15 @@ for column, key in zip(columns, COMPONENTS):
                                 _color_class(item["grade"]), desc=desc), unsafe_allow_html=True)
 
 alert_title = {
-    "SAFE": "信用市场尚未确认AI融资压力",
+    "SAFE": "广泛信用代理未提示同步压力",
     "WATCH": "融资成本抬升，但信用窗口仍然开放",
     "WARNING": "再融资压力上升，需要检查发行与续作条件",
     "CRITICAL": "信用窗口显著收缩，进入融资危机状态",
 }.get(state, "数据覆盖不足")
 alert_body = (
     f"当前CFRI为 {'N/A' if score is None else f'{score:.1f}/100'}。"
-    "广泛信用条件和单一AI发行人的定价必须分开解释；单笔债券事件不会被手工写入总分。"
+    "广泛信用条件和单一AI发行人的定价必须分开解释；历史代理曾漏掉重大事件，"
+    "本分数尚不能证明AI债务风险低。单笔债券事件不会被手工写入总分。"
 )
 st.markdown(render_alert(state, alert_title, alert_body), unsafe_allow_html=True)
 
@@ -211,26 +179,40 @@ deal_rows = "".join(
     for item in AI_DEALS
 )
 st.markdown(
-    '<div class="panel"><div class="panel-title">🏦 AI融资交易观察</div><table class="gpu-table"><thead><tr><th>日期</th><th>发行人</th><th>用途</th><th>规模</th><th>待观察定价</th><th>状态</th></tr></thead>'
-    f'<tbody>{deal_rows}</tbody></table><div class="metric-sub">只有最终收益率、国债利差、同评级溢价、认购倍数和二级市场表现齐备后，交易温度才进入评分。</div></div>',
+    '<div class="panel"><div class="panel-title">🏦 AI融资交易观察</div><div class="table-scroll"><table class="gpu-table"><thead><tr><th>日期</th><th>发行人</th><th>用途</th><th>规模</th><th>发行条款</th><th>状态</th></tr></thead>'
+    f'<tbody>{deal_rows}</tbody></table></div><div class="metric-sub">'
+    '同一发行人4月美元债3.5年及5.5年票息分别为7.625%和8.250%，本次同期限均上移100bp；'
+    '票息变化不等于信用利差变化，可能含基准利率、发行时点和融资需求影响。'
+    '<a href="https://group.softbank/en/news/press/20260416" target="_blank">4月发行文件</a>。'
+    '目前缺少可比国债利差、认购倍数和二级市场表现，故交易温度仍不计分。</div></div>',
     unsafe_allow_html=True,
 )
 
-history_rows = _history_rows(series)
+history_rows = build_credit_history_rows(series, CREDIT_EVENTS)
 body = []
 for row in history_rows:
     color = STATE_COLORS.get(row["state"], "#94a3b8")
     score_text = "N/A" if row["score"] is None else f"{row['score']:.1f}/100"
+    earlier_text = "N/A" if row["earlier_score"] is None else f"{row['earlier_score']:.1f}/100"
+    earlier_color = STATE_COLORS.get(row["earlier_state"], "#94a3b8")
+    interpretation = "未捕捉" if row["state"] == "SAFE" else "代理提示" if row["state"] != "N/A" else "数据不足"
     body.append(
         f'<tr><td>{row["month"]}</td><td><b>{escape(row["event"])}</b><br><small>{escape(row["description"])}</small></td>'
         f'<td>{row["credit"]}</td><td>{row["real"]}</td><td>{row["nfci"]}</td>'
-        f'<td style="color:{color};font-weight:800">{row["state"]}<br>{score_text}</td><td>{row["coverage"]}%</td></tr>'
+        f'<td style="color:{earlier_color};font-weight:800">{row["earlier_state"]}<br>{earlier_text}</td>'
+        f'<td style="color:{color};font-weight:800">{row["state"]}<br>{score_text}<br><small>{interpretation}</small></td>'
+        f'<td>{row["coverage"]}%</td></tr>'
     )
+available_cases = [row for row in history_rows if row["score"] is not None]
+missed_cases = sum(row["state"] == "SAFE" for row in available_cases)
 st.markdown(
     '<div class="panel"><div class="panel-title">📋 历史信用事件复盘</div>'
-    '<div class="history-help">按事件前三个月的观察值、以当前数据版本重建状态；NFCI等历史值可能修订，因此不能称为当时实际可见的实时评分。早期数据不足时显示N/A，不补写安全分。</div>'
-    '<table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差</th><th>实际利率</th><th>NFCI</th><th>事前状态</th><th>覆盖率</th></tr></thead>'
-    f'<tbody>{"".join(body)}</tbody></table></div>', unsafe_allow_html=True,
+    '<div class="history-help">分别观察事件前6个月和前3个月的月末值，按当前数据版本重建。'
+    'FRED的HY OAS从2026年4月起仅提供近三年，旧事件使用BAA−10Y代理；两者口径不同。'
+    'NFCI历史值可能修订，这不是当时真实可见的评分，也不是经过验证的命中率。'
+    f'本表{len(available_cases)}个可评分事件中，{missed_cases}个在事件前三个月仍为SAFE（未捕捉）。</div>'
+    '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差（前3个月）</th><th>实际利率（前3个月）</th><th>NFCI（前3个月）</th><th>前6个月代理</th><th>前3个月代理</th><th>覆盖率</th></tr></thead>'
+    f'<tbody>{"".join(body)}</tbody></table></div></div>', unsafe_allow_html=True,
 )
 
 st.markdown(logic_panel([
@@ -242,9 +224,9 @@ st.markdown(logic_panel([
 ], title="⚙️ CFRI评分逻辑"), unsafe_allow_html=True)
 
 st.markdown(model_evidence_panel(
-    sample="独立信用危机样本数尚未完成核实；历史事件表是案例复盘，不是命中率样本。",
-    validation="尚无可可靠展示的独立样本外命中率及置信区间。",
-    boundary="广泛信用指标是AI融资环境的代理，不能代表单笔AI债券；突发外生冲击不在可预测范围内。",
+    sample="历史表为事后选择的信用事件；独立事件数、正常时期对照样本尚未核实。",
+    validation=f"前3个月代理回放中{missed_cases}/{len(available_cases)}个可评分事件未捕捉；无可可靠展示的独立样本外命中率与置信区间。",
+    boundary="HY OAS在FRED仅保留近三年；更早事件改用不同口径的BAA−10Y代理。广泛指标不能代表单笔AI债券；外生冲击不在可预测范围内。",
     calibration="当前切点为探索性规则，尚未完成按历史发布版本的独立样本外校准。",
 ), unsafe_allow_html=True)
 
@@ -253,6 +235,6 @@ render_data_freshness([
     {"name": "长期信用代理", "source": "FRED · BAA10Y", "updated_at": _latest_date(series["baa10y"]), "mode": "live"},
     {"name": "实际利率", "source": "FRED · DFII10", "updated_at": _latest_date(series["real_yield"]), "mode": "live"},
     {"name": "金融条件", "source": "FRED · NFCI", "updated_at": _latest_date(series["nfci"]), "mode": "live"},
-    {"name": "AI融资交易", "source": "发行文件与可信新闻；当前等待最终定价", "updated_at": "2026-09-21", "mode": "static"},
+    {"name": "AI融资交易", "source": "SoftBank官方发行文件；待认购与二级市场数据", "updated_at": "2026-09-24", "mode": "static"},
 ])
 render_footer(f"{source} · 发行文件与事件驱动信息")
