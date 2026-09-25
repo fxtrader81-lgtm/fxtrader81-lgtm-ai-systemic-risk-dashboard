@@ -33,7 +33,7 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertIn(row["drawdown"], row["summary"])
         self.assertIn("六个月", row["summary"])
         self.assertNotIn("phase", row)
-        self.assertEqual(row["drawdown"], "-18%")
+        self.assertEqual(row["drawdown"], "-17.65%")
         self.assertLess(row["score"], compute_macro_metrics(**self.stress)["composite"]["score"])
 
     def test_six_month_outcome_excludes_seventh_month(self):
@@ -50,7 +50,7 @@ class MarketHistoryTests(unittest.TestCase):
             index=pd.to_datetime(["2020-06-30", "2020-07-15", "2020-07-16", "2020-12-31", "2021-01-04"]),
         )
         row = build_history_rows(stress, [("2020-06", "测试", "测试描述", "金融传导")], daily)[0]
-        self.assertEqual(row["drawdown"], "-30%")
+        self.assertEqual(row["drawdown"], "-30.00%")
 
     def test_no_drop_below_event_close_is_zero_not_future_peak_drawdown(self):
         daily = pd.Series(

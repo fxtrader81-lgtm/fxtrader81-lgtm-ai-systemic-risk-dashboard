@@ -67,6 +67,7 @@ def build_history_rows(
             float(min(0.0, (event_window / baseline - 1).min()))
             if not event_window.empty and np.isfinite(baseline) else np.nan
         )
+        drawdown_text = "N/A" if np.isnan(drawdown) else "0%" if drawdown == 0 else f"{drawdown:.2%}"
         components = []
         for key, definition in COMPONENTS.items():
             if key not in metrics:
@@ -90,9 +91,9 @@ def build_history_rows(
             "available": composite["score"] is not None,
             "as_of": month,
             "y10": f'{float(y10_at_event.iloc[-1]):.2f}%' if not y10_at_event.empty else "N/A",
-            "drawdown": "N/A" if np.isnan(drawdown) else f"{drawdown:.0%}",
+            "drawdown": drawdown_text,
             "summary": (
-                f'{description} 以事件月最后交易日收盘价为基准，随后六个月内最低日收盘价对应回撤为{drawdown:.0%}。'
+                f'{description} 以事件月最后交易日收盘价为基准，随后六个月内最低日收盘价对应回撤为{drawdown_text}。'
                 if not np.isnan(drawdown) else description
             ),
             "score": composite["score"],
