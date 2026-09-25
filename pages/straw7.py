@@ -28,10 +28,11 @@ from components.ui import (load_css, metric_card, model_evidence_panel, panel, r
                            two_column_info_panel)
 from components.transmission import market_phase_card
 from core.alert_engine import render_alert, render_osci_card
-from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot, load_sp500_daily
+from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
+from core.market_outcome_data import load_sp500_daily
 from core.macro_risk import COMPONENTS, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
-from core.market_history import build_history_rows, event_validation_scope
+from core.market_event_replay import build_history_rows, event_validation_scope
 from core.score_engine import register_score
 
 # =========================================================

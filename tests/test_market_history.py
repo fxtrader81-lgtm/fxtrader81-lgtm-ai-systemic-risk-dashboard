@@ -4,7 +4,7 @@ import unittest
 
 import pandas as pd
 
-from core.market_history import build_history_rows, event_validation_scope
+from core.market_event_replay import build_history_rows, event_validation_scope
 from core.macro_risk import compute_macro_metrics
 
 
