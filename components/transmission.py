@@ -8,10 +8,10 @@ from components.ui import panel
 
 
 def market_phase_card(phase: dict, score: float | None, grade: str, coverage: int) -> str:
-    """Lead the market page with an observable phase, not a probability-like score."""
+    """Explain the observed phase below the primary four-level rating."""
     phases = (
-        ("quiet", "尚未确认"), ("transmitting", "初步传导"),
-        ("release", "风险释放"), ("dissipating", "压力消退"),
+        ("quiet", "尚未出现市场传导"), ("transmitting", "有传导，但市场尚未共振"),
+        ("release", "指标共振，风险释放中"), ("dissipating", "风险压力消退，市场恢复中"),
     )
     steps = "".join(
         f'<div class="market-phase-step{" active" if key == phase["key"] else ""}">{escape(label)}</div>'
@@ -20,12 +20,12 @@ def market_phase_card(phase: dict, score: float | None, grade: str, coverage: in
     score_text = "N/A" if score is None else f"{score:.1f}/100"
     return (
         '<div class="market-phase-card">'
-        '<div class="market-phase-kicker">市场侧阶段观察（探索性）</div>'
+        '<div class="market-phase-kicker">辅助阶段解释</div>'
         f'<div class="market-phase-title">{escape(phase["label"])}</div>'
         f'<div class="market-phase-detail">{escape(phase["detail"])}</div>'
         f'<div class="market-phase-steps">{steps}</div>'
-        f'<div class="market-phase-meta">指标强度 {escape(score_text)} · 原四级状态 {escape(grade)} · '
-        f'有效数据覆盖 {coverage}% · 阶段为事中描述，不是未来回调概率</div></div>'
+        f'<div class="market-phase-meta">对应评分 {escape(score_text)} · 四级评级 {escape(grade)} · '
+        f'有效数据覆盖 {coverage}% · 阶段仅描述当前市场表现</div></div>'
     )
 
 

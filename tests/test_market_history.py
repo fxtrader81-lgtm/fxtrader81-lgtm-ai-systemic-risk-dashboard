@@ -21,7 +21,8 @@ class MarketHistoryTests(unittest.TestCase):
 
     def test_event_month_score_includes_event_month_not_later_month(self):
         event = [("2020-02", "测试冲击", "测试描述", "金融传导")]
-        row = build_history_rows(self.stress, event)[0]
+        daily = pd.Series([85.0, 80.0, 70.0], index=pd.to_datetime(["2020-02-28", "2020-03-05", "2020-03-20"]))
+        row = build_history_rows(self.stress, event, daily)[0]
         through_february = {key: value.iloc[:5] for key, value in self.stress.items()}
         expected = compute_macro_metrics(**through_february)
 
@@ -30,8 +31,9 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertEqual(row["state"], expected["composite"]["grade"])
         self.assertEqual(row["scope"], "机制案例；不等于独立验证样本")
         self.assertIn(row["drawdown"], row["summary"])
-        self.assertIn("6个月", row["summary"])
-        self.assertIn("phase", row)
+        self.assertIn("六个月", row["summary"])
+        self.assertNotIn("phase", row)
+        self.assertEqual(row["drawdown"], "-18%")
         self.assertLess(row["score"], compute_macro_metrics(**self.stress)["composite"]["score"])
 
     def test_six_month_outcome_excludes_seventh_month(self):
@@ -43,8 +45,24 @@ class MarketHistoryTests(unittest.TestCase):
             "stlfsi": pd.Series([-0.5] * 13, index=dates),
             "vix": pd.Series([15.0] * 13, index=dates),
         }
-        row = build_history_rows(stress, [("2020-06", "测试", "测试描述", "金融传导")])[0]
-        self.assertEqual(row["drawdown"], "-20%")
+        daily = pd.Series(
+            [100.0, 110.0, 70.0, 80.0, 50.0],
+            index=pd.to_datetime(["2020-06-30", "2020-07-15", "2020-07-16", "2020-12-31", "2021-01-04"]),
+        )
+        row = build_history_rows(stress, [("2020-06", "测试", "测试描述", "金融传导")], daily)[0]
+        self.assertEqual(row["drawdown"], "-30%")
+
+    def test_no_drop_below_event_close_is_zero_not_future_peak_drawdown(self):
+        daily = pd.Series(
+            [85.0, 110.0, 90.0],
+            index=pd.to_datetime(["2020-02-28", "2020-03-10", "2020-03-20"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["drawdown"], "0%")
+
+    def test_missing_daily_closes_are_unavailable(self):
+        row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")])[0]
+        self.assertEqual(row["drawdown"], "N/A")
 
     def test_external_shock_and_bottom_are_not_validation_samples(self):
         self.assertIn("模型边界", event_validation_scope("外生冲击"))

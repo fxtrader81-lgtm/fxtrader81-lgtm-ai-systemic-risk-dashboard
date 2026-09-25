@@ -391,9 +391,17 @@
 .transmission-node span { padding-right:7px; color:#60a5fa; }
 .market-phase-meta, .transmission-status { color:var(--text-muted); font-size:14px; line-height:1.6; margin-top:16px; }
 .transmission-panel { margin-bottom:24px; }
+.indicator-glossary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.indicator-glossary-item { border:1px solid var(--border-mid); border-radius:12px; padding:18px 20px; background:rgba(255,255,255,.025); color:var(--text-soft); font-size:15px; line-height:1.7; }
+.indicator-glossary-item > div + div { margin-top:7px; }
+.indicator-glossary-item strong { color:#f8fafc; }
+.indicator-glossary-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.indicator-glossary-heading b { color:#f8fafc; font-size:19px; }
+.indicator-glossary-heading span { color:#93c5fd; font-size:13px; font-weight:800; }
 @media (max-width:700px) {
   .market-phase-title { font-size:30px; }
   .market-phase-steps, .transmission-chain { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .indicator-glossary { grid-template-columns:1fr; }
 }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }
 .source-strip { margin-top:20px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }

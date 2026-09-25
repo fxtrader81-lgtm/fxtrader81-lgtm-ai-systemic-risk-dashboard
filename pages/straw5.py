@@ -158,7 +158,7 @@ else:
         f"当前 AFVI {score:.1f}/100；信贷与再融资={credit_state}，宏观市场确认={market_state}。"
         "只有05达到WARNING、06达到WARNING且07至少WATCH时才触发CASCADE。"
     )
-st.markdown(render_alert("CRITICAL" if critical_cascade else "WARNING" if cascade else state, title, body), unsafe_allow_html=True)
+st.markdown(render_alert("CRITICAL" if critical_cascade else "WARNING" if cascade else state, f"结论：{title}", body), unsafe_allow_html=True)
 
 left, right = st.columns(2)
 with left:

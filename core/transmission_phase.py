@@ -41,12 +41,12 @@ def market_phase(market_state: str, *, prior_grades: list[str] | None = None,
                   and vix_change is not None and vix_change < 0
                   and stress is not None and stress <= 0)
     if recovering:
-        return {"key": "dissipating", "label": "压力消退中", "detail": "近三个月曾有显著市场压力；目前股市动量转正、VIX回落且金融压力不高于零。"}
+        return {"key": "dissipating", "label": "风险压力消退，市场恢复中", "detail": "近三个月曾有显著市场压力；目前股市动量转正、VIX回落且金融压力不高于零。"}
     if RANK[market_state] >= 2:
-        return {"key": "release", "label": "风险释放中", "detail": "多项市场指标已明显恶化；这是事中识别，不是下跌前预测。"}
+        return {"key": "release", "label": "指标共振，风险释放中", "detail": "多项市场指标已经同时恶化，市场压力正在发生或已进入下跌过程。"}
     if market_state == "WATCH":
-        return {"key": "transmitting", "label": "初步传导", "detail": "市场出现初步压力，尚未达到广泛恶化。"}
-    return {"key": "quiet", "label": "尚未市场传导", "detail": "当前市场指标未形成确认；不能据此排除突发冲击。"}
+        return {"key": "transmitting", "label": "有传导，但市场尚未共振", "detail": "部分市场指标开始恶化，尚未形成广泛共振。"}
+    return {"key": "quiet", "label": "尚未出现市场传导", "detail": "当前股票、VIX和金融压力等指标尚未形成同步压力；不能据此排除突发冲击。"}
 
 
 def market_phase_from_series(series: dict[str, pd.Series]) -> dict:

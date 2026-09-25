@@ -27,8 +27,8 @@ from components.ui import (load_css, metric_card, model_evidence_panel, panel, r
                            render_footer, render_header, spacer,
                            two_column_info_panel)
 from components.transmission import market_phase_card
-from core.alert_engine import render_alert
-from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
+from core.alert_engine import render_alert, render_osci_card
+from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot, load_sp500_daily
 from core.macro_risk import COMPONENTS, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
 from core.market_history import build_history_rows, event_validation_scope
@@ -596,10 +596,9 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
             name=event,
             showlegend=False,
             hovertemplate=(
-                f"<b>{month} · {event}</b><br>事件月末确认强度: "
-                f"{row.get('phase', '数据不足')} · "
+                f"<b>{month} · {event}</b><br>事件当月指标状态: "
                 f"{('N/A' if row.get('score') is None else str(row['score']) + '/100')} · {severity}<br>"
-                f"10Y: {row.get('y10', 'N/A')}<br>后续6个月最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
+                f"10Y: {row.get('y10', 'N/A')}<br>后续六个月最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
             ),
         ), secondary_y=False)
         fig.add_annotation(
@@ -623,7 +622,7 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
 
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 470
-    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 事件线标记月末确认 / 点击锁定", font=dict(size=14, color="#e2e8f0"), x=0.01)
+    layout["title"] = dict(text="10Y国债收益率 × S&P500 · 事件线标记当月指标状态 / 点击锁定", font=dict(size=14, color="#e2e8f0"), x=0.01)
     layout["clickmode"] = "event+select"
     layout["hovermode"] = "closest"
     layout["hoverdistance"] = 36
@@ -674,14 +673,14 @@ def render_kpi_row(y10, y30, sp500, shcomp):
              "🔴 倒挂预警" if spread_now < 0 else "期限利差正常", spread_color)
 
 
-def render_alert_system(stress, y30, show_hist_chart=True):
+def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
     """Render the factor-07 score, evidence and historical validation."""
     y10, sp500 = stress["y10"], stress["sp500"]
     metrics = compute_alert_metrics(stress)
     composite  = metrics["composite"]
     master_score = composite["score"]
     master_grade = composite["grade"]
-    history_rows = build_history_rows(stress, HISTORY_EVENTS)
+    history_rows = build_history_rows(stress, HISTORY_EVENTS, sp500_daily)
 
     st.markdown(
         '<div class="alert-system-heading">🚨 市场传导确认 · 探索性状态</div>',
@@ -775,13 +774,13 @@ def render_alert_system(stress, y30, show_hist_chart=True):
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色表示事件月末的市场确认强度，阶段描述表示当时市场侧位置，均不能当成事前预测；回撤是事件月末后六个月内的最大月末峰谷回撤。历史压力序列按当前版本重建，可能包含修订值。</div>
+          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色、评分及评级均表示事件当月的指标状态。回撤以事件月最后交易日标普500收盘价为基准，比较随后六个月内最低的日收盘价；若未跌破基准则为0%。日线缺失时显示N/A。历史压力序列按当前版本重建，可能包含修订值。</div>
           <div class="history-header">
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">后续6个月回撤</div>
-            <div class="history-header-score">当月确认强度</div>
+            <div class="history-header-drawdown">后续六个月最大回撤</div>
+            <div class="history-header-score">事件当月指标状态</div>
           </div>
         """, unsafe_allow_html=True)
 
@@ -795,14 +794,14 @@ def render_alert_system(stress, y30, show_hist_chart=True):
               <div class="h-date history-cell-date">{date}</div>
               <div class="h-event"><b>{event}</b>
                 <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
-                <small><b>{row.get('kind', '')}</b> · 当月市场阶段：{row.get('phase', '数据不足')}。{row.get('summary', row['description'])}</small>
+                <small><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
                 <small>{row.get('scope', '')}</small>
-                <small>确认观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
+                <small>事件观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
                 <small class="history-calculation">{row.get('components', '该事件时点的源数据不足，未生成评分。')}</small>
               </div>
               <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
               <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}</div>
-              <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</div>
+              <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'} · {sev}</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -829,15 +828,16 @@ def render_alert_system(stress, y30, show_hist_chart=True):
 def load_all_data():
     y10, y30, sp500, _macro_source = load_macro_snapshot()
     stress, stress_source = load_macro_stress_snapshot()
+    sp500_daily, daily_source = load_sp500_daily()
     nasdaq = fetch_market_index("^IXIC", "1994-01-01")
     dow    = fetch_market_index("^DJI",  "1994-01-01")
     shcomp = fetch_yf_index("000001.SS", "1994-01-01")
     szcomp = fetch_yf_index("399001.SZ", "1994-01-01")
-    return y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source
+    return y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source, sp500_daily, daily_source
 
 
 with st.spinner("正在从 FRED · FMP · Yahoo Finance 拉取数据..."):
-    y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source = load_all_data()
+    y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source, sp500_daily, daily_source = load_all_data()
 
 # =========================================================
 # 页面顶部：标题 + 控制栏
@@ -866,18 +866,37 @@ with ctrl_col3:
 
 st.markdown(spacer("xs"), unsafe_allow_html=True)
 
-# 市场侧阶段置顶；数值评分仅作为可审计的辅助信息。
+# 四级评级与评分是主结果；市场阶段仅作辅助解释。
 top_metrics = compute_alert_metrics(stress)
 top_composite = top_metrics["composite"]
 if top_composite["score"] is not None:
     register_score("straw7", top_composite["score"])
 current_market_phase = market_phase_from_series(stress)
+top_state = top_composite["grade"]
+top_summary = {
+    "SAFE": "结论：当前市场指标尚未形成同步压力。SAFE表示本模型尚未观察到广泛市场传导。",
+    "WATCH": "结论：部分市场指标开始恶化，尚未形成广泛共振。",
+    "WARNING": "结论：多项市场指标正在共振，市场压力已经明显出现。",
+    "CRITICAL": "结论：市场指标强烈共振，风险正在释放。",
+}.get(top_state, "结论：有效数据不足，暂不判断市场状态。")
+st.markdown(render_osci_card(
+    "市场状态 · 宏观与跨市场传导确认",
+    top_composite["score"], top_state, top_summary,
+    bar_color=SEVERITY_COLOR.get(top_state, "#94a3b8"),
+    state_detail=f"有效数据覆盖率 {top_composite['coverage']}% · SAFE表示当前未发现广泛市场传导",
+    components_html=(
+        "标普500三个月收益 ×0.30 · 距近六个月高点 ×0.20 · VIX ×0.20<br>"
+        "10Y三个月变化 ×0.15 · STLFSI ×0.10 · 10Y−3M利差 ×0.05<br>"
+        "综合评分＝最强主触发 ×0.65＋加权压力广度 ×0.35"
+    ),
+    score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
+), unsafe_allow_html=True)
 st.markdown(market_phase_card(current_market_phase, top_composite["score"],
                               top_composite["grade"], top_composite["coverage"]), unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
-render_alert_system(stress, y30, show_hist_chart=True)
-history_rows_by_month = {row["month"]: row for row in build_history_rows(stress, HISTORY_EVENTS)}
+render_alert_system(stress, y30, sp500_daily, show_hist_chart=True)
+history_rows_by_month = {row["month"]: row for row in build_history_rows(stress, HISTORY_EVENTS, sp500_daily)}
 for event in CRASH_EVENTS:
     event["warning_state"] = history_rows_by_month.get(event["date"][:7], {}).get("state", "N/A")
 
@@ -922,15 +941,16 @@ with tab_all:
             event_row = history_rows_by_month.get(ev["date"][:7], {})
             warning_state = event_row.get("state", "N/A")
             drawdown = event_row.get("drawdown", "N/A")
+            event_score = "N/A" if event_row.get("score") is None else f'{event_row["score"]}/100'
             color = SEVERITY_COLOR.get(warning_state, "#94a3b8")
             with cols[i % 3]:
                 st.markdown(f"""
                 <div class="event-index-row">
                   <div class="event-index-bar" style="background:{color};"></div>
                   <div>
-                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']} · {event_row.get('phase', '数据不足')}</div>
+                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']}</div>
                     <div class="event-index-copy">{event_row.get('summary', ev['desc'])}</div>
-                    <div class="event-index-meta">当月强度{warning_state} · {event_validation_scope(ev['kind'])} · 后续6个月最大回撤：{drawdown}</div>
+                    <div class="event-index-meta">事件当月指标状态：{event_score} · {warning_state} · {event_validation_scope(ev['kind'])} · 后续六个月最大回撤：{drawdown}</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1004,6 +1024,6 @@ render_data_freshness([
     {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
     {"name": "期限结构", "source": "FRED · DGS3MO / DGS10 / DGS30", "updated_at": "每小时缓存", "mode": "live"},
     {"name": "股票指数", "source": "FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "历史事件说明", "source": "静态事件库；评分与回撤现场计算", "updated_at": "2026-09", "mode": "static"},
+    {"name": "历史事件说明", "source": f"静态事件库；评分现场计算；回撤使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
 ])
-render_footer("FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、备用及A股）")
+render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 历史回撤：{daily_source}")

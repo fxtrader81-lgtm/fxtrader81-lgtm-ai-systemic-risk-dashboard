@@ -51,6 +51,19 @@ def _yahoo(ticker: str) -> pd.Series:
     return series.groupby(level=0).last().sort_index()
 
 
+def _yahoo_daily(ticker: str) -> pd.Series:
+    """Daily adjusted closes for historical event outcomes."""
+    frame = yf.download(ticker, start="1994-01-01", interval="1d", progress=False, auto_adjust=True)
+    if frame.empty or "Close" not in frame.columns:
+        return pd.Series(dtype=float)
+    series = frame["Close"]
+    if isinstance(series, pd.DataFrame):
+        series = series.iloc[:, 0]
+    series = pd.to_numeric(series, errors="coerce").dropna()
+    series.index = pd.to_datetime(series.index).tz_localize(None)
+    return series.sort_index()
+
+
 def _fmp(symbol: str) -> pd.Series:
     if not FMP_API_KEY:
         return pd.Series(dtype=float)
@@ -66,6 +79,23 @@ def _fmp(symbol: str) -> pd.Series:
     frame = pd.DataFrame(history)[["date", "close"]]
     frame["date"] = pd.to_datetime(frame["date"])
     return frame.set_index("date")["close"].sort_index().resample("ME").last().dropna()
+
+
+def _fmp_daily(symbol: str) -> pd.Series:
+    if not FMP_API_KEY:
+        return pd.Series(dtype=float)
+    response = requests.get(
+        f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}",
+        params={"apikey": FMP_API_KEY, "from": "1994-01-01"},
+        timeout=20,
+    )
+    response.raise_for_status()
+    history = response.json().get("historical", [])
+    if not history:
+        return pd.Series(dtype=float)
+    frame = pd.DataFrame(history)[["date", "close"]]
+    frame["date"] = pd.to_datetime(frame["date"])
+    return pd.to_numeric(frame.set_index("date")["close"], errors="coerce").dropna().sort_index()
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -117,6 +147,24 @@ def load_macro_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
     if missing:
         source += f" · 缺失：{', '.join(missing)}"
     return series, source
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_sp500_daily() -> tuple[pd.Series, str]:
+    """Daily S&P 500 closes for the six-month historical outcome only."""
+    try:
+        series = _fmp_daily("^GSPC")
+    except Exception:
+        series = pd.Series(dtype=float)
+    if not series.empty and series.index.min() <= pd.Timestamp("1997-10-31"):
+        return series, "FMP（^GSPC 日收盘价）"
+    try:
+        yahoo_series = _yahoo_daily("^GSPC")
+    except Exception:
+        yahoo_series = pd.Series(dtype=float)
+    if not yahoo_series.empty and (series.empty or yahoo_series.index.min() < series.index.min()):
+        return yahoo_series, "Yahoo Finance（^GSPC 日收盘价；FMP 历史覆盖不足时的备用源）"
+    return (series, "FMP（^GSPC 日收盘价；早期事件可能无数据）") if not series.empty else (pd.Series(dtype=float), "日线暂不可用")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)

@@ -167,11 +167,51 @@ alert_body = (
     "广泛信用条件和单一AI发行人的定价必须分开解释；历史代理曾漏掉重大事件，"
     "本分数尚不能证明AI债务风险低。单笔债券事件不会被手工写入总分。"
 )
-st.markdown(render_alert(state, alert_title, alert_body), unsafe_allow_html=True)
+st.markdown(render_alert(state, f"结论：{alert_title}", alert_body), unsafe_allow_html=True)
 
 st.markdown(spacer("sm"), unsafe_allow_html=True)
-st.markdown(panel("📈 信用与融资条件历史", '<div class="history-help">HY OAS用于实时监控；BAA−10Y用于长历史参照。两者口径不同，不拼接成一条伪造序列。</div>'), unsafe_allow_html=True)
+st.markdown(panel("📈 信用与融资条件历史", '<div class="history-help">HY OAS用于当前市场监控（月末快照）；BAA−10Y用于长历史参照。两者口径不同，不拼接成一条序列。</div>'), unsafe_allow_html=True)
 st.plotly_chart(_stress_chart(series), use_container_width=True, config={"displayModeBar": False})
+
+indicator_notes = [
+    (
+        "BAA−10Y 长期代理", "穆迪 Baa 级公司债收益率 − 美国 10 年期国债收益率",
+        "衡量较低投资级企业债相对国债的额外融资成本。利差扩大表示广泛信用风险溢价上升；收窄表示压力缓和。",
+        "观察是否持续扩大及其三个月变化；它不是 AI 债券利差，也不能与 HY OAS 拼成同一序列。",
+        "历史代理", "baa10y", "bp", 100,
+    ),
+    (
+        "HY OAS", "ICE BofA 美国高收益债指数期权调整利差（High Yield Option-Adjusted Spread）",
+        "衡量高收益债相对无风险曲线的信用风险溢价。数值上升表示高风险借款人融资更贵；下降表示融资条件改善。",
+        "结合当前水平、三个月变动和持续时间观察；它反映广泛高收益市场，不是某笔 AI 债的实际发行利差。",
+        "当前市场监控（月末快照）", "hy_oas", "bp", 100,
+    ),
+    (
+        "10Y TIPS", "美国 10 年期通胀保值国债实际收益率（10-Year TIPS Real Yield）",
+        "衡量扣除市场通胀预期后的长期实际利率。上升通常提高长期项目的实际融资门槛并压低未来现金流现值；下降则缓和。",
+        "同时看水平和三个月变化；高实际利率提示项目 NPV 压力，但单独不能判定 AI 项目无法偿债。",
+        "当前融资成本监控", "real_yield", "%", 1,
+    ),
+    (
+        "NFCI", "芝加哥联储全国金融状况指数（National Financial Conditions Index）",
+        "综合衡量美国金融系统的风险、信用和杠杆条件。高于零表示比历史平均更紧；低于零表示更宽松，向上移动代表条件收紧。",
+        "结合是否越过零及连续变化观察；它是系统性金融条件的压力确认，不对应单个发行人的再融资报价。",
+        "系统性压力确认", "nfci", "指数", 1,
+    ),
+]
+glossary_rows = []
+for short_name, full_name, meaning, observation, role, key, unit, multiplier in indicator_notes:
+    values = series[key].dropna()
+    current = "N/A" if values.empty else f"{float(values.iloc[-1]) * multiplier:+.2f}{unit}（{_latest_date(values)}）"
+    glossary_rows.append(
+        '<div class="indicator-glossary-item">'
+        f'<div class="indicator-glossary-heading"><b>{escape(short_name)}</b><span>{escape(role)}</span></div>'
+        f'<div><strong>完整名称：</strong>{escape(full_name)}</div>'
+        f'<div><strong>衡量与方向：</strong>{escape(meaning)}</div>'
+        f'<div><strong>当前值：</strong>{escape(current)}</div>'
+        f'<div><strong>观察方法：</strong>{escape(observation)}</div></div>'
+    )
+st.markdown(panel("📖 图中指标说明与观察方法", '<div class="indicator-glossary">' + ''.join(glossary_rows) + '</div>'), unsafe_allow_html=True)
 
 deal_rows = "".join(
     f'<tr><td>{escape(item["date"])}</td><td><a href="{escape(item["source"])}" target="_blank">{escape(item["issuer"])}</a></td>'

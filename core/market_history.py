@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 
 from core.macro_risk import COMPONENTS, compute_macro_metrics
-from core.transmission_phase import market_phase_from_series
 
 
 def event_validation_scope(kind: str) -> str:
@@ -19,7 +18,8 @@ def event_validation_scope(kind: str) -> str:
 
 
 def build_history_rows(
-    stress: dict[str, pd.Series], events: list[tuple[str, str, str, str]]
+    stress: dict[str, pd.Series], events: list[tuple[str, str, str, str]],
+    sp500_daily: pd.Series | None = None,
 ) -> list[dict]:
     """Reconstruct each event-month state using observations through that month.
 
@@ -50,12 +50,23 @@ def build_history_rows(
             history["y10"], history["y3m"], history["sp500"],
             history["stlfsi"], history["vix"],
         )
-        # Subsequent peak-to-trough drawdown is an observed outcome, not input
-        # to the event-month confirmation score.
+        # Compare the event-month closing baseline with the lowest daily close
+        # in the following six calendar months. This outcome is not a score input.
         outcome_end = (pd.Period(month, freq="M") + 6).to_timestamp("M")
-        event_window = sp500[(sp500.index >= event_end) & (sp500.index <= outcome_end)]
-        drawdown = float((event_window / event_window.cummax() - 1).min()) if not event_window.empty else np.nan
-        phase = market_phase_from_series(history)
+        daily = sp500_daily if sp500_daily is not None else pd.Series(dtype=float)
+        if not daily.empty:
+            daily = daily.copy()
+            daily.index = pd.to_datetime(daily.index).tz_localize(None)
+            baseline_observations = daily[daily.index <= event_end]
+            baseline_month = baseline_observations[baseline_observations.index.to_period("M") == pd.Period(month)]
+            baseline = float(baseline_month.iloc[-1]) if not baseline_month.empty else np.nan
+            event_window = daily[(daily.index > event_end) & (daily.index <= outcome_end)]
+        else:
+            baseline, event_window = np.nan, pd.Series(dtype=float)
+        drawdown = (
+            float(min(0.0, (event_window / baseline - 1).min()))
+            if not event_window.empty and np.isfinite(baseline) else np.nan
+        )
         components = []
         for key, definition in COMPONENTS.items():
             if key not in metrics:
@@ -81,12 +92,11 @@ def build_history_rows(
             "y10": f'{float(y10_at_event.iloc[-1]):.2f}%' if not y10_at_event.empty else "N/A",
             "drawdown": "N/A" if np.isnan(drawdown) else f"{drawdown:.0%}",
             "summary": (
-                f'{description} 按事件月末后6个月的月末点位计算，标普500最大峰谷回撤为{drawdown:.0%}。'
+                f'{description} 以事件月最后交易日收盘价为基准，随后六个月内最低日收盘价对应回撤为{drawdown:.0%}。'
                 if not np.isnan(drawdown) else description
             ),
             "score": composite["score"],
             "state": composite["grade"],
-            "phase": phase["label"],
             "coverage": composite["coverage"],
             "components": " · ".join(components),
         })
