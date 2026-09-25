@@ -164,7 +164,10 @@ left, right = st.columns(2)
 with left:
     st.markdown('<div class="panel-title">🔗 融资关系与风险传导</div>', unsafe_allow_html=True)
     st.plotly_chart(_relationship_figure(), use_container_width=True, config={"displayModeBar": False})
-    st.caption("关系图为结构示意，连线宽度表达关系类型，不代表美元金额。")
+    st.markdown(
+        '<div class="figure-note">示意图：连线粗细仅用于区分关系，不代表融资金额或风险权重。</div>',
+        unsafe_allow_html=True,
+    )
 with right:
     st.markdown('<div class="panel-title">⏳ 期限阶梯与错配窗口</div>', unsafe_allow_html=True)
     st.plotly_chart(_duration_figure(), use_container_width=True, config={"displayModeBar": False})

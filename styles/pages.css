@@ -306,6 +306,7 @@
 .history-calculation summary { cursor:pointer; color:var(--blue); font-family:inherit; font-weight:700; }
 .history-calculation > div { padding:8px 0; line-height:1.6; overflow-wrap:anywhere; }
 .history-help { color:var(--text-dim); font-size:15px; margin:-8px 0 12px; }
+.figure-note { color:var(--text-soft); font-size:15px; line-height:1.6; margin:4px 0 18px; }
 .history-header { display:flex; align-items:center; gap:10px; margin-inline:-23px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,.09); color:var(--text-dim); font-size:14px; font-weight:700; }
 .history-score { flex-shrink:0; text-align:right; font-size:15px; font-weight:800; }
 .weight-label, .source-note { color:var(--text-dim); }

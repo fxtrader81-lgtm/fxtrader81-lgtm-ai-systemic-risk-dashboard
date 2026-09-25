@@ -25,8 +25,6 @@ load_css()
 
 
 CREDIT_EVENTS = [
-    ("1998-08", "俄罗斯违约与LTCM危机", "主权违约与高杠杆头寸冲击全球流动性。"),
-    ("2002-07", "企业信用危机", "电信与科技企业去杠杆推动公司债压力上升。"),
     ("2007-08", "次贷信用显性化", "结构化信用产品和银行间融资风险开始外溢。"),
     ("2008-09", "雷曼破产", "融资链冻结并触发全球信用利差急剧扩大。"),
     ("2011-08", "欧债与美国评级冲击", "主权信用担忧推高全球避险与融资压力。"),
@@ -164,8 +162,9 @@ alert_title = {
 }.get(state, "数据覆盖不足")
 alert_body = (
     f"当前CFRI为 {'N/A' if score is None else f'{score:.1f}/100'}。"
-    "广泛信用条件和单一AI发行人的定价必须分开解释；历史代理曾漏掉重大事件，"
-    "本分数尚不能证明AI债务风险低。单笔债券事件不会被手工写入总分。"
+    "本分数描述当前广泛信用市场的压力，不是事件发生前三至六个月的预测信号。"
+    "广泛信用条件和单一AI发行人的定价必须分开解释；SAFE不能证明AI债务风险低。"
+    "单笔债券事件不会被手工写入总分。"
 )
 st.markdown(render_alert(state, f"结论：{alert_title}", alert_body), unsafe_allow_html=True)
 
@@ -242,7 +241,7 @@ for row in history_rows:
     score_text = "N/A" if row["score"] is None else f"{row['score']:.1f}/100"
     earlier_text = "N/A" if row["earlier_score"] is None else f"{row['earlier_score']:.1f}/100"
     earlier_color = STATE_COLORS.get(row["earlier_state"], "#94a3b8")
-    interpretation = "未捕捉" if row["state"] == "SAFE" else "代理提示" if row["state"] != "N/A" else "数据不足"
+    interpretation = "未见广泛压力" if row["state"] == "SAFE" else "广泛压力抬升" if row["state"] != "N/A" else "数据不足"
     body.append(
         f'<tr><td>{row["month"]}</td><td><b>{escape(row["event"])}</b><br><small>{escape(row["description"])}</small></td>'
         f'<td>{row["credit"]}</td><td>{row["real"]}</td><td>{row["nfci"]}</td>'
@@ -251,13 +250,21 @@ for row in history_rows:
         f'<td>{row["coverage"]}%</td></tr>'
     )
 available_cases = [row for row in history_rows if row["score"] is not None]
-missed_cases = sum(row["state"] == "SAFE" for row in available_cases)
+safe_cases = sum(row["state"] == "SAFE" for row in available_cases)
+earlier_cases = [row for row in history_rows if row["earlier_score"] is not None]
+earlier_safe_cases = sum(row["earlier_state"] == "SAFE" for row in earlier_cases)
+history_summary = (
+    f'前6个月{earlier_safe_cases}/{len(earlier_cases)}、前3个月{safe_cases}/{len(available_cases)}个可评分事件仍为SAFE。'
+    if available_cases and earlier_cases else '当前历史数据覆盖不足，暂不能汇总可评分事件。'
+)
 st.markdown(
     '<div class="panel"><div class="panel-title">📋 历史信用事件复盘</div>'
-    '<div class="history-help">分别观察事件前6个月和前3个月的月末值，按当前数据版本重建。'
+    '<div class="history-help">分别观察事件前6个月和前3个月的月末值，按当前数据版本重建；这些是事前压力快照，不是事件预测。'
     'FRED的HY OAS从2026年4月起仅提供近三年，旧事件使用BAA−10Y代理；两者口径不同。'
+    '1998和2002年事件因10Y TIPS实际利率序列尚未开始、有效权重只有60%，从评分表移除。'
     'NFCI历史值可能修订，这不是当时真实可见的评分，也不是经过验证的命中率。'
-    f'本表{len(available_cases)}个可评分事件中，{missed_cases}个在事件前三个月仍为SAFE（未捕捉）。</div>'
+    f'{history_summary}SAFE只表示该时点尚未出现足以触发本模型的广泛信用压力；'
+    '突发事件、局部信用风险及尚未扩散的脆弱性可能不反映在这些指标里。</div>'
     '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差（前3个月）</th><th>实际利率（前3个月）</th><th>NFCI（前3个月）</th><th>前6个月代理</th><th>前3个月代理</th><th>覆盖率</th></tr></thead>'
     f'<tbody>{"".join(body)}</tbody></table></div></div>', unsafe_allow_html=True,
 )
@@ -275,7 +282,7 @@ with logic_tab:
 with evidence_tab:
     st.markdown(model_evidence_panel(
         sample="历史表为事后选择的信用事件；独立事件数、正常时期对照样本尚未核实。",
-        validation=f"前3个月代理回放中{missed_cases}/{len(available_cases)}个可评分事件未捕捉；无可可靠展示的独立样本外命中率与置信区间。",
+        validation=f"{history_summary}这些结果不支持把CFRI当作事件前三至六个月的预测器；无可可靠展示的独立样本外命中率与置信区间。",
         boundary="HY OAS在FRED仅保留近三年；更早事件改用不同口径的BAA−10Y代理。广泛指标不能代表单笔AI债券；外生冲击不在可预测范围内。",
         calibration="当前切点为探索性规则，尚未完成按历史发布版本的独立样本外校准。",
     ), unsafe_allow_html=True)
