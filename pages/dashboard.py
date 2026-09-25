@@ -5,7 +5,8 @@ from html import escape
 import streamlit as st
 
 from components.ui import (dashboard_conclusion, dashboard_header, load_css,
-                           render_footer, source_strip, transmission_chain_panel)
+                           render_footer, source_strip)
+from components.transmission import transmission_chain_panel
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.macro_data import load_macro_stress_snapshot

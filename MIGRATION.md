@@ -23,6 +23,7 @@
 - `core/credit_risk.py`：因子06信用利差、实际利率、NFCI与AI融资交易评分。
 - `core/macro_risk.py`：因子07股票、VIX、利率冲击和跨市场确认评分。
 - `core/transmission_phase.py`：市场阶段及05→06→07传导链快照；仅作观察，不作预测概率。
+- `components/transmission.py`：市场阶段卡与四节点传导链的共享展示组件。
 - `core/credit_history.py`：信用事件前6个月与前3个月的当前数据版本代理回放。
 - `styles/base.css`：颜色变量、全局背景、字体与Streamlit基础覆盖。
 - `styles/components.css`：评分卡、指标卡、结论框、Dashboard和响应式组件。

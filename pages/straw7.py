@@ -23,9 +23,10 @@ from datetime import datetime, timedelta
 from copy import deepcopy
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
-from components.ui import (load_css, market_phase_card, metric_card, model_evidence_panel, panel, render_data_freshness,
+from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
                            two_column_info_panel)
+from components.transmission import market_phase_card
 from core.alert_engine import render_alert
 from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
 from core.macro_risk import COMPONENTS, compute_macro_metrics
