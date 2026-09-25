@@ -7,7 +7,7 @@
 # 运行方式：
 #   streamlit run app.py
 # =========================================================
-# Deployment sync: the market-stage explanation now renders as a compact secondary note.
+# Deployment sync: reload factor 07 scoring modules for daily-close calculations.
 
 import streamlit as st
 from datetime import datetime
