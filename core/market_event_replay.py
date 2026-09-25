@@ -49,6 +49,7 @@ def build_history_rows(
         metrics = compute_macro_metrics(
             history["y10"], history["y3m"], history["sp500"],
             history["stlfsi"], history["vix"],
+            sp500_daily[sp500_daily.index <= event_end] if sp500_daily is not None else None,
         )
         # Compare the event-month closing baseline with the lowest daily close
         # in the following six calendar months. This outcome is not a score input.

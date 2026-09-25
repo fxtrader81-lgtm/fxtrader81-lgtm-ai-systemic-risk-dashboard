@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from core.market_event_replay import build_history_rows, event_validation_scope
-from core.macro_risk import compute_macro_metrics
+from core.macro_risk import compute_macro_metrics, daily_six_month_peak_gap
 
 
 class MarketHistoryTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class MarketHistoryTests(unittest.TestCase):
         daily = pd.Series([85.0, 80.0, 70.0], index=pd.to_datetime(["2020-02-28", "2020-03-05", "2020-03-20"]))
         row = build_history_rows(self.stress, event, daily)[0]
         through_february = {key: value.iloc[:5] for key, value in self.stress.items()}
-        expected = compute_macro_metrics(**through_february)
+        expected = compute_macro_metrics(**through_february, sp500_daily=daily.loc[:"2020-02-28"])
 
         self.assertEqual(row["as_of"], "2020-02")
         self.assertEqual(row["score"], expected["composite"]["score"])
@@ -34,7 +34,29 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertIn("六个月", row["summary"])
         self.assertNotIn("phase", row)
         self.assertEqual(row["drawdown"], "-17.65%")
-        self.assertLess(row["score"], compute_macro_metrics(**self.stress)["composite"]["score"])
+        self.assertLess(row["score"], compute_macro_metrics(**self.stress, sp500_daily=daily)["composite"]["score"])
+
+    def test_six_month_high_uses_daily_close_not_month_end_only(self):
+        daily = pd.Series(
+            [100.0, 120.0, 105.0, 90.0],
+            index=pd.to_datetime(["2019-09-30", "2019-11-15", "2019-11-29", "2020-02-28"]),
+        )
+        self.assertAlmostEqual(daily_six_month_peak_gap(daily), -25.0)
+        row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")], daily)[0]
+        self.assertIn("标普500距近六个月高点 -25.00%", row["components"])
+
+    def test_event_score_does_not_see_daily_closes_after_event_month(self):
+        daily = pd.Series(
+            [100.0, 90.0, 150.0],
+            index=pd.to_datetime(["2019-12-31", "2020-02-28", "2020-03-02"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")], daily)[0]
+        self.assertIn("标普500距近六个月高点 -10.00%", row["components"])
+
+    def test_missing_daily_history_does_not_become_safe(self):
+        metrics = compute_macro_metrics(**self.stress)
+        self.assertNotIn("equity_drawdown", metrics)
+        self.assertEqual(metrics["composite"]["coverage"], 80)
 
     def test_six_month_outcome_excludes_seventh_month(self):
         dates = pd.date_range("2020-01-31", periods=13, freq="ME")

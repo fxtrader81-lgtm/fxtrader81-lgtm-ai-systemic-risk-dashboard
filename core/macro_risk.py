@@ -54,12 +54,28 @@ def _item(value: float, score: int, unit: str) -> dict:
     return {"value": round(float(value), 3), "score": score, "grade": _grade(score), "unit": unit}
 
 
+def daily_six_month_peak_gap(sp500_daily: pd.Series | None) -> float | None:
+    """Latest daily close versus the highest daily close in the trailing six calendar months."""
+    if sp500_daily is None or sp500_daily.empty:
+        return None
+    daily = pd.to_numeric(sp500_daily, errors="coerce").dropna().copy()
+    if daily.empty:
+        return None
+    daily.index = pd.to_datetime(daily.index).tz_localize(None)
+    daily = daily.sort_index()
+    as_of = daily.index[-1]
+    window = daily[(daily.index >= as_of - pd.DateOffset(months=6)) & (daily.index <= as_of)]
+    peak = float(window.max()) if not window.empty else 0.0
+    return float(daily.iloc[-1] / peak - 1) * 100 if peak > 0 else None
+
+
 def compute_macro_metrics(
     y10: pd.Series,
     y3m: pd.Series,
     sp500: pd.Series,
     stlfsi: pd.Series,
     vix: pd.Series | None = None,
+    sp500_daily: pd.Series | None = None,
 ) -> dict:
     """Score observed cross-market confirmation signals.
 
@@ -71,9 +87,8 @@ def compute_macro_metrics(
     if len(sp500) >= 4:
         value = float(sp500.iloc[-1] / sp500.iloc[-4] - 1) * 100
         result["equity_momentum"] = _item(value, _falling(value, 0.0, -5.0, -12.0), "%")
-    if len(sp500) >= 2:
-        window = sp500.iloc[-6:]
-        value = float(window.iloc[-1] / window.max() - 1) * 100
+    value = daily_six_month_peak_gap(sp500_daily)
+    if value is not None:
         result["equity_drawdown"] = _item(value, _falling(value, -3.0, -8.0, -15.0), "%")
     if not vix.empty:
         value = float(vix.iloc[-1])

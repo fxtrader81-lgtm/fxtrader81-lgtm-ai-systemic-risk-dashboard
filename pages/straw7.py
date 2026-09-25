@@ -208,10 +208,10 @@ def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
 # 预警计算
 # =========================================================
 
-def compute_alert_metrics(stress: dict[str, pd.Series]) -> dict:
+def compute_alert_metrics(stress: dict[str, pd.Series], sp500_daily: pd.Series) -> dict:
     return compute_macro_metrics(
         stress["y10"], stress["y3m"], stress["sp500"],
-        stress["stlfsi"], stress["vix"],
+        stress["stlfsi"], stress["vix"], sp500_daily,
     )
 
 
@@ -677,7 +677,7 @@ def render_kpi_row(y10, y30, sp500, shcomp):
 def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
     """Render the factor-07 score, evidence and historical validation."""
     y10, sp500 = stress["y10"], stress["sp500"]
-    metrics = compute_alert_metrics(stress)
+    metrics = compute_alert_metrics(stress, sp500_daily)
     composite  = metrics["composite"]
     master_score = composite["score"]
     master_grade = composite["grade"]
@@ -699,7 +699,11 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
     }
     icons = ["📉", "📉", "🌪", "📈", "🌡", "📐"]
     metric_notes = {
-        "equity_drawdown": "市场确认项：当前月末点位相对近六个月最高月末<br>",
+        "equity_drawdown": (
+            "市场确认项：最新日收盘价相对近六个月最高日收盘价"
+            + (f"（数据截至 {pd.to_datetime(sp500_daily.index[-1]):%Y-%m-%d}）" if not sp500_daily.empty else "（日线缺失）")
+            + "<br>"
+        ),
     }
     for column, icon, (key, definition) in zip(columns, icons, COMPONENTS.items()):
         item = metrics.get(key)
@@ -809,7 +813,7 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown(panel("⚙️ 确认逻辑、阈值与数据口径", """
-          <div class="history-help">本风险因子识别已经传导到市场的压力，不是下跌前的预测模型。标普500三个月收益、当前月末点位距近六个月最高月末的跌幅、VIX、10Y收益率三个月变化和STLFSI由时间序列计算；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景。切点仍是探索性规则，当前状态不代表回调概率。</div>
+          <div class="history-help">本风险因子识别已经传导到市场的压力，不是下跌前的预测模型。标普500三个月收益、VIX、10Y收益率三个月变化和STLFSI由时间序列计算；距近六个月高点的跌幅按最新日收盘价与过去六个月最高日收盘价计算，历史事件仅使用截至事件月末的日线；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景。切点仍是探索性规则，当前状态不代表回调概率。</div>
           <div class="boundary-note">⚠️ <b>边界声明</b>：该指标用于识别已发生的市场压力，无法提前预测9·11、COVID等外生冲击；外生事件应标为模型边界，不将事件月末状态改写成事前预测。</div>
         """), unsafe_allow_html=True)
 
@@ -868,7 +872,7 @@ with ctrl_col3:
 st.markdown(spacer("xs"), unsafe_allow_html=True)
 
 # 四级评级与评分是主结果；市场阶段仅作辅助解释。
-top_metrics = compute_alert_metrics(stress)
+top_metrics = compute_alert_metrics(stress, sp500_daily)
 top_composite = top_metrics["composite"]
 if top_composite["score"] is not None:
     register_score("straw7", top_composite["score"])
@@ -886,7 +890,7 @@ st.markdown(render_osci_card(
     bar_color=SEVERITY_COLOR.get(top_state, "#94a3b8"),
     state_detail=f"有效数据覆盖率 {top_composite['coverage']}% · SAFE表示当前未发现广泛市场传导",
     components_html=(
-        "标普500三个月收益 ×0.30 · 距近六个月高点 ×0.20 · VIX ×0.20<br>"
+        "标普500三个月收益 ×0.30 · 距近六个月每日收盘高点 ×0.20 · VIX ×0.20<br>"
         "10Y三个月变化 ×0.15 · STLFSI ×0.10 · 10Y−3M利差 ×0.05<br>"
         "综合评分＝最强主触发 ×0.65＋加权压力广度 ×0.35"
     ),
@@ -1024,6 +1028,6 @@ render_data_freshness([
     {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
     {"name": "期限结构", "source": "FRED · DGS3MO / DGS10 / DGS30", "updated_at": "每小时缓存", "mode": "live"},
     {"name": "股票指数", "source": "FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "历史事件说明", "source": f"静态事件库；评分现场计算；回撤使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
+    {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及后续回撤均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
 ])
-render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 历史回撤：{daily_source}")
+render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 距六个月高点及历史回撤：{daily_source}")
