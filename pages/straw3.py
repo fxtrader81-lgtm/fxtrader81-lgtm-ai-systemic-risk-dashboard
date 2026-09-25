@@ -437,7 +437,7 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 # 下方面板：检测逻辑 + GPU 功率密度图
 # =========================================================
 
-lp, rp = st.columns([1, 1.5])
+lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 
 with lp:
     st.markdown(logic_panel([
@@ -532,8 +532,9 @@ with rp:
 # 页脚
 # =========================================================
 
-render_data_freshness([
-    {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "GPU适配系数", "source": "NVIDIA规格与机架功率基准", "updated_at": "2026-09", "mode": "static"},
-])
+with source_tab:
+    render_data_freshness([
+        {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},
+        {"name": "GPU适配系数", "source": "NVIDIA规格与机架功率基准", "updated_at": "2026-09", "mode": "static"},
+    ])
 render_footer("Yahoo Finance · 每小时缓存 · AOF 基准参数人工校准")

@@ -255,26 +255,30 @@ st.markdown(
     f'<tbody>{"".join(body)}</tbody></table></div></div>', unsafe_allow_html=True,
 )
 
-st.markdown(logic_panel([
+logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+with logic_tab:
+    st.markdown(logic_panel([
     {"text": "<b>信用利差（35%）</b>：实时优先采用HY OAS；长历史仅用BAA−10Y代理并明确标注，不混合口径。"},
     {"text": "<b>实际利率（30%）</b>：10Y TIPS水平占70%，三个月变化占30%，用于衡量项目NPV和真实资金成本。"},
     {"text": "<b>NFCI（25%）</b>：水平占60%，13周变化占40%；正值表示金融条件较长期平均更紧。"},
     {"text": "<b>AI融资交易温度（10%）</b>：只有可比较的最终定价与市场表现齐备时才计分。"},
     {"text": "<b>覆盖政策</b>：有效权重不足75%时输出N/A；缺失指标绝不按SAFE或零分处理。"},
-], title="⚙️ CFRI评分逻辑"), unsafe_allow_html=True)
+    ], title="⚙️ CFRI评分逻辑"), unsafe_allow_html=True)
 
-st.markdown(model_evidence_panel(
-    sample="历史表为事后选择的信用事件；独立事件数、正常时期对照样本尚未核实。",
-    validation=f"前3个月代理回放中{missed_cases}/{len(available_cases)}个可评分事件未捕捉；无可可靠展示的独立样本外命中率与置信区间。",
-    boundary="HY OAS在FRED仅保留近三年；更早事件改用不同口径的BAA−10Y代理。广泛指标不能代表单笔AI债券；外生冲击不在可预测范围内。",
-    calibration="当前切点为探索性规则，尚未完成按历史发布版本的独立样本外校准。",
-), unsafe_allow_html=True)
+with evidence_tab:
+    st.markdown(model_evidence_panel(
+        sample="历史表为事后选择的信用事件；独立事件数、正常时期对照样本尚未核实。",
+        validation=f"前3个月代理回放中{missed_cases}/{len(available_cases)}个可评分事件未捕捉；无可可靠展示的独立样本外命中率与置信区间。",
+        boundary="HY OAS在FRED仅保留近三年；更早事件改用不同口径的BAA−10Y代理。广泛指标不能代表单笔AI债券；外生冲击不在可预测范围内。",
+        calibration="当前切点为探索性规则，尚未完成按历史发布版本的独立样本外校准。",
+    ), unsafe_allow_html=True)
 
-render_data_freshness([
-    {"name": "高收益信用利差", "source": "FRED · BAMLH0A0HYM2", "updated_at": _latest_date(series["hy_oas"]), "mode": "live"},
-    {"name": "长期信用代理", "source": "FRED · BAA10Y", "updated_at": _latest_date(series["baa10y"]), "mode": "live"},
-    {"name": "实际利率", "source": "FRED · DFII10", "updated_at": _latest_date(series["real_yield"]), "mode": "live"},
-    {"name": "金融条件", "source": "FRED · NFCI", "updated_at": _latest_date(series["nfci"]), "mode": "live"},
-    {"name": "AI融资交易", "source": "SoftBank官方发行文件；待认购与二级市场数据", "updated_at": "2026-09-24", "mode": "static"},
-])
+with source_tab:
+    render_data_freshness([
+        {"name": "高收益信用利差", "source": "FRED · BAMLH0A0HYM2", "updated_at": _latest_date(series["hy_oas"]), "mode": "live"},
+        {"name": "长期信用代理", "source": "FRED · BAA10Y", "updated_at": _latest_date(series["baa10y"]), "mode": "live"},
+        {"name": "实际利率", "source": "FRED · DFII10", "updated_at": _latest_date(series["real_yield"]), "mode": "live"},
+        {"name": "金融条件", "source": "FRED · NFCI", "updated_at": _latest_date(series["nfci"]), "mode": "live"},
+        {"name": "AI融资交易", "source": "SoftBank官方发行文件；待认购与二级市场数据", "updated_at": "2026-09-24", "mode": "static"},
+    ])
 render_footer(f"{source} · 发行文件与事件驱动信息")

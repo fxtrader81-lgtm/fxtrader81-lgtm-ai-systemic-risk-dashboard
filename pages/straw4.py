@@ -488,7 +488,7 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 # 下方面板：检测逻辑 + 图表 + 反证模块
 # =========================================================
 
-lp, rp = st.columns([1, 1.5])
+lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 
 with lp:
     st.markdown(logic_panel([
@@ -597,11 +597,12 @@ with cc3:
 # 底部注释：数据说明（含EIA实时状态）
 # =========================================================
 
-render_data_freshness([
-    {"name": "美国商业电价", "source": f"EIA Open Data · ${us_price_live:.4f}/kWh", "updated_at": eia_result.get("period") or "备用值", "mode": "live" if eia_result["price_usd"] else "fallback"},
-    {"name": "核电市场信号", "source": "Yahoo Finance · CEG / VST / NEE / XLU / ICLN", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "基础设施约束", "source": "FERC · NERC · LPT采购调研", "updated_at": INFRA_DATA["updated"], "mode": "static"},
-    {"name": "GPU效率", "source": "NVIDIA官方规格", "updated_at": GPU_EFFICIENCY_DATA["updated"], "mode": "static"},
-    {"name": "中国西部电价", "source": "国家能源局 · 行业均值", "updated_at": ENERGY_COST_DATA["updated"], "mode": "static"},
-])
+with source_tab:
+    render_data_freshness([
+        {"name": "美国商业电价", "source": f"EIA Open Data · ${us_price_live:.4f}/kWh", "updated_at": eia_result.get("period") or "备用值", "mode": "live" if eia_result["price_usd"] else "fallback"},
+        {"name": "核电市场信号", "source": "Yahoo Finance · CEG / VST / NEE / XLU / ICLN", "updated_at": "每小时缓存", "mode": "live"},
+        {"name": "基础设施约束", "source": "FERC · NERC · LPT采购调研", "updated_at": INFRA_DATA["updated"], "mode": "static"},
+        {"name": "GPU效率", "source": "NVIDIA官方规格", "updated_at": GPU_EFFICIENCY_DATA["updated"], "mode": "static"},
+        {"name": "中国西部电价", "source": "国家能源局 · 行业均值", "updated_at": ENERGY_COST_DATA["updated"], "mode": "static"},
+    ])
 render_footer(f'Yahoo Finance · EIA Open Data · FERC · NERC · NVIDIA规格 · BloombergNEF（{INFRA_DATA["updated"]}）')

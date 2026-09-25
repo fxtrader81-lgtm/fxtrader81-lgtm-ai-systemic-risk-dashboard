@@ -170,7 +170,7 @@ with right:
     st.plotly_chart(_duration_figure(), use_container_width=True, config={"displayModeBar": False})
     st.caption("期限来自不同披露与行业样本，用于识别结构错配，不表示同一项目的完整现金流表。")
 
-tab1, tab2, tab3 = st.tabs(["检测逻辑", "实体与结构证据", "数据覆盖与来源"])
+tab1, tab2, tab3 = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 with tab1:
     st.markdown(logic_panel([
         {"text": "<b>期限错配（35%）</b>：合同WAL与GPU寿命、设施租约及债务尾部期限的缺口。"},

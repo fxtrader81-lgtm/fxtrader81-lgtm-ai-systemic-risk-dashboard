@@ -21,12 +21,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from copy import deepcopy
+from html import escape
+from io import StringIO
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
                            two_column_info_panel)
-from components.market_phase_note import market_phase_note
 from core.alert_engine import render_alert, render_osci_card
 from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
 from core.market_outcome_data import load_sp500_daily
@@ -53,23 +54,23 @@ load_css()
 # 股灾事件数据库（内置）
 # =========================================================
 CRASH_EVENTS = [
-    {"date": "1997-10-01", "label": "Asian Crisis", "event": "亚洲金融危机", "desc": "金融危机由东南亚扩散至香港，并冲击全球风险资产。", "kind": "金融传导"},
-    {"date": "1998-08-01", "label": "LTCM / Russia", "event": "俄罗斯违约与LTCM危机", "desc": "俄罗斯主权违约与LTCM高杠杆头寸冲击全球融资流动性。", "kind": "金融传导"},
-    {"date": "2000-03-01", "label": "Dot-com Peak", "event": "科网泡沫见顶", "desc": "美国科技股估值见顶，市场进入长期盈利与估值重估。", "kind": "估值周期"},
-    {"date": "2001-09-01", "label": "9/11 Attack", "event": "9·11袭击", "desc": "美国纽约和华盛顿遭遇恐怖袭击，股市暂停交易并于9月17日复市。", "kind": "外生冲击"},
-    {"date": "2002-10-01", "label": "Post 9/11 Bottom", "event": "科网熊市低点", "desc": "美国科技股熊市在去杠杆后接近周期底部，不属于风险发生前的预警事件。", "kind": "周期底部"},
-    {"date": "2007-08-01", "label": "Subprime Starts", "event": "次贷风险显性化", "desc": "欧美按揭相关基金暂停赎回，信用与银行间融资压力开始外溢。", "kind": "信用周期"},
-    {"date": "2008-09-01", "label": "Lehman Collapse", "event": "雷曼破产", "desc": "雷曼兄弟在美国申请破产，全球融资链与银行间信用迅速收缩。", "kind": "金融传导"},
-    {"date": "2010-05-01", "label": "Flash Crash", "event": "闪电崩盘", "desc": "美国股市盘中流动性与交易结构异常，指数短时间急跌。", "kind": "市场结构"},
-    {"date": "2011-08-01", "label": "US Downgrade", "event": "美国评级下调", "desc": "美国主权评级下调叠加欧洲债务压力，推动全球避险交易。", "kind": "政策信用"},
-    {"date": "2015-08-01", "label": "China Crash", "event": "中国市场冲击", "desc": "中国A股下跌和人民币汇率调整冲击全球风险偏好。", "kind": "跨市场传导"},
-    {"date": "2018-10-01", "label": "Fed Tightening", "event": "紧缩抛售", "desc": "美联储加息与缩表预期压缩美国股票估值。", "kind": "紧缩周期"},
-    {"date": "2020-02-01", "label": "COVID Crash", "event": "新冠冲击", "desc": "疫情由公共卫生事件演变为全球市场与流动性冲击。", "kind": "外生冲击"},
-    {"date": "2022-01-01", "label": "Rate Hike Cycle", "event": "快速加息周期", "desc": "高通胀与紧缩预期推动美国长久期资产重估。", "kind": "紧缩周期"},
-    {"date": "2023-03-01", "label": "SVB Crisis", "event": "硅谷银行事件", "desc": "美国加州硅谷银行因久期错配与存款外流倒闭，冲击区域银行。", "kind": "银行业压力"},
+    {"date": "1997-10-27", "label": "Asian Crisis", "event": "亚洲金融危机", "desc": "亚洲危机冲击美国市场；以10月27日美股大跌为观察锚点。", "kind": "金融传导", "anchor": "代表观察日"},
+    {"date": "1998-08-17", "label": "LTCM / Russia", "event": "俄罗斯违约与LTCM危机", "desc": "俄罗斯宣布债务延期偿付，随后与LTCM高杠杆头寸共同冲击全球融资流动性。", "kind": "金融传导", "anchor": "事件日"},
+    {"date": "2000-03-24", "label": "Dot-com Peak", "event": "科网泡沫见顶", "desc": "以标普500阶段性高点作为长期估值重估的观察锚点。", "kind": "估值周期", "anchor": "代表观察日"},
+    {"date": "2001-09-11", "label": "9/11 Attack", "event": "9·11袭击", "desc": "美国纽约和华盛顿遭遇恐怖袭击，股市暂停交易并于9月17日复市。", "kind": "外生冲击", "anchor": "事件日"},
+    {"date": "2002-10-09", "label": "Post 9/11 Bottom", "event": "科网熊市低点", "desc": "以熊市低点作为事后观察锚点；不属于风险发生前的预警事件。", "kind": "周期底部", "anchor": "代表观察日"},
+    {"date": "2007-08-09", "label": "Subprime Starts", "event": "次贷风险显性化", "desc": "法国巴黎银行暂停旗下基金赎回，信用与银行间融资压力开始外溢。", "kind": "信用周期", "anchor": "事件日"},
+    {"date": "2008-09-15", "label": "Lehman Collapse", "event": "雷曼破产", "desc": "雷曼兄弟在美国申请破产，全球融资链与银行间信用迅速收缩。", "kind": "金融传导", "anchor": "事件日"},
+    {"date": "2010-05-06", "label": "Flash Crash", "event": "闪电崩盘", "desc": "美国股市盘中流动性与交易结构异常，指数短时间急跌。", "kind": "市场结构", "anchor": "事件日"},
+    {"date": "2011-08-08", "label": "US Downgrade", "event": "美国评级下调", "desc": "美国主权评级于8月5日收盘后下调；以随后首个交易日观察市场反应。", "kind": "政策信用", "anchor": "首个可交易日"},
+    {"date": "2015-08-11", "label": "China Crash", "event": "中国市场冲击", "desc": "人民币汇率调整叠加A股波动，冲击全球风险偏好。", "kind": "跨市场传导", "anchor": "代表观察日"},
+    {"date": "2018-10-03", "label": "Fed Tightening", "event": "紧缩抛售", "desc": "以10月初长端利率上行和紧缩预期重估为观察锚点。", "kind": "紧缩周期", "anchor": "代表观察日"},
+    {"date": "2020-02-20", "label": "COVID Crash", "event": "新冠冲击", "desc": "以美国股市由高位转弱的日期为观察锚点；疫情本身并非单日事件。", "kind": "外生冲击", "anchor": "代表观察日"},
+    {"date": "2022-01-05", "label": "Rate Hike Cycle", "event": "快速加息周期", "desc": "以联储会议纪要公布后利率重估的日期为观察锚点；不是首次实际加息日。", "kind": "紧缩周期", "anchor": "代表观察日"},
+    {"date": "2023-03-10", "label": "SVB Crisis", "event": "硅谷银行事件", "desc": "美国加州监管机构关闭硅谷银行，冲击区域银行信用传导。", "kind": "银行业压力", "anchor": "事件日"},
 ]
 
-HISTORY_EVENTS = [(item["date"][:7], item["event"], item["desc"], item["kind"]) for item in CRASH_EVENTS]
+HISTORY_EVENTS = [(item["date"], item["event"], item["desc"], item["kind"]) for item in CRASH_EVENTS]
 
 SEVERITY_COLOR = {
     "SAFE":     "#22c55e",
@@ -99,16 +100,6 @@ STOCK_LINE = {
 SPREAD_NAME = "30Y−10Y 期限利差"
 SPREAD_COLOR = "#F8FAFC"
 
-SERIES_MARKERS = {
-    "10Y Treasury": "🟩",
-    "30Y Treasury": "🟦",
-    SPREAD_NAME: "⬜",
-    "S&P 500": "🟦",
-    "NASDAQ 100": "🟧",
-    "Dow Jones": "🟪",
-    "上证指数": "🟥",
-    "深证成指": "🟨",
-}
 NORM_FILL = {
     "10Y Treasury": "rgba(92,184,92,0.15)",
     "30Y Treasury": "rgba(88,120,255,0.15)",
@@ -165,9 +156,9 @@ def fetch_fmp_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
         df = pd.DataFrame(hist)[["date", "close"]].copy()
         df["date"] = pd.to_datetime(df["date"])
         df = df.set_index("date").sort_index()
-        monthly = df["close"].resample("ME").last()
-        monthly.name = symbol
-        return monthly
+        daily = pd.to_numeric(df["close"], errors="coerce").dropna()
+        daily.name = symbol
+        return daily
     except Exception as e:
         st.warning(f"FMP {symbol} 获取失败: {e}")
         return pd.Series(dtype=float)
@@ -176,13 +167,15 @@ def fetch_fmp_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_yf_index(ticker: str, start: str = "1994-01-01") -> pd.Series:
     try:
-        df = yf.download(ticker, start=start, interval="1mo", progress=False, auto_adjust=True)
+        df = yf.download(ticker, start=start, interval="1d", progress=False, auto_adjust=True)
         if df.empty:
             return pd.Series(dtype=float)
-        s = df["Close"].squeeze()
-        s.index = pd.to_datetime(s.index).to_period("M").to_timestamp("M")
+        s = df["Close"]
+        if isinstance(s, pd.DataFrame):
+            s = s.iloc[:, 0]
+        s.index = pd.to_datetime(s.index).tz_localize(None)
         s.name = ticker
-        return s.dropna()
+        return pd.to_numeric(s, errors="coerce").dropna().sort_index()
     except Exception as e:
         st.warning(f"yfinance {ticker} 获取失败: {e}")
         return pd.Series(dtype=float)
@@ -202,6 +195,23 @@ def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
     if not series.empty:
         return series
     return fetch_yf_index(symbol, start)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_fred_daily(series_id: str, start: str = "1994-01-01") -> pd.Series:
+    """Daily Treasury observations for charts; the scoring engine stays monthly."""
+    try:
+        response = requests.get(
+            "https://fred.stlouisfed.org/graph/fredgraph.csv",
+            params={"id": series_id, "cosd": start}, timeout=25,
+        )
+        response.raise_for_status()
+        frame = pd.read_csv(StringIO(response.text))
+        dates = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
+        values = pd.to_numeric(frame[series_id], errors="coerce")
+        return pd.Series(values.values, index=dates, name=series_id).dropna().sort_index()
+    except Exception:
+        return pd.Series(dtype=float)
 
 
 # =========================================================
@@ -389,14 +399,16 @@ def render_series_selector(scope: str, series_names: list[str], compact: bool = 
             st.session_state[key] = target
 
     st.markdown('<div class="series-selector-title">图例与显示开关</div>', unsafe_allow_html=True)
-    controls = st.columns(1 if compact else 4)
-    controls[0].checkbox("全选", key=all_key, on_change=toggle_all_series)
+    st.checkbox("全选", key=all_key, on_change=toggle_all_series)
     selected = set()
     for idx, name in enumerate(series_names):
-        col = controls[0] if compact else controls[(idx + 1) % 4]
-        label = f"{SERIES_MARKERS.get(name, '◻️')} {name}"
-        if col.checkbox(label, key=item_keys[idx]):
-            selected.add(name)
+        swatch_col, control_col = st.columns([0.3, 3], gap="small")
+        color = BOND_LINE.get(name, STOCK_LINE.get(name, SPREAD_COLOR))
+        with swatch_col:
+            st.markdown(f'<span class="series-swatch" style="background:{color}"></span>', unsafe_allow_html=True)
+        with control_col:
+            if st.checkbox(name, key=item_keys[idx]):
+                selected.add(name)
     return selected
 
 
@@ -582,7 +594,7 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
     for row in history_rows:
         month, event = row["month"], row["event"]
         severity = row.get("state", "N/A")
-        dt = pd.Period(month, freq="M").to_timestamp("M")
+        dt = pd.Timestamp(row["event_date"]) if row.get("event_date") not in (None, "N/A") else pd.Period(month, freq="M").to_timestamp("M")
         color = SEVERITY_COLOR.get(severity, "#94a3b8")
         active = month == selected_month
         hit_y = np.linspace(y_min, y_max, 81)
@@ -597,9 +609,11 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
             name=event,
             showlegend=False,
             hovertemplate=(
-                f"<b>{month} · {event}</b><br>事件当月指标状态: "
+                f"<b>{row.get('event_date', month)} · {event}</b><br>事件当月指标状态: "
                 f"{('N/A' if row.get('score') is None else str(row['score']) + '/100')} · {severity}<br>"
-                f"10Y: {row.get('y10', 'N/A')}<br>后续六个月最大回撤: {row.get('drawdown', 'N/A')}<extra></extra>"
+                f"10Y: {row.get('y10', 'N/A')}<br>六个月内最大跌幅: {row.get('drawdown', 'N/A')}"
+                f"（第{row.get('drawdown_days', 'N/A')}天）<br>首次恢复前跌幅: {row.get('initial_drawdown', 'N/A')}"
+                f"（第{row.get('initial_drawdown_days', 'N/A')}天）<extra></extra>"
             ),
         ), secondary_y=False)
         fig.add_annotation(
@@ -674,7 +688,7 @@ def render_kpi_row(y10, y30, sp500, shcomp):
              "🔴 倒挂预警" if spread_now < 0 else "期限利差正常", spread_color)
 
 
-def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
+def render_alert_system(stress, y30, sp500_daily, market_phase, daily_source, show_hist_chart=True):
     """Render the factor-07 score, evidence and historical validation."""
     y10, sp500 = stress["y10"], stress["sp500"]
     metrics = compute_alert_metrics(stress, sp500_daily)
@@ -750,7 +764,12 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
         },
     }
     conc = ALERT_CONCLUSIONS.get(master_grade, ALERT_CONCLUSIONS["WATCH"])
-    st.markdown(render_alert(master_grade, conc["title"], conc["body"]), unsafe_allow_html=True)
+    phase_detail = market_phase["detail"].rstrip("。；; ")
+    phase_copy = (
+        f'<br><small><b>辅助阶段：{escape(market_phase["label"])}</b> · '
+        f'{escape(phase_detail)}。阶段只描述当前表现，不改变四级评级。</small>'
+    )
+    st.markdown(render_alert(master_grade, conc["title"], conc["body"] + phase_copy), unsafe_allow_html=True)
 
     if show_hist_chart:
         selected_month = st.session_state.get("straw7_selected_event")
@@ -779,12 +798,13 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看详情；点击顶部事件点可锁定并突出对应事件行。颜色、评分及评级均表示事件当月的指标状态。回撤以事件月最后交易日标普500收盘价为基准，比较随后六个月内最低的日收盘价；若未跌破基准则为0%。日线缺失时显示N/A。历史压力序列按当前版本重建，可能包含修订值。</div>
+          <div class="history-help">悬停事件线查看详情；点击事件点可锁定对应事件。评分与颜色表示事件当月的指标状态，不是事前预报。两项跌幅均以观察日前一交易日的标普500日收盘价为基准：第一项取随后六个月内最低日收盘；第二项只取首次收盘恢复到基准之前的最低日收盘。天数从观察日算起；未跌破基准记0%。持续性事件使用明确标注的代表观察日。历史压力序列按当前版本重建，可能包含修订值。</div>
           <div class="history-header">
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">后续六个月最大回撤</div>
+            <div class="history-header-drawdown">六个月内最大跌幅</div>
+            <div class="history-header-drawdown">首次恢复前跌幅</div>
             <div class="history-header-score">事件当月指标状态</div>
           </div>
         """, unsafe_allow_html=True)
@@ -800,29 +820,42 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
               <div class="h-event"><b>{event}</b>
                 <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
                 <small><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
+                <small>观察锚点：{row.get('event_date', 'N/A')} · {next((e['anchor'] for e in CRASH_EVENTS if e['date'] == row.get('event_date')), '日期待确认')} · 事前基准：{row.get('baseline_date', 'N/A')} 收盘 {row.get('baseline_close', 'N/A')} 点</small>
                 <small>{row.get('scope', '')}</small>
                 <small>事件观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
-                <small class="history-calculation">{row.get('components', '该事件时点的源数据不足，未生成评分。')}</small>
+                <details class="history-calculation"><summary>查看评分计算与数据追溯</summary><div>{row.get('components', '该事件时点的源数据不足，未生成评分。')}</div></details>
               </div>
               <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
-              <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}</div>
+              <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{row.get('drawdown_date', 'N/A')} · 第{row.get('drawdown_days', 'N/A')}天</small></div>
+              <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('initial_drawdown_date', 'N/A')} · 第{row.get('initial_drawdown_days', 'N/A')}天</small></div>
               <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'} · {sev}</div>
             </div>
             """, unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
+    logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+    with logic_tab:
         st.markdown(panel("⚙️ 确认逻辑、阈值与数据口径", """
-          <div class="history-help">本风险因子识别已经传导到市场的压力，不是下跌前的预测模型。标普500三个月收益、VIX、10Y收益率三个月变化和STLFSI由时间序列计算；距近六个月高点的跌幅按最新日收盘价与过去六个月最高日收盘价计算，历史事件仅使用截至事件月末的日线；信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景。切点仍是探索性规则，当前状态不代表回调概率。</div>
+          <div class="history-help">本风险因子识别已经传导到市场的压力，不是下跌前的预测模型。标普500三个月收益、VIX、10Y收益率三个月变化和STLFSI由时间序列计算；距近六个月高点的跌幅按最新日收盘价与过去六个月最高日收盘价计算，历史事件评分仅使用截至事件月末的数据；两项事后跌幅另用观察日前一交易日基准，不进入评分。信用利差、实际利率和NFCI由“AI信贷与再融资压力”指标单独监测。综合得分采用“最强主触发 ×0.65 + 加权压力广度 ×0.35”；期限曲线仅作为低权重背景。切点仍是探索性规则，当前状态不代表回调概率。</div>
           <div class="boundary-note">⚠️ <b>边界声明</b>：该指标用于识别已发生的市场压力，无法提前预测9·11、COVID等外生冲击；外生事件应标为模型边界，不将事件月末状态改写成事前预测。</div>
         """), unsafe_allow_html=True)
-
-    st.markdown(model_evidence_panel(
-        sample="19个领先压力信号起点中，5条正例归属2008、2020、2022三轮独立下跌；不是19次独立危机。",
-        validation="2017年后21个重叠联合信号月中7个月随后回调，样本表观比例33.3%；不作为预测概率，独立样本置信区间尚不可估。",
-        boundary="三轮下跌的07月末确认均晚于标普500自近期高点下跌5%；外生冲击不在预测范围内，市场底部不纳入预警验证。",
-        calibration="当前结果足以支持分层设计，不足以确定精确阈值；历史STLFSI4存在回填，尚未完成发布版本的样本外校准。",
-    ), unsafe_allow_html=True)
+    with evidence_tab:
+        st.markdown(model_evidence_panel(
+            sample="19个领先压力信号起点中，5条正例归属2008、2020、2022三轮独立下跌；不是19次独立危机。",
+            validation="2017年后21个重叠联合信号月中7个月随后回调，样本表观比例33.3%；不作为预测概率，独立样本置信区间尚不可估。",
+            boundary="三轮下跌的07月末确认均晚于标普500自近期高点下跌5%；外生冲击不在预测范围内，市场底部不纳入预警验证。",
+            calibration="当前结果足以支持分层设计，不足以确定精确阈值；历史STLFSI4存在回填，尚未完成发布版本的样本外校准。",
+        ), unsafe_allow_html=True)
+    with source_tab:
+        render_data_freshness([
+            {"name": "金融市场压力", "source": "FRED · STLFSI4", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "期限结构", "source": "FRED · DGS3MO / DGS10 / DGS30", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "股票指数", "source": "每日收盘价：FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及两项事后跌幅均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
+        ])
+    return history_rows
 
 
 # =========================================================
@@ -831,9 +864,15 @@ def render_alert_system(stress, y30, sp500_daily, show_hist_chart=True):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_all_data():
-    y10, y30, sp500, _macro_source = load_macro_snapshot()
+    monthly_y10, monthly_y30, _monthly_sp500, _macro_source = load_macro_snapshot()
     stress, stress_source = load_macro_stress_snapshot()
     sp500_daily, daily_source = load_sp500_daily()
+    y10 = fetch_fred_daily("DGS10")
+    y30 = fetch_fred_daily("DGS30")
+    y10 = y10 if not y10.empty else monthly_y10
+    y30 = y30 if not y30.empty else monthly_y30
+    # Do not silently substitute monthly points for a chart labeled daily.
+    sp500 = sp500_daily
     nasdaq = fetch_market_index("^IXIC", "1994-01-01")
     dow    = fetch_market_index("^DJI",  "1994-01-01")
     shcomp = fetch_yf_index("000001.SS", "1994-01-01")
@@ -896,11 +935,9 @@ st.markdown(render_osci_card(
     ),
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
 ), unsafe_allow_html=True)
-st.markdown(market_phase_note(current_market_phase), unsafe_allow_html=True)
-
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
-render_alert_system(stress, y30, sp500_daily, show_hist_chart=True)
-history_rows_by_month = {row["month"]: row for row in build_history_rows(stress, HISTORY_EVENTS, sp500_daily)}
+history_rows = render_alert_system(stress, y30, sp500_daily, current_market_phase, daily_source, show_hist_chart=True)
+history_rows_by_month = {row["month"]: row for row in history_rows}
 for event in CRASH_EVENTS:
     event["warning_state"] = history_rows_by_month.get(event["date"][:7], {}).get("state", "N/A")
 
@@ -932,33 +969,9 @@ with tab_all:
             period=period, show_crashes=show_crashes, visible_series=selected_all,
         )
         st.plotly_chart(fig_overview, use_container_width=True, key="straw7_all_overview")
-    st.caption("右侧勾选框控制折线；期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示 bps。")
+    st.caption("股指采用每日收盘价连续曲线；右侧勾选框控制折线，色块与曲线同色。期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示 bps。")
 
-    # 股灾事件索引
-    if show_crashes:
-        st.markdown("""
-        <div class="panel">
-        <div class="panel-title">📌 历史市场事件索引</div>
-        """, unsafe_allow_html=True)
-        cols = st.columns(3)
-        for i, ev in enumerate(CRASH_EVENTS):
-            event_row = history_rows_by_month.get(ev["date"][:7], {})
-            warning_state = event_row.get("state", "N/A")
-            drawdown = event_row.get("drawdown", "N/A")
-            event_score = "N/A" if event_row.get("score") is None else f'{event_row["score"]}/100'
-            color = SEVERITY_COLOR.get(warning_state, "#94a3b8")
-            with cols[i % 3]:
-                st.markdown(f"""
-                <div class="event-index-row">
-                  <div class="event-index-bar" style="background:{color};"></div>
-                  <div>
-                    <div class="event-index-title" style="color:{color};">{ev['date'][:7]} · {ev['label']}</div>
-                    <div class="event-index-copy">{event_row.get('summary', ev['desc'])}</div>
-                    <div class="event-index-meta">事件当月指标状态：{event_score} · {warning_state} · {event_validation_scope(ev['kind'])} · 后续六个月最大回撤：{drawdown}</div>
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.caption("事件索引与详细复盘已合并至上方『历史事件复盘』；点击上方事件图中的事件点可聚焦对应行。")
 
 # ─────────────────────────────────────────────
 # Tab: US
@@ -977,7 +990,7 @@ with tab_us:
             visible_series=selected_us,
         )
         st.plotly_chart(fig_us, use_container_width=True, key="straw7_us_markets")
-    st.caption("右侧勾选框控制折线；期限利差背景柱固定显示，绿色为正、红色为倒挂。")
+    st.caption("股指采用每日收盘价连续曲线；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
     st.markdown(two_column_info_panel("📖 美股 × 美债联动解读", [
         {"title": "📈 收益率上行 × 股市表现", "color_class": "blue", "body": """
@@ -1007,7 +1020,7 @@ with tab_cn:
             visible_series=selected_cn,
         )
         st.plotly_chart(fig_cn, use_container_width=True, key="straw7_cn_markets")
-    st.caption("右侧勾选框控制折线；期限利差背景柱固定显示，绿色为正、红色为倒挂。")
+    st.caption("股指采用每日收盘价连续曲线；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
     st.markdown(two_column_info_panel("📖 A股 × 美债联动特征", [
         {"title": "🇨🇳 A股与美债相关性特点", "color_class": "red", "body": """
@@ -1023,11 +1036,4 @@ with tab_cn:
 # =========================================================
 # 底部版权
 # =========================================================
-render_data_freshness([
-    {"name": "金融市场压力", "source": "FRED · STLFSI4", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "期限结构", "source": "FRED · DGS3MO / DGS10 / DGS30", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "股票指数", "source": "FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及后续回撤均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
-])
-render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 距六个月高点及历史回撤：{daily_source}")
+render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 距六个月高点及两项历史跌幅：{daily_source}")

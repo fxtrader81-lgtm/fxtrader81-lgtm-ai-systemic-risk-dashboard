@@ -447,7 +447,7 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 # 下方面板：检测逻辑 + 数据图表
 # =========================================================
 
-lp, rp = st.columns([1, 1.5])
+lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 
 with lp:
     st.markdown(logic_panel([
@@ -568,9 +568,10 @@ st.markdown(note_panel("⚠ 静态基准数据说明（能力代差指标）", f
     Benchmark 追平不等于商业崩塌，企业迁移滞后周期约 12–18 个月。
 """), unsafe_allow_html=True)
 
-render_data_freshness([
-    {"name": "模型价格", "source": "OpenRouter API", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "开发者生态", "source": "GitHub REST · Hugging Face API", "updated_at": "每小时缓存", "mode": "live"},
-    {"name": "能力基准", "source": "季度人工复核", "updated_at": BENCHMARK_DATA["closed"]["updated"], "mode": "static"},
-])
+with source_tab:
+    render_data_freshness([
+        {"name": "模型价格", "source": "OpenRouter API", "updated_at": "每小时缓存", "mode": "live"},
+        {"name": "开发者生态", "source": "GitHub REST · Hugging Face API", "updated_at": "每小时缓存", "mode": "live"},
+        {"name": "能力基准", "source": "季度人工复核", "updated_at": BENCHMARK_DATA["closed"]["updated"], "mode": "static"},
+    ])
 render_footer(f'OpenRouter API · GitHub REST API · HuggingFace API · Benchmark 静态维护（{BENCHMARK_DATA["closed"]["updated"]}）')

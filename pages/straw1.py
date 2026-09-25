@@ -245,7 +245,7 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     st.markdown(render_alert(risk_state, alert_title, alert_body), unsafe_allow_html=True)
 
     # ===== 下方面板 =====
-    lp, rp = st.columns([1, 1.5])
+    lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 
     with lp:
         st.markdown(logic_panel([
@@ -338,10 +338,11 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         st.plotly_chart(fig, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    render_data_freshness([
-        {"name": "公司财务数据", "source": f"{data_source} · {symbol}", "updated_at": "每小时缓存", "mode": "live"},
-        {"name": "评分口径", "source": "最近两个完整财年 · 收入与资本开支", "updated_at": "随财报更新", "mode": "live"},
-    ])
+    with source_tab:
+        render_data_freshness([
+            {"name": "公司财务数据", "source": f"{data_source} · {symbol}", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "评分口径", "source": "最近两个完整财年 · 收入与资本开支", "updated_at": "随财报更新", "mode": "live"},
+        ])
     render_footer(f"{data_source} · 当前标的：{symbol}")
 
 else:

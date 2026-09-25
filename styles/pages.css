@@ -288,6 +288,9 @@
 
 .h-event small { display:block; color:var(--text-dim); font-size:13px; line-height:1.55; margin-top:5px; }
 .h-event .history-calculation { color:var(--text-muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.history-calculation { display:block; margin-top:8px; font-size:12px; }
+.history-calculation summary { cursor:pointer; color:var(--blue); font-family:inherit; font-weight:700; }
+.history-calculation > div { padding:8px 0; line-height:1.6; overflow-wrap:anywhere; }
 .history-help { color:var(--text-dim); font-size:15px; margin:-8px 0 12px; }
 .history-header { display:flex; gap:10px; padding:10px 16px; border-bottom:1px solid rgba(255,255,255,.09); color:var(--text-dim); font-size:14px; font-weight:700; }
 .history-score { flex-shrink:0; text-align:right; font-size:15px; font-weight:800; }
@@ -309,6 +312,8 @@
   width: 60px;
   text-align: right;
 }
+.h-drop small { display:block; color:var(--text-dim); font-size:11px; font-weight:500; line-height:1.4; white-space:normal; }
+.series-swatch { display:inline-block; width:18px; height:12px; border-radius:3px; margin-top:10px; border:1px solid rgba(255,255,255,.25); }
 
 .counter-card {
   background: rgba(34,197,94,0.04);
@@ -364,7 +369,8 @@
 
 .history-header-date, .history-cell-date, .history-cell-yield { width:90px; }
 .history-header-event { flex:1; }
-.history-header-drawdown, .history-cell-drawdown, .history-header-score, .history-cell-score { width:110px; text-align:right; }
+.history-header-drawdown, .history-cell-drawdown { width:130px; min-width:130px; text-align:right; }
+.history-header-score, .history-cell-score { width:110px; text-align:right; }
 .history-state-badge { display:inline-block; font-size:10px; padding:0 6px; border-radius:4px; font-weight:700; margin-left:4px; }
 .boundary-note { margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06); font-size:13px; color:var(--text-dim); line-height:1.8; }
 .boundary-note b { color:var(--text-soft); }
@@ -384,7 +390,8 @@
   .page-header-meta { text-align:left; padding-top:0; }
   .info-grid { grid-template-columns:1fr; }
   .history-header-yield, .history-cell-yield { display:none; }
-  .history-header-drawdown, .history-cell-drawdown { width:88px; }
+  .history-row, .history-header { flex-wrap:wrap; }
+  .history-header-drawdown, .history-cell-drawdown { width:106px; min-width:106px; }
   .history-header-score, .history-cell-score { width:82px; }
 }
 

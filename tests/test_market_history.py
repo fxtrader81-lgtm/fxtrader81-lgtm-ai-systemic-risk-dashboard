@@ -20,8 +20,8 @@ class MarketHistoryTests(unittest.TestCase):
         }
 
     def test_event_month_score_includes_event_month_not_later_month(self):
-        event = [("2020-02", "测试冲击", "测试描述", "金融传导")]
-        daily = pd.Series([85.0, 80.0, 70.0], index=pd.to_datetime(["2020-02-28", "2020-03-05", "2020-03-20"]))
+        event = [("2020-02-28", "测试冲击", "测试描述", "金融传导")]
+        daily = pd.Series([100.0, 85.0, 80.0, 70.0], index=pd.to_datetime(["2020-02-27", "2020-02-28", "2020-03-05", "2020-03-20"]))
         row = build_history_rows(self.stress, event, daily)[0]
         through_february = {key: value.iloc[:5] for key, value in self.stress.items()}
         expected = compute_macro_metrics(**through_february, sp500_daily=daily.loc[:"2020-02-28"])
@@ -33,7 +33,9 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertIn(row["drawdown"], row["summary"])
         self.assertIn("六个月", row["summary"])
         self.assertNotIn("phase", row)
-        self.assertEqual(row["drawdown"], "-17.65%")
+        self.assertEqual(row["drawdown"], "-30.00%")
+        self.assertEqual(row["initial_drawdown"], "-30.00%")
+        self.assertEqual(row["baseline_date"], "2020-02-27")
         self.assertLess(row["score"], compute_macro_metrics(**self.stress, sp500_daily=daily)["composite"]["score"])
 
     def test_six_month_high_uses_daily_close_not_month_end_only(self):
@@ -68,19 +70,45 @@ class MarketHistoryTests(unittest.TestCase):
             "vix": pd.Series([15.0] * 13, index=dates),
         }
         daily = pd.Series(
-            [100.0, 110.0, 70.0, 80.0, 50.0],
-            index=pd.to_datetime(["2020-06-30", "2020-07-15", "2020-07-16", "2020-12-31", "2021-01-04"]),
+            [100.0, 90.0, 110.0, 70.0, 80.0, 50.0],
+            index=pd.to_datetime(["2020-06-29", "2020-06-30", "2020-07-15", "2020-07-16", "2020-12-31", "2021-01-04"]),
         )
-        row = build_history_rows(stress, [("2020-06", "测试", "测试描述", "金融传导")], daily)[0]
+        row = build_history_rows(stress, [("2020-06-30", "测试", "测试描述", "金融传导")], daily)[0]
         self.assertEqual(row["drawdown"], "-30.00%")
 
     def test_no_drop_below_event_close_is_zero_not_future_peak_drawdown(self):
         daily = pd.Series(
-            [85.0, 110.0, 90.0],
-            index=pd.to_datetime(["2020-02-28", "2020-03-10", "2020-03-20"]),
+            [85.0, 85.0, 110.0, 90.0],
+            index=pd.to_datetime(["2020-02-27", "2020-02-28", "2020-03-10", "2020-03-20"]),
         )
-        row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")], daily)[0]
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
         self.assertEqual(row["drawdown"], "0%")
+        self.assertEqual(row["initial_drawdown"], "0%")
+
+    def test_later_decline_after_recovery_is_not_initial_event_decline(self):
+        daily = pd.Series(
+            [100.0, 90.0, 110.0, 70.0],
+            index=pd.to_datetime(["2020-02-27", "2020-02-28", "2020-03-10", "2020-03-20"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["drawdown"], "-30.00%")
+        self.assertEqual(row["initial_drawdown"], "-10.00%")
+        self.assertEqual(row["drawdown_days"], "21")
+        self.assertEqual(row["initial_drawdown_days"], "0")
+        self.assertEqual(row["recovery_date"], "2020-03-10")
+
+    def test_september_11_baseline_is_last_pre_event_trading_day(self):
+        daily = pd.Series(
+            [1092.54, 1038.77, 965.80, 1040.94, 1172.51],
+            index=pd.to_datetime(["2001-09-10", "2001-09-17", "2001-09-21", "2001-09-28", "2002-01-04"]),
+        )
+        dates = pd.date_range("2001-04-30", periods=6, freq="ME")
+        stress = {key: pd.Series([float(series.iloc[0])] * 6, index=dates) for key, series in self.stress.items()}
+        row = build_history_rows(stress, [("2001-09-11", "9·11", "", "外生冲击")], daily)[0]
+        self.assertEqual(row["baseline_date"], "2001-09-10")
+        self.assertEqual(row["drawdown"], "-11.60%")
+        self.assertEqual(row["drawdown_date"], "2001-09-21")
+        self.assertEqual(row["drawdown_days"], "10")
 
     def test_missing_daily_closes_are_unavailable(self):
         row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")])[0]
