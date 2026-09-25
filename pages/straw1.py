@@ -244,25 +244,9 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
     # ===== Alert =====
     st.markdown(render_alert(risk_state, alert_title, alert_body), unsafe_allow_html=True)
 
-    # ===== 下方面板 =====
-    lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
-
-    with lp:
-        st.markdown(logic_panel([
-            {"text": "获取最新两个财年数据：收入、资本开支"},
-            {"text": "计算收入增长率 = (本期收入 - 上期收入) / 上期收入"},
-            {"text": "计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支"},
-            {"text": "计算增速差 = 资本开支增长率 - 收入增长率"},
-            {"text": "映射风险分数：Score = clamp(25 + 250 × 增速差, 0, 100)，再按统一四级阈值判断状态：", "thresholds": [
-                ("#22c55e", "增速差 < 0%（Score < 25）", "SAFE", "green"),
-                ("#fbbf24", "0% ≤ 增速差 < 10%（25 ≤ Score < 50）", "WATCH", "yellow"),
-                ("#f97316", "10% ≤ 增速差 < 20%（50 ≤ Score < 75）", "WARNING", "orange"),
-                ("#ef4444", "增速差 ≥ 20%（Score ≥ 75）", "CRITICAL", "red"),
-            ]},
-        ]), unsafe_allow_html=True)
-
-    with rp:
-        st.markdown('<div class="panel"><div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
+    # 主图直接展示在页面中；方法、原始财年值和来源留在底部标签页。
+    with st.container(border=True):
+        st.markdown('<div class="panel-title">📈 趋势对比（最近5年）</div>', unsafe_allow_html=True)
 
         rg_list, cg_list, cy_list = [], [], []
         for i in range(1, len(final_timeline)):
@@ -336,7 +320,30 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
             )
         )
         st.plotly_chart(fig, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+
+    lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+    with lp:
+        st.markdown(logic_panel([
+            {"text": "获取最新两个财年数据：收入、资本开支"},
+            {"text": "计算收入增长率 = (本期收入 - 上期收入) / 上期收入"},
+            {"text": "计算资本开支增长率 = (本期资本开支 - 上期资本开支) / 上期资本开支"},
+            {"text": "计算增速差 = 资本开支增长率 - 收入增长率"},
+            {"text": "映射风险分数：Score = clamp(25 + 250 × 增速差, 0, 100)，再按统一四级阈值判断状态：", "thresholds": [
+                ("#22c55e", "增速差 < 0%（Score < 25）", "SAFE", "green"),
+                ("#fbbf24", "0% ≤ 增速差 < 10%（25 ≤ Score < 50）", "WATCH", "yellow"),
+                ("#f97316", "10% ≤ 增速差 < 20%（50 ≤ Score < 75）", "WARNING", "orange"),
+                ("#ef4444", "增速差 ≥ 20%（Score ≥ 75）", "CRITICAL", "red"),
+            ]},
+        ]), unsafe_allow_html=True)
+
+    with rp:
+        st.markdown('<div class="panel-title">📋 图表所用财年原始数据</div>', unsafe_allow_html=True)
+        st.dataframe([
+            {"财年": row["year"], "收入（十亿美元）": round(row["revenue"] / 1e9, 2),
+             "资本开支（十亿美元）": round(row["capex"] / 1e9, 2)}
+            for row in final_timeline
+        ], use_container_width=True, hide_index=True)
+        st.caption("按相邻财年计算增长率；图表使用这些年度原始值，未插值。")
 
     with source_tab:
         render_data_freshness([

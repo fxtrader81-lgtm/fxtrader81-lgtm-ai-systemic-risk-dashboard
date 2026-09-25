@@ -6,7 +6,6 @@ import streamlit as st
 
 from components.ui import (dashboard_conclusion, dashboard_header, load_css,
                            render_footer, source_strip)
-from components.transmission import transmission_chain_panel
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.macro_data import load_macro_stress_snapshot
@@ -56,14 +55,14 @@ def _conclusion_report(system, results):
             '若资本开支继续领先需求，这两项会放大折旧、改造和交付压力。</p>'
         ),
         (
-            '<p><b>融资结构与外部信用：</b>AI 融资结构脆弱性处于 '
-            f'<strong>{escape(_state_text(s5))}</strong>，期限错配、资本角色重叠与证券化传染是主要传导路径；'
-            f'AI信贷与再融资压力为 <strong>{escape(_state_text(s6))}</strong>，依据信用利差、实际利率与金融条件判断融资窗口。</p>'
-        ),
-        (
-            '<p><b>市场确认：</b>宏观与跨市场传导确认为 '
-            f'<strong>{escape(_state_text(s7))}</strong>，依据股票动量与回撤、VIX、利率冲击、金融市场压力与期限曲线判断。'
-            f'当前阶段为 <strong>{escape(system.get("phase", "常态监测"))}</strong>；07表示当前市场确认强度，不是未来回调概率。外生冲击仍需独立监测。</p>'
+            '<p><b>结构—信贷—市场传导：</b>融资结构脆弱性（05）为 '
+            f'<strong>{escape(_state_text(s5))}</strong>，外部信贷与再融资压力（06）为 '
+            f'<strong>{escape(_state_text(s6))}</strong>，宏观市场确认（07）为 '
+            f'<strong>{escape(_state_text(s7))}</strong>。'
+            f'当前处于 <strong>{escape(system.get("phase", "常态监测"))}</strong>；'
+            '这三层分别描述结构脆弱性、外部融资条件和市场反应；是否出现接力，需观察融资成本、股票动量、VIX与金融压力。'
+            '只有05与06均达到WARNING、且07至少达到WATCH，才触发CASCADE。'
+            '这是当前状态快照，不代表连续触发顺序或未来回调概率；外生冲击仍需独立监测。</p>'
         ),
     ]
     return "".join(paragraphs)
@@ -86,7 +85,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
-st.markdown(transmission_chain_panel(system["phase"], system["phase_nodes"]), unsafe_allow_html=True)
 
 color = STATE_COLORS.get(system["state"], "#94a3b8")
 conclusion_col, factor_col = st.columns(2, gap="medium")

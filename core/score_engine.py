@@ -130,4 +130,9 @@ def render_factor_navigation(scores: dict, results: dict | None = None) -> None:
             f'<div class="straw-bar-wrap"><div class="straw-bar-fill" style="width:{bar_w}%;background:{color};"></div></div></div>',
             unsafe_allow_html=True,
         )
-        st.page_link(FACTOR_FILES[straw_id], label=f"{label}　查看详情 →", use_container_width=True)
+        with st.container(border=True):
+            name_col, link_col = st.columns([1, 1], gap="small", vertical_alignment="center")
+            with name_col:
+                st.markdown(f'<div class="factor-native-name">{label}</div>', unsafe_allow_html=True)
+            with link_col:
+                st.page_link(FACTOR_FILES[straw_id], label="查看详情 →", use_container_width=True)

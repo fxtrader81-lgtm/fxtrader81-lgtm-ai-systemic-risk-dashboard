@@ -222,17 +222,27 @@
   background: transparent;
   border-radius: 8px 8px 0 0;
   padding: 10px 28px;
-  color: var(--text-faint);
-  font-weight: 700;
-  font-size: 14px;
+  color: #dbeafe !important;
+  opacity: 1 !important;
+  font-weight: 750;
+  font-size: 16px;
   border: 1px solid transparent;
   border-bottom: none;
   letter-spacing: 0.3px;
 }
 
+.stTabs [data-baseweb="tab"] * {
+  color: inherit !important;
+  opacity: 1 !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover { color:#ffffff !important; background:rgba(96,165,250,.07); }
+
 .stTabs [aria-selected="true"] {
   background: var(--bg-panel) !important;
-  color: var(--blue) !important;
+  color: #93c5fd !important;
   border-color: rgba(255,255,255,0.08) !important;
   border-bottom: none !important;
 }

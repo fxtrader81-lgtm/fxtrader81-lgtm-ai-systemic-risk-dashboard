@@ -211,7 +211,14 @@ for short_name, full_name, meaning, observation, role, key, unit, multiplier in 
         f'<div><strong>当前值：</strong>{escape(current)}</div>'
         f'<div><strong>观察方法：</strong>{escape(observation)}</div></div>'
     )
-st.markdown(panel("📖 图中指标说明与观察方法", '<div class="indicator-glossary">' + ''.join(glossary_rows) + '</div>'), unsafe_allow_html=True)
+st.markdown(
+    '<details class="panel indicator-disclosure">'
+    '<summary><span>📖 图中指标说明与观察方法</span>'
+    '<span class="indicator-disclosure-action"><span class="disclosure-open-label">展开查看</span>'
+    '<span class="disclosure-close-label">收起说明</span><span aria-hidden="true">⌄</span></span></summary>'
+    '<div class="indicator-glossary">' + ''.join(glossary_rows) + '</div></details>',
+    unsafe_allow_html=True,
+)
 
 deal_rows = "".join(
     f'<tr><td>{escape(item["date"])}</td><td><a href="{escape(item["source"])}" target="_blank">{escape(item["issuer"])}</a></td>'

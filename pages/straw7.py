@@ -688,7 +688,7 @@ def render_kpi_row(y10, y30, sp500, shcomp):
              "🔴 倒挂预警" if spread_now < 0 else "期限利差正常", spread_color)
 
 
-def render_alert_system(stress, y30, sp500_daily, market_phase, daily_source, show_hist_chart=True):
+def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=True):
     """Render the factor-07 score, evidence and historical validation."""
     y10, sp500 = stress["y10"], stress["sp500"]
     metrics = compute_alert_metrics(stress, sp500_daily)
@@ -834,6 +834,11 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, daily_source, sh
 
         st.markdown("</div>", unsafe_allow_html=True)
 
+    return history_rows
+
+
+def render_method_tabs(daily_source):
+    """Keep supporting method and source tabs after the main market views."""
     logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
     with logic_tab:
         st.markdown(panel("⚙️ 确认逻辑、阈值与数据口径", """
@@ -855,7 +860,6 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, daily_source, sh
             {"name": "股票指数", "source": "每日收盘价：FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
             {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及两项事后跌幅均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
         ])
-    return history_rows
 
 
 # =========================================================
@@ -936,7 +940,7 @@ st.markdown(render_osci_card(
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
 ), unsafe_allow_html=True)
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
-history_rows = render_alert_system(stress, y30, sp500_daily, current_market_phase, daily_source, show_hist_chart=True)
+history_rows = render_alert_system(stress, y30, sp500_daily, current_market_phase, show_hist_chart=True)
 history_rows_by_month = {row["month"]: row for row in history_rows}
 for event in CRASH_EVENTS:
     event["warning_state"] = history_rows_by_month.get(event["date"][:7], {}).get("state", "N/A")
@@ -1032,6 +1036,8 @@ with tab_cn:
             <b class="orange">美债快速上行</b>：人民币贬值压力加大，关注资本外流数据<br>
             <b class="blue">中美利差收窄至负</b>：资本外流压力显著增加"""},
     ]), unsafe_allow_html=True)
+
+render_method_tabs(daily_source)
 
 # =========================================================
 # 底部版权
