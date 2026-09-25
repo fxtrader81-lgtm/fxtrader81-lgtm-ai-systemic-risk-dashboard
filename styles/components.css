@@ -369,27 +369,27 @@
 [data-testid="stPageLink"] a:hover { border-color:rgba(96,165,250,.38); background:rgba(96,165,250,.07); }
 .system-score-na { color:var(--text-faint); font-size:72px; font-weight:900; line-height:1; }
 
-.market-phase-card {
-  background:linear-gradient(135deg,var(--bg-panel),var(--bg-panel-2));
-  border:1px solid var(--border-mid);
-  border-radius:18px;
-  padding:28px 32px;
-  margin-bottom:20px;
+.market-phase-note {
+  margin:8px 0 20px; padding:11px 16px;
+  border-left:3px solid #60a5fa; border-radius:0 8px 8px 0;
+  background:rgba(96,165,250,.055);
 }
-.market-phase-kicker { color:var(--text-dim); font-size:15px; font-weight:800; letter-spacing:.5px; }
-.market-phase-title { color:#f8fafc; font-size:42px; line-height:1.25; font-weight:900; margin:12px 0 8px; }
-.market-phase-detail { color:var(--text-soft); font-size:17px; line-height:1.6; }
-.market-phase-steps, .transmission-chain { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:22px; }
-.market-phase-step, .transmission-node {
+.market-phase-note-current { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 14px; line-height:1.5; }
+.market-phase-note-label { color:var(--text-muted); font-size:13px; font-weight:800; }
+.market-phase-note-current strong { color:#e2e8f0; font-size:17px; }
+.market-phase-note-current > span:last-child { color:var(--text-soft); font-size:14px; }
+.market-phase-note-scale { margin-top:4px; color:var(--text-muted); font-size:12px; line-height:1.5; }
+.transmission-chain { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:22px; }
+.transmission-node {
   border:1px solid var(--border-mid); border-radius:10px; padding:12px 14px;
   color:var(--text-dim); background:rgba(255,255,255,.025);
   font-size:15px; font-weight:700; text-align:center;
 }
-.market-phase-step.active, .transmission-node.active {
+.transmission-node.active {
   border-color:rgba(96,165,250,.65); color:#eaf2ff; background:rgba(96,165,250,.12);
 }
 .transmission-node span { padding-right:7px; color:#60a5fa; }
-.market-phase-meta, .transmission-status { color:var(--text-muted); font-size:14px; line-height:1.6; margin-top:16px; }
+.transmission-status { color:var(--text-muted); font-size:14px; line-height:1.6; margin-top:16px; }
 .transmission-panel { margin-bottom:24px; }
 .indicator-glossary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .indicator-glossary-item { border:1px solid var(--border-mid); border-radius:12px; padding:18px 20px; background:rgba(255,255,255,.025); color:var(--text-soft); font-size:15px; line-height:1.7; }
@@ -399,8 +399,7 @@
 .indicator-glossary-heading b { color:#f8fafc; font-size:19px; }
 .indicator-glossary-heading span { color:#93c5fd; font-size:13px; font-weight:800; }
 @media (max-width:700px) {
-  .market-phase-title { font-size:30px; }
-  .market-phase-steps, .transmission-chain { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .transmission-chain { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .indicator-glossary { grid-template-columns:1fr; }
 }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }

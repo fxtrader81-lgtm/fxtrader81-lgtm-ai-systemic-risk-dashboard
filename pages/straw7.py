@@ -26,7 +26,7 @@ from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
                            two_column_info_panel)
-from components.transmission import market_phase_card
+from components.market_phase_note import market_phase_note
 from core.alert_engine import render_alert, render_osci_card
 from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
 from core.market_outcome_data import load_sp500_daily
@@ -892,8 +892,7 @@ st.markdown(render_osci_card(
     ),
     score_display="N/A" if top_composite["score"] is None else f"{top_composite['score']:.1f}",
 ), unsafe_allow_html=True)
-st.markdown(market_phase_card(current_market_phase, top_composite["score"],
-                              top_composite["grade"], top_composite["coverage"]), unsafe_allow_html=True)
+st.markdown(market_phase_note(current_market_phase), unsafe_allow_html=True)
 
 # 预警系统统一放在综合评分卡下方，不再在各市场 Tab 中重复展示。
 render_alert_system(stress, y30, sp500_daily, show_hist_chart=True)
