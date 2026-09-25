@@ -434,12 +434,10 @@ alert = alert_map.get(state, alert_map["WATCH"])
 st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
-# 下方面板：检测逻辑 + GPU 功率密度图
+# GPU 功率密度图直接展示；方法和精确数据留在底部标签页。
 # =========================================================
 
-lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
-
-with lp:
+def _render_detection_logic():
     st.markdown(logic_panel([
         {"text": "<b>AOF 资产淘汰系数（×0.25）</b>：当前主流GPU机柜功率 ÷ 老机房设计上限，倍数越高代表存量机房技术性报废越严重", "thresholds": [
             ("#22c55e", "AOF < 1.5x", "SAFE", "green"),
@@ -457,8 +455,8 @@ with lp:
         {"text": "<b>电力压力（×0.15）</b>：NEE/SO 相对强弱，电力需求旺盛是功率密度危机的物理证据"},
     ]), unsafe_allow_html=True)
 
-with rp:
-    st.markdown('<div class="panel"><div class="panel-title">⚡ GPU 功率密度代际跃迁（单机柜 kW）</div>', unsafe_allow_html=True)
+with st.container(border=True):
+    st.markdown('<div class="panel-title">⚡ GPU 功率密度代际跃迁（单机柜 kW）</div>', unsafe_allow_html=True)
 
     gens     = [g["gen"]          for g in GPU_GENERATIONS]
     rack_mid = [(g["rack_kw_min"] + g["rack_kw_max"]) / 2 for g in GPU_GENERATIONS]
@@ -525,13 +523,22 @@ with rp:
   <div class="legend-item"><div class="legend-dot legend-dot-current"></div>最新一代（在售）</div>
   <div class="legend-item"><div class="legend-dot legend-dot-roadmap"></div>下一代（路线图）</div>
 </div>
-</div>
 """, unsafe_allow_html=True)
 
 # =========================================================
 # 页脚
 # =========================================================
 
+logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+with logic_tab:
+    _render_detection_logic()
+with evidence_tab:
+    st.markdown('<div class="panel-title">📋 GPU 单机柜功率基准</div>', unsafe_allow_html=True)
+    st.dataframe([
+        {"GPU 世代": row["gen"], "功率下限（kW）": row["rack_kw_min"],
+         "功率上限（kW）": row["rack_kw_max"], "状态": row["status"]}
+        for row in GPU_GENERATIONS
+    ], use_container_width=True, hide_index=True)
 with source_tab:
     render_data_freshness([
         {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},

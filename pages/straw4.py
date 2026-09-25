@@ -485,12 +485,10 @@ alert = alert_map.get(state, alert_map["WATCH"])
 st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
-# 下方面板：检测逻辑 + 图表 + 反证模块
+# 评分构成图直接展示；检测方法和分项值留在底部标签页。
 # =========================================================
 
-lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
-
-with lp:
+def _render_detection_logic():
     st.markdown(logic_panel([
         {"text": "<b>基础设施约束（×0.40）</b>：并网排队周期（45%权重）+ 变压器交期（30%）+ 电网储备率（25%）。物理瓶颈是最难用钱解决的约束。", "thresholds": [
             ("#22c55e", "排队 <12月 · 储备率 >20%", "SAFE", "green"),
@@ -506,8 +504,8 @@ with lp:
         {"text": "<b>市场信号（×0.15）</b>：核电（CEG/VST）股价在52周区间的位置。市场对电力稀缺性的实时定价。"},
     ]), unsafe_allow_html=True)
 
-with rp:
-    st.markdown('<div class="panel"><div class="panel-title">📊 ESRI分项评分构成 · 能源风险传导链</div>', unsafe_allow_html=True)
+with st.container(border=True):
+    st.markdown('<div class="panel-title">📊 ESRI分项评分构成 · 能源风险传导链</div>', unsafe_allow_html=True)
 
     categories = ["基础设施约束", "能源成本压力", "GPU效率对冲", "市场信号"]
     scores     = [infra_s, cost_s, efficiency_s, market_s]
@@ -562,7 +560,6 @@ with rp:
         f'<span class="source-tag-gray">{ceg_pos_str}</span>',
         f'<span class="source-tag-gray">{vst_pos_str}</span>',
     ]), unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # =========================================================
 # 反证模块
@@ -597,6 +594,16 @@ with cc3:
 # 底部注释：数据说明（含EIA实时状态）
 # =========================================================
 
+logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+with logic_tab:
+    _render_detection_logic()
+with evidence_tab:
+    st.markdown('<div class="panel-title">📋 ESRI 分项原始评分</div>', unsafe_allow_html=True)
+    st.dataframe([
+        {"指标": category, "权重": f"{weight:.0%}", "分项评分": round(score, 1),
+         "加权贡献": round(score * weight, 1)}
+        for category, weight, score in zip(categories, weights, scores)
+    ], use_container_width=True, hide_index=True)
 with source_tab:
     render_data_freshness([
         {"name": "美国商业电价", "source": f"EIA Open Data · ${us_price_live:.4f}/kWh", "updated_at": eia_result.get("period") or "备用值", "mode": "live" if eia_result["price_usd"] else "fallback"},

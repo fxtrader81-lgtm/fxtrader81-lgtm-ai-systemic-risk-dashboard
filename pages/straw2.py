@@ -444,12 +444,10 @@ alert = alert_map.get(state, alert_map["WATCH"])
 st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
 # =========================================================
-# 下方面板：检测逻辑 + 数据图表
+# 主图直接展示；计算方法与原始分项值留在底部标签页。
 # =========================================================
 
-lp, rp, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
-
-with lp:
+def _render_detection_logic():
     st.markdown(logic_panel([
         {"text": "<b>能力代差（×0.20）</b>：对比闭源与开源顶级模型在 MMLU、HumanEval、MATH 三项 benchmark 的均值差距", "thresholds": [
             ("#22c55e", "代差 > 12%", "SAFE", "green"),
@@ -467,8 +465,8 @@ with lp:
         {"text": "<b>生态速度（×0.15）</b>：HuggingFace 顶级开源模型下载量，反映市场渗透加速度"},
     ]), unsafe_allow_html=True)
 
-with rp:
-    st.markdown('<div class="panel"><div class="panel-title">📊 指标分项评分（OSCI 构成）</div>', unsafe_allow_html=True)
+with st.container(border=True):
+    st.markdown('<div class="panel-title">📊 指标分项评分（OSCI 构成）</div>', unsafe_allow_html=True)
 
     categories = ["能力代差", "价格压缩", "部署动能", "生态速度"]
     scores     = [cap_s, price_s, deploy_s, vel_s]
@@ -546,8 +544,6 @@ with rp:
         f'<span class="source-tag-gray">{src_llama}</span>',
     ]), unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
 # =========================================================
 # 页脚
 # =========================================================
@@ -567,6 +563,17 @@ st.markdown(note_panel("⚠ 静态基准数据说明（能力代差指标）", f
     <b>权重说明：</b>能力代差仅占 OSCI 权重的 20%，且上限压至 60 分（商业粘性缓冲）。
     Benchmark 追平不等于商业崩塌，企业迁移滞后周期约 12–18 个月。
 """), unsafe_allow_html=True)
+
+logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+with logic_tab:
+    _render_detection_logic()
+with evidence_tab:
+    st.markdown('<div class="panel-title">📋 OSCI 分项原始评分</div>', unsafe_allow_html=True)
+    st.dataframe([
+        {"指标": category, "权重": f"{weight:.0%}", "分项评分": round(score, 1),
+         "加权贡献": round(score * weight, 1)}
+        for category, weight, score in zip(categories, weights, scores)
+    ], use_container_width=True, hide_index=True)
 
 with source_tab:
     render_data_freshness([
