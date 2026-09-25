@@ -3,7 +3,7 @@ import requests
 import yfinance as yf
 import plotly.graph_objects as go
 from config.api_keys import FMP_API_KEY, FMP_BASE
-from components.ui import load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
+from components.ui import evidence_table, load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card, score_to_state
 from core.factor_registry import straw1_score
 from core.score_engine import register_score
@@ -337,13 +337,13 @@ if isinstance(income, list) and isinstance(cash, list) and len(income) >= 2:
         ]), unsafe_allow_html=True)
 
     with rp:
-        st.markdown('<div class="panel-title">📋 图表所用财年原始数据</div>', unsafe_allow_html=True)
-        st.dataframe([
-            {"财年": row["year"], "收入（十亿美元）": round(row["revenue"] / 1e9, 2),
-             "资本开支（十亿美元）": round(row["capex"] / 1e9, 2)}
-            for row in final_timeline
-        ], use_container_width=True, hide_index=True)
-        st.caption("按相邻财年计算增长率；图表使用这些年度原始值，未插值。")
+        st.markdown(evidence_table(
+            "📋 图表所用财年原始数据",
+            ["财年", "收入（十亿美元）", "资本开支（十亿美元）"],
+            [(row["year"], f'{row["revenue"] / 1e9:.2f}', f'{row["capex"] / 1e9:.2f}')
+             for row in final_timeline],
+            "按相邻财年计算增长率；图表使用这些年度原始值，未插值。",
+        ), unsafe_allow_html=True)
 
     with source_tab:
         render_data_freshness([

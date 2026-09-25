@@ -116,6 +116,21 @@ def panel(title: str, body: str, *, extra_class: str = "") -> str:
     return f'<div class="{classes}">{title_html}{body}</div>'
 
 
+def evidence_table(title: str, columns: list[str], rows: list[tuple], note: str = "") -> str:
+    """Render small source-value tables with the same dark panel style as the dashboard."""
+    header = "".join(f'<th scope="col">{escape(str(value))}</th>' for value in columns)
+    body = "".join(
+        "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in row) + "</tr>"
+        for row in rows
+    )
+    note_html = f'<div class="metric-sub evidence-table-note">{escape(note)}</div>' if note else ""
+    return panel(
+        title,
+        '<div class="table-scroll"><table class="gpu-table evidence-table">'
+        f'<thead><tr>{header}</tr></thead><tbody>{body}</tbody></table></div>{note_html}',
+    )
+
+
 # ---- 检测逻辑步骤 --------------------------------------------
 
 def logic_step(num: int, text: str) -> str:

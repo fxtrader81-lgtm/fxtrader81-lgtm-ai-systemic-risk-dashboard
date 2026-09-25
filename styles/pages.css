@@ -439,6 +439,19 @@
   border-bottom: none;
 }
 
+.table-scroll .evidence-table { min-width: 560px; }
+.evidence-table th {
+  color: #cbd5e1;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  border-bottom-color: rgba(148, 163, 184, 0.22);
+}
+.evidence-table td { color: #e2e8f0; font-size: 14px; }
+.evidence-table tbody tr:nth-child(odd) { background: rgba(148, 163, 184, 0.045); }
+.evidence-table tbody tr:hover { background: rgba(96, 165, 250, 0.08); }
+.evidence-table-note { margin-top: 12px; }
+
 .gpu-gen-active {
   color: var(--yellow);
   font-weight: 700;

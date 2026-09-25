@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import plotly.graph_objects as go
-from components.ui import (load_css, logic_panel, metric_card, note_panel,
+from components.ui import (evidence_table, load_css, logic_panel, metric_card, note_panel,
                            render_data_freshness, render_footer, render_header,
                            source_tag_row)
 from core.alert_engine import render_alert, render_osci_card
@@ -568,12 +568,12 @@ logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史�
 with logic_tab:
     _render_detection_logic()
 with evidence_tab:
-    st.markdown('<div class="panel-title">📋 OSCI 分项原始评分</div>', unsafe_allow_html=True)
-    st.dataframe([
-        {"指标": category, "权重": f"{weight:.0%}", "分项评分": round(score, 1),
-         "加权贡献": round(score * weight, 1)}
-        for category, weight, score in zip(categories, weights, scores)
-    ], use_container_width=True, hide_index=True)
+    st.markdown(evidence_table(
+        "📋 OSCI 分项原始评分",
+        ["指标", "权重", "分项评分", "加权贡献"],
+        [(category, f"{weight:.0%}", f"{score:.1f}", f"{score * weight:.1f}")
+         for category, weight, score in zip(categories, weights, scores)],
+    ), unsafe_allow_html=True)
 
 with source_tab:
     render_data_freshness([

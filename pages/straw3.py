@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from components.ui import load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
+from components.ui import evidence_table, load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 
@@ -533,12 +533,14 @@ logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史�
 with logic_tab:
     _render_detection_logic()
 with evidence_tab:
-    st.markdown('<div class="panel-title">📋 GPU 单机柜功率基准</div>', unsafe_allow_html=True)
-    st.dataframe([
-        {"GPU 世代": row["gen"], "功率下限（kW）": row["rack_kw_min"],
-         "功率上限（kW）": row["rack_kw_max"], "状态": row["status"]}
-        for row in GPU_GENERATIONS
-    ], use_container_width=True, hide_index=True)
+    status_labels = {"legacy": "历史世代（已淘汰）", "active": "当前主力部署",
+                     "current": "最新一代（在售）", "next": "下一代（路线图）"}
+    st.markdown(evidence_table(
+        "📋 GPU 单机柜功率基准",
+        ["GPU 世代", "功率下限（kW）", "功率上限（kW）", "状态"],
+        [(row["gen"].replace("\n", " "), row["rack_kw_min"], row["rack_kw_max"],
+          status_labels[row["status"]]) for row in GPU_GENERATIONS],
+    ), unsafe_allow_html=True)
 with source_tab:
     render_data_freshness([
         {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},
