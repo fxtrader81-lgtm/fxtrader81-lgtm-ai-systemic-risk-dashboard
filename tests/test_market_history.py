@@ -84,6 +84,23 @@ class MarketHistoryTests(unittest.TestCase):
         row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
         self.assertEqual(row["drawdown"], "0%")
         self.assertEqual(row["initial_drawdown"], "0%")
+        self.assertEqual(row["drawdown_days"], "—")
+        self.assertEqual(row["recovery_duration"], "未跌破基准")
+        self.assertIn("没有一天收盘跌破该基准", row["summary"])
+
+    def test_drawdown_magnitude_and_recovery_duration_are_distinct(self):
+        daily = pd.Series(
+            [100.0, 90.0, 70.0, 101.0],
+            index=pd.to_datetime(["2020-02-27", "2020-02-28", "2020-03-05", "2020-03-12"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["drawdown"], "-30.00%")
+        self.assertEqual(row["drawdown_formula"], "70.00 ÷ 100.00 − 1 = -30.00%")
+        self.assertEqual(row["drawdown_days"], "6")
+        self.assertEqual(row["recovery_after_trough_date"], "2020-03-12")
+        self.assertEqual(row["recovery_duration"], "13天")
+        self.assertEqual(row["window_end_label"], "最后可用交易日")
+        self.assertIn("观察日后第6个自然日", row["summary"])
 
     def test_later_decline_after_recovery_is_not_initial_event_decline(self):
         daily = pd.Series(
@@ -96,6 +113,8 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertEqual(row["drawdown_days"], "21")
         self.assertEqual(row["initial_drawdown_days"], "0")
         self.assertEqual(row["recovery_date"], "2020-03-10")
+        self.assertTrue(row["later_episode"])
+        self.assertIn("后续另一段下跌", row["summary"])
 
     def test_september_11_baseline_is_last_pre_event_trading_day(self):
         daily = pd.Series(
@@ -109,6 +128,62 @@ class MarketHistoryTests(unittest.TestCase):
         self.assertEqual(row["drawdown"], "-11.60%")
         self.assertEqual(row["drawdown_date"], "2001-09-21")
         self.assertEqual(row["drawdown_days"], "10")
+
+    def test_dot_com_example_uses_fixed_pre_event_close_not_one_day_loss(self):
+        daily = pd.Series(
+            [1527.35, 1527.46, 1356.56, 1448.72],
+            index=pd.to_datetime(["2000-03-23", "2000-03-24", "2000-04-14", "2000-09-22"]),
+        )
+        dates = pd.date_range("1999-10-31", periods=6, freq="ME")
+        stress = {key: pd.Series([float(series.iloc[0])] * 6, index=dates) for key, series in self.stress.items()}
+        row = build_history_rows(stress, [("2000-03-24", "科网泡沫见顶", "", "估值周期")], daily)[0]
+        self.assertEqual(row["baseline_close"], "1,527.35")
+        self.assertEqual(row["drawdown"], "-11.18%")
+        self.assertEqual(row["initial_drawdown"], "-11.18%")
+        self.assertEqual(row["drawdown_days"], "21")
+        self.assertEqual(row["recovery_duration"], "六个月内未收复")
+        self.assertEqual(row["window_end_date"], "2000-09-22")
+        self.assertEqual(row["window_end_close"], "1,448.72")
+        self.assertEqual(row["window_end_return"], "-5.15%")
+        self.assertIn("2000-03-24为观察日", row["summary"])
+        self.assertIn("2000-03-23标普500收于1,527.35点", row["summary"])
+        self.assertIn("观察日后第21个自然日", row["summary"])
+        self.assertIn("六个月观察期最后交易日2000-09-22收于1,448.72点", row["summary"])
+        self.assertIn("仍未收复", row["summary"])
+        self.assertEqual(row["first_breach_date"], "2000-04-14")
+
+    def test_first_recovery_requires_a_prior_close_below_baseline(self):
+        daily = pd.Series(
+            [100.0, 110.0, 105.0, 95.0, 100.0, 112.0],
+            index=pd.to_datetime(["2020-02-27", "2020-02-28", "2020-03-02", "2020-03-03", "2020-03-04", "2020-03-05"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["first_breach_date"], "2020-03-03")
+        self.assertEqual(row["recovery_date"], "2020-03-04")
+        self.assertEqual(row["first_underwater_days"], "1个自然日后收复")
+        self.assertEqual(row["initial_drawdown"], "-5.00%")
+        self.assertEqual(row["new_high_date"], "2020-02-28")
+
+    def test_recovered_baseline_does_not_imply_new_six_month_high(self):
+        daily = pd.Series(
+            [120.0, 100.0, 80.0, 100.0, 105.0],
+            index=pd.to_datetime(["2020-01-15", "2020-02-27", "2020-02-28", "2020-03-10", "2020-04-01"]),
+        )
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["recovery_date"], "2020-03-10")
+        self.assertEqual(row["new_high_date"], "—")
+        self.assertIn("未超过事前六个月最高收盘", row["summary"])
+
+    def test_four_month_delayed_first_breach_is_not_attributed(self):
+        dates = pd.bdate_range("2020-02-28", "2020-07-01")
+        daily = pd.Series([100.0] + [101.0] * (len(dates) - 2) + [82.0], index=dates)
+        daily.loc[pd.Timestamp("2020-02-27")] = 100.0
+        daily = daily.sort_index()
+        row = build_history_rows(self.stress, [("2020-02-28", "测试", "", "金融传导")], daily)[0]
+        self.assertEqual(row["drawdown"], "-18.00%")
+        self.assertEqual(row["first_breach_date"], "2020-07-01")
+        self.assertIn("较晚出现，不能直接归因", row["breach_timing"])
+        self.assertEqual(row["recovery_date"], "未恢复")
 
     def test_missing_daily_closes_are_unavailable(self):
         row = build_history_rows(self.stress, [("2020-02", "测试", "", "金融传导")])[0]

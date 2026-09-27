@@ -301,6 +301,7 @@
 }
 
 .h-event small { display:block; color:var(--text-dim); font-size:13px; line-height:1.55; margin-top:5px; }
+.h-event .event-path-summary { color:var(--text-soft); font-size:14px; line-height:1.7; }
 .h-event .history-calculation { color:var(--text-muted); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 .history-calculation { display:block; margin-top:8px; font-size:12px; }
 .history-calculation summary { cursor:pointer; color:var(--blue); font-family:inherit; font-weight:700; }

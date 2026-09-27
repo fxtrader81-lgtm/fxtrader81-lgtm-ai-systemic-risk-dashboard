@@ -65,27 +65,137 @@ def build_history_rows(
             baseline_date = prior.index[-1] if not prior.empty else None
             outcome_end = anchor_date + pd.DateOffset(months=6)
             event_window = daily[(daily.index >= anchor_date) & (daily.index <= outcome_end)]
+            prior_six_months = prior[prior.index >= anchor_date - pd.DateOffset(months=6)]
         else:
             baseline, baseline_date, event_window = np.nan, None, pd.Series(dtype=float)
+            prior_six_months = pd.Series(dtype=float)
 
         def outcome(segment: pd.Series) -> tuple[str, str, str]:
             if segment.empty or not np.isfinite(baseline):
                 return "N/A", "N/A", "N/A"
             low_date = segment.idxmin()
             loss = min(0.0, float(segment.loc[low_date] / baseline - 1))
-            loss_text = "0%" if loss == 0 else f"{loss:.2%}"
+            if loss == 0:
+                return "0%", "—", "—"
+            loss_text = f"{loss:.2%}"
             return loss_text, low_date.strftime("%Y-%m-%d"), str((low_date - anchor_date).days)
 
         drawdown_text, drawdown_date, drawdown_days = outcome(event_window)
+        if drawdown_text not in {"N/A", "0%"}:
+            trough_date = pd.Timestamp(drawdown_date)
+            trough_close = float(event_window.loc[trough_date])
+            recovered_after_trough = event_window[
+                (event_window.index > trough_date) & (event_window >= baseline)
+            ]
+            recovery_after_trough = recovered_after_trough.index[0] if not recovered_after_trough.empty else None
+            recovery_duration = (
+                f"{(recovery_after_trough - anchor_date).days}天"
+                if recovery_after_trough is not None else "六个月内未收复"
+            )
+            drawdown_formula = f"{trough_close:,.2f} ÷ {baseline:,.2f} − 1 = {drawdown_text}"
+        else:
+            recovery_after_trough = None
+            recovery_duration = "未跌破基准" if drawdown_text == "0%" else "N/A"
+            drawdown_formula = "未跌破基准，记0%" if drawdown_text == "0%" else "日收盘数据不足"
+        first_breach_date = None
+        first_breach_session = None
         if not event_window.empty and np.isfinite(baseline):
-            recovered = event_window[event_window >= baseline]
-            recovery_date = recovered.index[0] if not recovered.empty else None
-            initial_window = event_window[event_window.index < recovery_date] if recovery_date is not None else event_window
+            first_breach = event_window[event_window < baseline]
+            if first_breach.empty:
+                recovery_date, initial_window = None, pd.Series(dtype=float)
+            else:
+                first_breach_date = first_breach.index[0]
+                first_breach_session = int(event_window.index.get_loc(first_breach_date)) + 1
+                recovered = event_window[(event_window.index > first_breach_date) & (event_window >= baseline)]
+                recovery_date = recovered.index[0] if not recovered.empty else None
+                initial_window = event_window[event_window.index >= first_breach_date]
+                if recovery_date is not None:
+                    initial_window = initial_window[initial_window.index < recovery_date]
         else:
             recovery_date, initial_window = None, pd.Series(dtype=float)
         initial_text, initial_date, initial_days = outcome(initial_window)
-        if recovery_date is not None and initial_window.empty:
+        if not event_window.empty and np.isfinite(baseline) and first_breach.empty:
             initial_text, initial_date, initial_days = "0%", "—", "—"
+
+        if first_breach_date is None:
+            breach_timing = "未跌破事前基准" if not event_window.empty and np.isfinite(baseline) else "N/A"
+            first_underwater_days = "—"
+        else:
+            # These are descriptive buckets, not an estimate of causal impact.
+            timing = "短期观察窗" if first_breach_session <= 5 else (
+                "传导观察窗" if first_breach_session <= 20 else "较晚出现，不能直接归因于该事件"
+            )
+            breach_timing = f"第{first_breach_session}个有数据的交易日首次跌破（{timing}）"
+            first_underwater_days = (
+                f"{(recovery_date - first_breach_date).days}个自然日后收复"
+                if recovery_date is not None else
+                f"截至{event_window.index[-1]:%Y-%m-%d}已持续{(event_window.index[-1] - first_breach_date).days}个自然日，仍未收复"
+            )
+        later_episode = recovery_date is not None and drawdown_date not in {"N/A", "—"} and pd.Timestamp(drawdown_date) > recovery_date
+        if not prior_six_months.empty and not event_window.empty:
+            prior_peak_date = prior_six_months.idxmax()
+            prior_peak_close = float(prior_six_months.loc[prior_peak_date])
+            higher = event_window[event_window > prior_peak_close]
+            new_high_date = higher.index[0] if not higher.empty else None
+            new_high_status = (
+                f"曾于{new_high_date:%Y-%m-%d}超过事前六个月最高收盘"
+                if new_high_date is not None else "未超过事前六个月最高收盘"
+            )
+        else:
+            prior_peak_date, prior_peak_close, new_high_date = None, np.nan, None
+            new_high_status = "N/A"
+
+        if event_window.empty or not np.isfinite(baseline):
+            window_end_date, window_end_close, window_end_return = "N/A", "N/A", "N/A"
+            window_end_label = "观察期末"
+            path_summary = f"{description}缺少事前基准或后续日收盘价，无法计算事件后六个月的跌幅和期末位置。"
+            hover_summary = "事前基准或后续日收盘数据不足，无法计算六个月市场路径。"
+        else:
+            last_date = event_window.index[-1]
+            last_close = float(event_window.iloc[-1])
+            window_end_date = last_date.strftime("%Y-%m-%d")
+            window_end_close = f"{last_close:,.2f}"
+            window_end_return = f"{last_close / baseline - 1:+.2%}"
+            complete_window = outcome_end - last_date <= pd.Timedelta(days=7)
+            window_end_label = "六个月观察期最后交易日" if complete_window else "最后可用交易日"
+            end_position = (
+                f"高于基准{last_close / baseline - 1:.2%}" if last_close > baseline
+                else f"低于基准{1 - last_close / baseline:.2%}" if last_close < baseline
+                else "恰好回到基准"
+            )
+            baseline_story = (
+                f"以{event_date}为观察日，前一交易日{baseline_date:%Y-%m-%d}"
+                f"标普500收于{baseline:,.2f}点，作为固定基准。"
+            )
+            end_story = f"{window_end_label}{window_end_date}收于{window_end_close}点，{end_position}。"
+            if drawdown_text == "0%":
+                path_summary = f"{description}{baseline_story}观察窗口内没有一天收盘跌破该基准；{new_high_status}。{end_story}"
+                hover_summary = f"事前基准{baseline:,.2f}点（{baseline_date:%Y-%m-%d}）<br>观察期内未跌破基准；{new_high_status}<br>{window_end_label}{window_end_date}：{window_end_close}点，{end_position}"
+            else:
+                recovery_story = (
+                    f"首次跌破发生于{first_breach_date:%Y-%m-%d}，{breach_timing}；"
+                    + f"首轮低于基准状态：{first_underwater_days}；"
+                    + f"首轮最深跌幅{initial_text}。"
+                )
+                if later_episode:
+                    recovery_story += "六个月最低点出现在首次收复之后，属于后续另一段下跌，不能自动归因于原事件。"
+                elif recovery_after_trough is None:
+                    recovery_story += "六个月最低点之后在观察期内未重新收复基准。"
+                recovery_story += f"{new_high_status}。"
+                path_summary = (
+                    f"{description}{baseline_story}观察日后第{drawdown_days}个自然日"
+                    f"（{drawdown_date}）收于{trough_close:,.2f}点，"
+                    f"为随后六个月的最低日收盘，较事前基准下跌{abs(trough_close / baseline - 1):.2%}（{drawdown_text}）。"
+                    f"{recovery_story}{end_story}"
+                )
+                hover_summary = (
+                    f"事前基准{baseline:,.2f}点（{baseline_date:%Y-%m-%d}）<br>"
+                    f"第{drawdown_days}个自然日触及六个月最低收盘{trough_close:,.2f}点，"
+                    f"相对基准{drawdown_text}<br>"
+                    f"首次跌破：{first_breach_date:%Y-%m-%d}（{breach_timing}）；"
+                    f"首次收复：{recovery_date.strftime('%Y-%m-%d') if recovery_date is not None else '观察期内未收复'}<br>"
+                    f"{new_high_status}；{window_end_label}{window_end_date}：{window_end_close}点，{end_position}"
+                )
         components = []
         for key, definition in COMPONENTS.items():
             if key not in metrics:
@@ -112,19 +222,31 @@ def build_history_rows(
             "drawdown": drawdown_text,
             "drawdown_date": drawdown_date,
             "drawdown_days": drawdown_days,
+            "drawdown_formula": drawdown_formula,
+            "recovery_after_trough_date": recovery_after_trough.strftime("%Y-%m-%d") if recovery_after_trough is not None else "—",
+            "recovery_duration": recovery_duration,
+            "window_end_date": window_end_date,
+            "window_end_close": window_end_close,
+            "window_end_return": window_end_return,
+            "window_end_label": window_end_label,
+            "hover_summary": hover_summary,
             "initial_drawdown": initial_text,
             "initial_drawdown_date": initial_date,
             "initial_drawdown_days": initial_days,
+            "first_breach_date": first_breach_date.strftime("%Y-%m-%d") if first_breach_date is not None else "—",
+            "first_breach_session": first_breach_session,
+            "breach_timing": breach_timing,
+            "first_underwater_days": first_underwater_days,
+            "later_episode": later_episode,
+            "prior_peak_date": prior_peak_date.strftime("%Y-%m-%d") if prior_peak_date is not None else "N/A",
+            "prior_peak_close": f"{prior_peak_close:,.2f}" if np.isfinite(prior_peak_close) else "N/A",
+            "new_high_date": new_high_date.strftime("%Y-%m-%d") if new_high_date is not None else "—",
+            "new_high_status": new_high_status,
             "event_date": event_date if anchor_date is not None else "N/A",
             "baseline_date": baseline_date.strftime("%Y-%m-%d") if baseline_date is not None else "N/A",
             "baseline_close": f"{baseline:,.2f}" if np.isfinite(baseline) else "N/A",
             "recovery_date": recovery_date.strftime("%Y-%m-%d") if recovery_date is not None else "未恢复",
-            "summary": (
-                f'{description} 以观察日前一交易日收盘价为基准，六个月内相对基准最大跌幅'
-                f'{drawdown_text}（第{drawdown_days}天）；首次恢复前跌幅{initial_text}'
-                f'{f"（第{initial_days}天）" if initial_days != "—" else ""}。'
-                if drawdown_text != "N/A" else description
-            ),
+            "summary": path_summary,
             "score": composite["score"],
             "state": composite["grade"],
             "coverage": composite["coverage"],

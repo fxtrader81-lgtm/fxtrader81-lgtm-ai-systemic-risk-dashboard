@@ -611,9 +611,10 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
             hovertemplate=(
                 f"<b>{row.get('event_date', month)} · {event}</b><br>事件当月指标状态: "
                 f"{('N/A' if row.get('score') is None else str(row['score']) + '/100')} · {severity}<br>"
-                f"10Y: {row.get('y10', 'N/A')}<br>六个月内最大跌幅: {row.get('drawdown', 'N/A')}"
-                f"（第{row.get('drawdown_days', 'N/A')}天）<br>首次恢复前跌幅: {row.get('initial_drawdown', 'N/A')}"
-                f"（第{row.get('initial_drawdown_days', 'N/A')}天）<extra></extra>"
+                f"{row.get('hover_summary', '事件后日收盘数据不足。')}<br>"
+                f"首轮跌破区间最深跌幅：{row.get('initial_drawdown', 'N/A')}；"
+                f"首轮收复：{row.get('first_underwater_days', 'N/A')}"
+                f"<extra></extra>"
             ),
         ), secondary_y=False)
         fig.add_annotation(
@@ -798,13 +799,13 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
         st.markdown("""
         <div class="panel">
           <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看详情；点击事件点可锁定对应事件。评分与颜色表示事件当月的指标状态，不是事前预报。两项跌幅均以观察日前一交易日的标普500日收盘价为基准：第一项取随后六个月内最低日收盘；第二项只取首次收盘恢复到基准之前的最低日收盘。天数从观察日算起；未跌破基准记0%。持续性事件使用明确标注的代表观察日。历史压力序列按当前版本重建，可能包含修订值。</div>
+          <div class="history-help">悬停事件线查看市场路径；点击事件点可锁定对应事件。事前基准＝观察日前一交易日的标普500日收盘；「六个月内相对基准最深跌幅」＝六个月内最低日收盘÷基准−1，触底历时不是连续下跌时长。「首轮跌破区间」从首次日收盘低于基准开始，到首次日收盘重新达到基准结束；若未收复，持续时间截至最后可用交易日。创新高单独指超过观察日前六个月最高日收盘。首次跌破在前5个有数据交易日属短期观察，第6—20日属传导观察，此后属较晚走势；这些只是展示分类，不证明事件造成下跌。六个月是价格路径观察期，不是事件影响期限。评分与颜色仅表示事件当月指标状态；持续性事件使用代表观察日；历史压力序列可能包含修订值。</div>
           <div class="history-header">
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">六个月内最大跌幅</div>
-            <div class="history-header-drawdown">首次恢复前跌幅</div>
+            <div class="history-header-drawdown">六个月相对基准最深跌幅</div>
+            <div class="history-header-drawdown">首轮跌破区间最深跌幅</div>
             <div class="history-header-score">事件当月指标状态</div>
           </div>
         """, unsafe_allow_html=True)
@@ -819,15 +820,16 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
               <div class="h-date history-cell-date">{date}</div>
               <div class="h-event"><b>{event}</b>
                 <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
-                <small><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
-                <small>观察锚点：{row.get('event_date', 'N/A')} · {next((e['anchor'] for e in CRASH_EVENTS if e['date'] == row.get('event_date')), '日期待确认')} · 事前基准：{row.get('baseline_date', 'N/A')} 收盘 {row.get('baseline_close', 'N/A')} 点</small>
+                <small class="event-path-summary"><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
+                <small>观察日类型：{next((e['anchor'] for e in CRASH_EVENTS if e['date'] == row.get('event_date')), '日期待确认')}</small>
                 <small>{row.get('scope', '')}</small>
                 <small>事件观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
+                <details class="history-calculation"><summary>查看跌幅计算与数据追溯</summary><div>以{row.get('event_date', 'N/A')}为观察日，事前交易日{row.get('baseline_date', 'N/A')}收盘{row.get('baseline_close', 'N/A')}点；六个月内最低日收盘 ÷ 固定基准 − 1：{row.get('drawdown_formula', 'N/A')}；六个月最低日：{row.get('drawdown_date', 'N/A')}。首次跌破：{row.get('first_breach_date', 'N/A')}（{row.get('breach_timing', 'N/A')}）；首次收复：{row.get('recovery_date', 'N/A')}；首轮低于基准时长：{row.get('first_underwater_days', 'N/A')}；首轮最深跌幅：{row.get('initial_drawdown', 'N/A')}。事前六个月最高收盘：{row.get('prior_peak_close', 'N/A')}点（{row.get('prior_peak_date', 'N/A')}）；{row.get('new_high_status', 'N/A')}。{row.get('window_end_label', '观察期末')}{row.get('window_end_date', 'N/A')}收盘{row.get('window_end_close', 'N/A')}点（相对基准{row.get('window_end_return', 'N/A')}）。后续再次下跌不自动归因于原事件。</div></details>
                 <details class="history-calculation"><summary>查看评分计算与数据追溯</summary><div>{row.get('components', '该事件时点的源数据不足，未生成评分。')}</div></details>
               </div>
               <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
-              <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{row.get('drawdown_date', 'N/A')} · 第{row.get('drawdown_days', 'N/A')}天</small></div>
-              <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('initial_drawdown_date', 'N/A')} · 第{row.get('initial_drawdown_days', 'N/A')}天</small></div>
+              <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{'未跌破事前基准' if row.get('drawdown_days') in ('—', 'N/A', None) else '第' + str(row['drawdown_days']) + '个自然日触及最低收盘'}<br>期末{row.get('window_end_close', 'N/A')}点</small></div>
+              <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('first_underwater_days', 'N/A')}<br>{'曾超过事前六个月高点' if row.get('new_high_date') not in ('—', 'N/A', None) else '未超过事前六个月高点' if row.get('new_high_status') != 'N/A' else '高点数据不足'}</small></div>
               <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'} · {sev}</div>
             </div>
             """, unsafe_allow_html=True)
