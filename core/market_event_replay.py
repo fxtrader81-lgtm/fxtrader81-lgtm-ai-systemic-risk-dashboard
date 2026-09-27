@@ -125,7 +125,7 @@ def build_history_rows(
             timing = "短期观察窗" if first_breach_session <= 5 else (
                 "传导观察窗" if first_breach_session <= 20 else "较晚出现，不能直接归因于该事件"
             )
-            breach_timing = f"第{first_breach_session}个有数据的交易日首次跌破（{timing}）"
+            breach_timing = f"观察日后第{first_breach_session}个有数据交易日（{timing}）"
             first_underwater_days = (
                 f"{(recovery_date - first_breach_date).days}个自然日后收复"
                 if recovery_date is not None else

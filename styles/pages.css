@@ -391,6 +391,22 @@
 .history-header-score, .history-cell-score { width:130px; flex-shrink:0; text-align:right; }
 .history-header-score { text-align:center; white-space:nowrap; }
 .history-state-badge { display:inline-block; font-size:10px; padding:0 6px; border-radius:4px; font-weight:700; margin-left:4px; }
+@media (max-width: 1450px) {
+  .history-header { display:none; }
+  .history-row { flex-wrap:wrap; align-items:flex-start; gap:12px; }
+  .history-cell-date { width:80px; }
+  .history-row .h-event { flex:1 1 calc(100% - 100px); min-width:0; }
+  .history-cell-yield, .history-cell-drawdown, .history-cell-score {
+    flex:1 1 145px; width:auto; min-width:130px; text-align:left;
+  }
+  .history-cell-yield::before, .history-cell-drawdown::before, .history-cell-score::before {
+    display:block; margin-bottom:4px; color:var(--text-dim); font-size:11px; font-weight:600;
+  }
+  .history-cell-yield::before { content:"10Y收益率"; }
+  .history-cell-drawdown:nth-last-child(3)::before { content:"六个月相对基准最深跌幅"; }
+  .history-cell-drawdown:nth-last-child(2)::before { content:"首轮跌破区间最深跌幅"; }
+  .history-cell-score::before { content:"事件当月指标状态"; }
+}
 .boundary-note { margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,.06); font-size:13px; color:var(--text-dim); line-height:1.8; }
 .boundary-note b { color:var(--text-soft); }
 .model-evidence-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; }
