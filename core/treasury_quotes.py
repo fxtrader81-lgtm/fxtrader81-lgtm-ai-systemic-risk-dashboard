@@ -53,3 +53,18 @@ def fetch_latest_treasury_quote(ticker: str) -> TreasuryQuote:
         return TreasuryQuote(value, observed_at)
     except Exception:
         return TreasuryQuote()
+
+
+def aligned_spread_bps(y10: TreasuryQuote, y30: TreasuryQuote) -> float | None:
+    """Return a current 30Y−10Y spread only for comparable quote times."""
+    if (
+        y10.yield_pct is None or y30.yield_pct is None
+        or y10.observed_at is None or y30.observed_at is None
+    ):
+        return None
+    eastern = "America/New_York"
+    if y10.observed_at.tz_convert(eastern).date() != y30.observed_at.tz_convert(eastern).date():
+        return None
+    if abs(y10.observed_at - y30.observed_at) > pd.Timedelta(minutes=15):
+        return None
+    return (y30.yield_pct - y10.yield_pct) * 100

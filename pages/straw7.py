@@ -35,7 +35,7 @@ from core.macro_risk import COMPONENTS, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
 from core.market_event_replay import build_history_rows, event_validation_scope
 from core.score_engine import register_score
-from core.treasury_quotes import TreasuryQuote, fetch_latest_treasury_quote
+from core.treasury_quotes import TreasuryQuote, aligned_spread_bps, fetch_latest_treasury_quote
 
 # =========================================================
 # 页面配置
@@ -365,7 +365,7 @@ def add_spread_background(fig, y10, y30, period):
         marker=dict(color=colors, line=dict(width=0)),
         opacity=0.92,
         showlegend=False,
-        hovertemplate="30Y−10Y利差: %{customdata:.1f} bps<extra></extra>",
+        hovertemplate="%{x|%Y-%m-%d}<br>历史30Y−10Y利差: %{customdata:.1f} bps<extra></extra>",
     ))
     fig.data[-1].update(yaxis="y3")
 
@@ -563,7 +563,7 @@ def build_spread_chart(y10, y30, period):
     fig.add_trace(go.Bar(
         x=spread.index, y=spread.values,
         marker_color=colors, name="30Y-10Y利差",
-        hovertemplate="利差: %{y:.1f} bps<extra></extra>",
+        hovertemplate="%{x|%Y-%m-%d}<br>历史30Y−10Y利差: %{y:.1f} bps<extra></extra>",
     ))
     fig.add_hline(y=0, line_color="rgba(255,255,255,0.3)", line_width=1)
     layout = dict(**PLOTLY_LAYOUT)
@@ -664,37 +664,57 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
 # 可复用组件
 # =========================================================
 
+def render_market_note(message: str) -> None:
+    """Readable supporting copy on the dark market page."""
+    st.markdown(f'<div class="market-note">{message}</div>', unsafe_allow_html=True)
+
+
 def render_kpi_row(y10_quote: TreasuryQuote, y30_quote: TreasuryQuote, sp500, shcomp):
     c1, c2, c3, c4, c5 = st.columns(5)
 
-    def kpi_card(col, label, value, sub, color_cls):
+    def quote_asof(quote: TreasuryQuote) -> str:
+        if quote.observed_at is None or quote.yield_pct is None:
+            return "报价时间不可用"
+        return f"报价 {quote.observed_at.tz_convert('America/New_York'):%Y-%m-%d %H:%M} ET"
+
+    def close_asof(series: pd.Series) -> str:
+        return f"日线日期 {pd.Timestamp(series.index[-1]):%Y-%m-%d}" if not series.empty else "数据日期不可用"
+
+    def kpi_card(col, label, value, sub, color_cls, asof):
         with col:
-            st.markdown(metric_card(label, value, color_cls, "", sub, extra_class="metric-card-compact"),
-                        unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-card metric-card-compact market-kpi-card">
+              <div class="market-kpi-asof">{asof}</div>
+              <div class="metric-label">{label}</div>
+              <div class="metric-row"><span class="metric-number {color_cls}">{value}</span></div>
+              <div class="metric-desc">{sub}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     y10_now = f"{y10_quote.yield_pct:.3f}%" if y10_quote.yield_pct is not None else "N/A"
     y30_now = f"{y30_quote.yield_pct:.3f}%" if y30_quote.yield_pct is not None else "N/A"
-    sp_now  = f"{sp500.iloc[-1]:,.0f}" if not sp500.empty else "N/A"
-    sh_now  = f"{shcomp.iloc[-1]:,.0f}" if not shcomp.empty else "N/A"
+    sp_now  = f"{sp500.iloc[-1]:,.2f}" if not sp500.empty else "N/A"
+    sh_now  = f"{shcomp.iloc[-1]:,.2f}" if not shcomp.empty else "N/A"
 
-    quote_pair_aligned = (
-        y10_quote.yield_pct is not None and y30_quote.yield_pct is not None
-        and y10_quote.observed_at is not None and y30_quote.observed_at is not None
-        and y10_quote.observed_at.date() == y30_quote.observed_at.date()
-        and abs(y10_quote.observed_at - y30_quote.observed_at) <= pd.Timedelta(minutes=15)
+    spread_now = aligned_spread_bps(y10_quote, y30_quote)
+    spread_asof = (
+        f"报价 {max(y10_quote.observed_at, y30_quote.observed_at).tz_convert('America/New_York'):%Y-%m-%d %H:%M} ET"
+        if spread_now is not None else "同步报价不可用"
     )
-    spread_now = (y30_quote.yield_pct - y10_quote.yield_pct) * 100 if quote_pair_aligned else None
 
-    kpi_card(c1, "10Y Treasury", y10_now, f"收益率 · {y10_quote.label}",
-             "green" if y10_quote.yield_pct is not None and y10_quote.yield_pct < 4 else "orange" if y10_quote.yield_pct is not None else "gray")
-    kpi_card(c2, "30Y Treasury", y30_now, f"收益率 · {y30_quote.label}",
-             "green" if y30_quote.yield_pct is not None and y30_quote.yield_pct < 4.5 else "orange" if y30_quote.yield_pct is not None else "gray")
-    kpi_card(c3, "S&P 500", sp_now, "标普500指数", "blue")
-    kpi_card(c4, "上证指数", sh_now, "Shanghai Composite", "red")
+    kpi_card(c1, "10Y Treasury", y10_now, "当前可得收益率 · Yahoo/Cboe",
+             "green" if y10_quote.yield_pct is not None and y10_quote.yield_pct < 4 else "orange" if y10_quote.yield_pct is not None else "gray",
+             quote_asof(y10_quote))
+    kpi_card(c2, "30Y Treasury", y30_now, "当前可得收益率 · Yahoo/Cboe",
+             "green" if y30_quote.yield_pct is not None and y30_quote.yield_pct < 4.5 else "orange" if y30_quote.yield_pct is not None else "gray",
+             quote_asof(y30_quote))
+    kpi_card(c3, "S&P 500", sp_now, "标普500日线最新值 · 盘中可能变动", "blue", close_asof(sp500))
+    kpi_card(c4, "上证指数", sh_now, "上证指数日线最新值 · 盘中可能变动", "red", close_asof(shcomp))
 
     spread_color = "green" if spread_now is not None and spread_now > 20 else ("yellow" if spread_now is not None and spread_now > 0 else "red" if spread_now is not None else "gray")
-    kpi_card(c5, "30Y-10Y利差", f"{spread_now:+.0f}bps" if spread_now is not None else "N/A",
-             "报价时间相差≤15分钟" if spread_now is not None else "两端报价未同步，暂不计算", spread_color)
+    kpi_card(c5, "30Y-10Y利差", f"{spread_now:+.1f}bps" if spread_now is not None else "N/A",
+             "当前报价利差 · 非历史图末值" if spread_now is not None else "两端报价未同步，暂不计算",
+             spread_color, spread_asof)
 
 
 def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=True):
@@ -812,9 +832,9 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
             <div class="history-header-date">时间</div>
             <div class="history-header-event">事件与计算依据</div>
             <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">六个月相对基准最深跌幅</div>
-            <div class="history-header-drawdown">首轮跌破区间最深跌幅</div>
-            <div class="history-header-score">事件当月指标状态</div>
+            <div class="history-header-drawdown">六个月相对基准<br>最深跌幅</div>
+            <div class="history-header-drawdown">首轮跌破区间<br>最深跌幅</div>
+            <div class="history-header-score">事件当月<br>指标状态</div>
           </div>
         """, unsafe_allow_html=True)
 
@@ -838,7 +858,7 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
               <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
               <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{'未跌破事前基准' if row.get('drawdown_days') in ('—', 'N/A', None) else '第' + str(row['drawdown_days']) + '个自然日触及最低收盘'}<br>期末{row.get('window_end_close', 'N/A')}点</small></div>
               <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('first_underwater_days', 'N/A')}<br>{'曾超过事前六个月高点' if row.get('new_high_date') not in ('—', 'N/A', None) else '未超过事前六个月高点' if row.get('new_high_status') != 'N/A' else '高点数据不足'}</small></div>
-              <div class="history-score history-cell-score" style="color:{color};">{'N/A' if row.get('score') is None else f'{row["score"]}/100'} · {sev}</div>
+              <div class="history-score history-cell-score" style="color:{color};"><strong>{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</strong><span>{sev}</span></div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -967,11 +987,19 @@ history_through = (
     if last_10y_day is not None and last_30y_day is not None
     else "历史日线有缺失，请核对数据来源。"
 )
-st.caption(
+render_market_note(
     "10Y/30Y卡片为每次刷新重新获取的最近可得收益率报价（Yahoo/Cboe，可能延迟；以各卡片时间戳为准），"
     "不是国债债券价格。历史曲线为FRED每日发布的DGS10/DGS30恒定期限收益率；两种来源不拼接，"
     f"FRED未发布的交易日或30Y历史停发期间保留空缺。{history_through}"
 )
+historical_spread = treasury_spread(y10, y30, period)
+if not historical_spread.empty:
+    historical_day = pd.Timestamp(historical_spread.index[-1])
+    render_market_note(
+        "利差口径：上方卡片是卡片所示报价时间的当前30Y−10Y利差；图表柱形是每日FRED观察值。"
+        f"当前图示范围最后一个历史观察日为{historical_day:%Y-%m-%d}，利差{historical_spread.iloc[-1] * 100:+.1f}bps；"
+        "悬停其他日期时显示的是该日历史值，因此可与卡片数值不同。"
+    )
 
 st.markdown(spacer("md"), unsafe_allow_html=True)
 
@@ -998,9 +1026,9 @@ with tab_all:
             period=period, show_crashes=show_crashes, visible_series=selected_all,
         )
         st.plotly_chart(fig_overview, use_container_width=True, key="straw7_all_overview")
-    st.caption("股指采用每日收盘价连续曲线；右侧勾选框控制折线，色块与曲线同色。期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示 bps。")
+    render_market_note("股指采用日线连续曲线（已收市为收盘价，当日未收市则为暂值）；右侧勾选框控制折线，色块与曲线同色。期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示该日 bps。")
 
-    st.caption("事件索引与详细复盘已合并至上方『历史事件复盘』；点击上方事件图中的事件点可聚焦对应行。")
+    render_market_note("事件索引与详细复盘已合并至上方『历史事件复盘』；点击上方事件图中的事件点可聚焦对应行。")
 
 # ─────────────────────────────────────────────
 # Tab: US
@@ -1019,7 +1047,7 @@ with tab_us:
             visible_series=selected_us,
         )
         st.plotly_chart(fig_us, use_container_width=True, key="straw7_us_markets")
-    st.caption("股指采用每日收盘价连续曲线；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
+    render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
     st.markdown(two_column_info_panel("📖 美股 × 美债联动解读", [
         {"title": "📈 收益率上行 × 股市表现", "color_class": "blue", "body": """
@@ -1049,7 +1077,7 @@ with tab_cn:
             visible_series=selected_cn,
         )
         st.plotly_chart(fig_cn, use_container_width=True, key="straw7_cn_markets")
-    st.caption("股指采用每日收盘价连续曲线；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
+    render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
     st.markdown(two_column_info_panel("📖 A股 × 美债联动特征", [
         {"title": "🇨🇳 A股与美债相关性特点", "color_class": "red", "body": """

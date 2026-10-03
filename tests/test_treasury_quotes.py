@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from core.treasury_quotes import TreasuryQuote, fetch_latest_treasury_quote
+from core.treasury_quotes import TreasuryQuote, aligned_spread_bps, fetch_latest_treasury_quote
 
 
 class TreasuryQuoteTests(unittest.TestCase):
@@ -47,6 +47,14 @@ class TreasuryQuoteTests(unittest.TestCase):
     def test_unknown_ticker_is_rejected(self):
         with self.assertRaises(ValueError):
             fetch_latest_treasury_quote("^GSPC")
+
+    def test_current_spread_uses_synchronized_quotes_only(self):
+        observed = pd.Timestamp("2026-10-02 14:00", tz="America/New_York")
+        y10 = TreasuryQuote(5.277, observed)
+        y30 = TreasuryQuote(5.630, observed + pd.Timedelta(minutes=5))
+        self.assertAlmostEqual(aligned_spread_bps(y10, y30), 35.3)
+        self.assertIsNone(aligned_spread_bps(y10, TreasuryQuote(5.630, observed + pd.Timedelta(minutes=16))))
+        self.assertIsNone(aligned_spread_bps(y10, TreasuryQuote()))
 
 
 if __name__ == "__main__":
