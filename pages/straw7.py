@@ -29,12 +29,13 @@ from components.ui import (load_css, metric_card, model_evidence_panel, panel, r
                            render_footer, render_header, spacer,
                            two_column_info_panel)
 from core.alert_engine import render_alert, render_osci_card
-from core.macro_data import load_macro_snapshot, load_macro_stress_snapshot
+from core.macro_data import load_macro_stress_snapshot
 from core.market_outcome_data import load_sp500_daily
 from core.macro_risk import COMPONENTS, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
 from core.market_event_replay import build_history_rows, event_validation_scope
 from core.score_engine import register_score
+from core.treasury_quotes import TreasuryQuote, fetch_latest_treasury_quote
 
 # =========================================================
 # 页面配置
@@ -199,7 +200,7 @@ def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fred_daily(series_id: str, start: str = "1994-01-01") -> pd.Series:
-    """Daily Treasury observations for charts; the scoring engine stays monthly."""
+    """Daily Treasury observations for charts; preserve true source gaps."""
     try:
         response = requests.get(
             "https://fred.stlouisfed.org/graph/fredgraph.csv",
@@ -209,7 +210,8 @@ def fetch_fred_daily(series_id: str, start: str = "1994-01-01") -> pd.Series:
         frame = pd.read_csv(StringIO(response.text))
         dates = pd.to_datetime(frame.iloc[:, 0], errors="coerce")
         values = pd.to_numeric(frame[series_id], errors="coerce")
-        return pd.Series(values.values, index=dates, name=series_id).dropna().sort_index()
+        observations = pd.Series(values.values, index=dates, name=series_id)
+        return observations[observations.index.notna()].sort_index()
     except Exception:
         return pd.Series(dtype=float)
 
@@ -431,11 +433,12 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
             continue
         if series.empty:
             continue
-        s = filter_by_period(series, period).dropna()
-        if s.empty:
+        s = filter_by_period(series, period)
+        if s.dropna().empty:
             continue
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name=name,
+            connectgaps=False,
             fill="tozeroy",
             fillcolor=BOND_FILL[name],
             line=dict(color=BOND_LINE[name], width=1.6),
@@ -499,9 +502,12 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
             continue
         if series.empty:
             continue
-        s = filter_by_period(series, period).dropna()
+        s = filter_by_period(series, period)
+        if s.dropna().empty:
+            continue
         fig.add_trace(go.Scatter(
             x=s.index, y=s.values, name=name,
+            connectgaps=False,
             fill="tozeroy",
             fillcolor=BOND_FILL[name],
             line=dict(color=BOND_LINE[name], width=1.6),
@@ -658,7 +664,7 @@ def build_alert_history_chart(y10, sp500, period, history_rows, selected_month=N
 # 可复用组件
 # =========================================================
 
-def render_kpi_row(y10, y30, sp500, shcomp):
+def render_kpi_row(y10_quote: TreasuryQuote, y30_quote: TreasuryQuote, sp500, shcomp):
     c1, c2, c3, c4, c5 = st.columns(5)
 
     def kpi_card(col, label, value, sub, color_cls):
@@ -666,27 +672,29 @@ def render_kpi_row(y10, y30, sp500, shcomp):
             st.markdown(metric_card(label, value, color_cls, "", sub, extra_class="metric-card-compact"),
                         unsafe_allow_html=True)
 
-    y10_now = f"{y10.iloc[-1]:.2f}%" if not y10.empty else "N/A"
-    y30_now = f"{y30.iloc[-1]:.2f}%" if not y30.empty else "N/A"
+    y10_now = f"{y10_quote.yield_pct:.3f}%" if y10_quote.yield_pct is not None else "N/A"
+    y30_now = f"{y30_quote.yield_pct:.3f}%" if y30_quote.yield_pct is not None else "N/A"
     sp_now  = f"{sp500.iloc[-1]:,.0f}" if not sp500.empty else "N/A"
     sh_now  = f"{shcomp.iloc[-1]:,.0f}" if not shcomp.empty else "N/A"
 
-    spread_now = 0.0
-    if not y10.empty and not y30.empty:
-        common = y10.index.intersection(y30.index)
-        if len(common):
-            spread_now = (y30.loc[common[-1]] - y10.loc[common[-1]]) * 100
+    quote_pair_aligned = (
+        y10_quote.yield_pct is not None and y30_quote.yield_pct is not None
+        and y10_quote.observed_at is not None and y30_quote.observed_at is not None
+        and y10_quote.observed_at.date() == y30_quote.observed_at.date()
+        and abs(y10_quote.observed_at - y30_quote.observed_at) <= pd.Timedelta(minutes=15)
+    )
+    spread_now = (y30_quote.yield_pct - y10_quote.yield_pct) * 100 if quote_pair_aligned else None
 
-    kpi_card(c1, "10Y Treasury", y10_now, "美国10年期国债收益率",
-             "green" if not y10.empty and y10.iloc[-1] < 4 else "orange")
-    kpi_card(c2, "30Y Treasury", y30_now, "美国30年期国债收益率",
-             "green" if not y30.empty and y30.iloc[-1] < 4.5 else "orange")
+    kpi_card(c1, "10Y Treasury", y10_now, f"收益率 · {y10_quote.label}",
+             "green" if y10_quote.yield_pct is not None and y10_quote.yield_pct < 4 else "orange" if y10_quote.yield_pct is not None else "gray")
+    kpi_card(c2, "30Y Treasury", y30_now, f"收益率 · {y30_quote.label}",
+             "green" if y30_quote.yield_pct is not None and y30_quote.yield_pct < 4.5 else "orange" if y30_quote.yield_pct is not None else "gray")
     kpi_card(c3, "S&P 500", sp_now, "标普500指数", "blue")
     kpi_card(c4, "上证指数", sh_now, "Shanghai Composite", "red")
 
-    spread_color = "green" if spread_now > 20 else ("yellow" if spread_now > 0 else "red")
-    kpi_card(c5, "30Y-10Y利差", f"{spread_now:+.0f}bps",
-             "🔴 倒挂预警" if spread_now < 0 else "期限利差正常", spread_color)
+    spread_color = "green" if spread_now is not None and spread_now > 20 else ("yellow" if spread_now is not None and spread_now > 0 else "red" if spread_now is not None else "gray")
+    kpi_card(c5, "30Y-10Y利差", f"{spread_now:+.0f}bps" if spread_now is not None else "N/A",
+             "报价时间相差≤15分钟" if spread_now is not None else "两端报价未同步，暂不计算", spread_color)
 
 
 def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=True):
@@ -858,7 +866,8 @@ def render_method_tabs(daily_source):
         render_data_freshness([
             {"name": "金融市场压力", "source": "FRED · STLFSI4", "updated_at": "每小时缓存", "mode": "live"},
             {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
-            {"name": "期限结构", "source": "FRED · DGS3MO / DGS10 / DGS30", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "10Y/30Y当前收益率", "source": "Yahoo Finance · Cboe ^TNX / ^TYX；最近分钟报价，不保证零延迟", "updated_at": "每次页面刷新重新请求；以卡片时间戳为准", "mode": "live"},
+            {"name": "国债历史收益率", "source": "FRED · DGS10 / DGS30；日度观察值，非盘中报价", "updated_at": "日度发布；页面缓存最多1小时，手动刷新清缓存", "mode": "live"},
             {"name": "股票指数", "source": "每日收盘价：FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
             {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及两项事后跌幅均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
         ])
@@ -870,14 +879,11 @@ def render_method_tabs(daily_source):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_all_data():
-    monthly_y10, monthly_y30, _monthly_sp500, _macro_source = load_macro_snapshot()
     stress, stress_source = load_macro_stress_snapshot()
     sp500_daily, daily_source = load_sp500_daily()
     y10 = fetch_fred_daily("DGS10")
     y30 = fetch_fred_daily("DGS30")
-    y10 = y10 if not y10.empty else monthly_y10
-    y30 = y30 if not y30.empty else monthly_y30
-    # Do not silently substitute monthly points for a chart labeled daily.
+    # Do not substitute monthly fallback points into curves labelled daily.
     sp500 = sp500_daily
     nasdaq = fetch_market_index("^IXIC", "1994-01-01")
     dow    = fetch_market_index("^DJI",  "1994-01-01")
@@ -916,6 +922,11 @@ with ctrl_col3:
 
 st.markdown(spacer("xs"), unsafe_allow_html=True)
 
+# Uncached: each page refresh requests new 10Y/30Y quotes. The historical
+# FRED curves above remain separate daily constant-maturity observations.
+y10_quote = fetch_latest_treasury_quote("^TNX")
+y30_quote = fetch_latest_treasury_quote("^TYX")
+
 # 四级评级与评分是主结果；市场阶段仅作辅助解释。
 top_metrics = compute_alert_metrics(stress, sp500_daily)
 top_composite = top_metrics["composite"]
@@ -948,7 +959,19 @@ for event in CRASH_EVENTS:
     event["warning_state"] = history_rows_by_month.get(event["date"][:7], {}).get("state", "N/A")
 
 # KPI 行（全局共用）
-render_kpi_row(y10, y30, sp500, shcomp)
+render_kpi_row(y10_quote, y30_quote, sp500, shcomp)
+last_10y_day = y10.last_valid_index()
+last_30y_day = y30.last_valid_index()
+history_through = (
+    f"历史日线最新观察日：10Y {last_10y_day:%Y-%m-%d}；30Y {last_30y_day:%Y-%m-%d}。"
+    if last_10y_day is not None and last_30y_day is not None
+    else "历史日线有缺失，请核对数据来源。"
+)
+st.caption(
+    "10Y/30Y卡片为每次刷新重新获取的最近可得收益率报价（Yahoo/Cboe，可能延迟；以各卡片时间戳为准），"
+    "不是国债债券价格。历史曲线为FRED每日发布的DGS10/DGS30恒定期限收益率；两种来源不拼接，"
+    f"FRED未发布的交易日或30Y历史停发期间保留空缺。{history_through}"
+)
 
 st.markdown(spacer("md"), unsafe_allow_html=True)
 
@@ -1044,4 +1067,4 @@ render_method_tabs(daily_source)
 # =========================================================
 # 底部版权
 # =========================================================
-render_footer(f"FRED（STLFSI4、DGS3MO、DGS10、DGS30）· FMP（美股）· Yahoo Finance（VIX、A股）· 距六个月高点及两项历史跌幅：{daily_source}")
+render_footer(f"国债卡片：Yahoo/Cboe ^TNX/^TYX 最近报价（每次刷新）；国债历史：FRED DGS10/DGS30 日度 · FRED（STLFSI4、DGS3MO）· FMP（美股）· Yahoo Finance（VIX、A股）· 距六个月高点及两项历史跌幅：{daily_source}")

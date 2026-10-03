@@ -381,7 +381,10 @@
 .ui-spacer-md { height:16px; }
 .ui-spacer-lg { height:24px; }
 
-.metric-card-compact { height:130px; }
+.metric-card-compact { height:auto; min-height:164px; padding:14px 16px; }
+.metric-card-compact .metric-label { margin-bottom:8px; }
+.metric-card-compact .metric-row { margin-bottom:8px; }
+.metric-card-compact .metric-desc { font-size:12px !important; line-height:1.35; overflow-wrap:anywhere; }
 
 .history-header-date, .history-cell-date, .history-cell-yield { width:90px; }
 .history-header-date, .history-header-yield { flex-shrink:0; text-align:center; }
