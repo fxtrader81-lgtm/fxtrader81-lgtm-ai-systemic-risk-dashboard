@@ -23,6 +23,7 @@ from datetime import datetime, timedelta
 from copy import deepcopy
 from html import escape
 from io import StringIO
+from concurrent.futures import ThreadPoolExecutor
 import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
@@ -899,16 +900,24 @@ def render_method_tabs(daily_source):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_all_data():
-    stress, stress_source = load_macro_stress_snapshot()
-    sp500_daily, daily_source = load_sp500_daily()
-    y10 = fetch_fred_daily("DGS10")
-    y30 = fetch_fred_daily("DGS30")
+    # Independent sources can be requested together; each still has its own
+    # one-hour cache and source-specific fallback/coverage rules.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        stress_job = pool.submit(load_macro_stress_snapshot)
+        sp500_job = pool.submit(load_sp500_daily)
+        y10_job = pool.submit(fetch_fred_daily, "DGS10")
+        y30_job = pool.submit(fetch_fred_daily, "DGS30")
+        nasdaq_job = pool.submit(fetch_market_index, "^IXIC", "1994-01-01")
+        dow_job = pool.submit(fetch_market_index, "^DJI", "1994-01-01")
+        shcomp_job = pool.submit(fetch_yf_index, "000001.SS", "1994-01-01")
+        szcomp_job = pool.submit(fetch_yf_index, "399001.SZ", "1994-01-01")
+        stress, stress_source = stress_job.result()
+        sp500_daily, daily_source = sp500_job.result()
+        y10, y30 = y10_job.result(), y30_job.result()
+        nasdaq, dow = nasdaq_job.result(), dow_job.result()
+        shcomp, szcomp = shcomp_job.result(), szcomp_job.result()
     # Do not substitute monthly fallback points into curves labelled daily.
     sp500 = sp500_daily
-    nasdaq = fetch_market_index("^IXIC", "1994-01-01")
-    dow    = fetch_market_index("^DJI",  "1994-01-01")
-    shcomp = fetch_yf_index("000001.SS", "1994-01-01")
-    szcomp = fetch_yf_index("399001.SZ", "1994-01-01")
     return y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source, sp500_daily, daily_source
 
 
@@ -944,8 +953,10 @@ st.markdown(spacer("xs"), unsafe_allow_html=True)
 
 # Uncached: each page refresh requests new 10Y/30Y quotes. The historical
 # FRED curves above remain separate daily constant-maturity observations.
-y10_quote = fetch_latest_treasury_quote("^TNX")
-y30_quote = fetch_latest_treasury_quote("^TYX")
+with ThreadPoolExecutor(max_workers=2) as pool:
+    y10_quote_job = pool.submit(fetch_latest_treasury_quote, "^TNX")
+    y30_quote_job = pool.submit(fetch_latest_treasury_quote, "^TYX")
+    y10_quote, y30_quote = y10_quote_job.result(), y30_quote_job.result()
 
 # 四级评级与评分是主结果；市场阶段仅作辅助解释。
 top_metrics = compute_alert_metrics(stress, sp500_daily)

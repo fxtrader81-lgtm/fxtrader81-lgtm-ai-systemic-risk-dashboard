@@ -478,6 +478,19 @@
 }
 .evidence-table td { color: #e2e8f0; font-size: 14px; }
 .evidence-table tbody tr:nth-child(odd) { background: rgba(148, 163, 184, 0.045); }
+.credit-table { min-width: 900px; }
+.credit-table th { color: #cbd5e1; white-space: nowrap; }
+.credit-table td { vertical-align: top; line-height: 1.5; }
+.credit-table a { color: #93c5fd; text-decoration: underline; }
+.credit-note { color: #cbd5e1; line-height: 1.6; margin-top: 12px; }
+.credit-path { color: #f8fafc; line-height: 1.9; font-size: 16px; font-weight: 650; }
+.stSelectbox [data-baseweb="select"] > div {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.35) !important;
+}
+.stSelectbox [data-baseweb="select"] span,
+.stSelectbox [data-baseweb="select"] input { color: #f8fafc !important; }
 .evidence-table tbody tr:hover { background: rgba(96, 165, 250, 0.08); }
 .evidence-table-note { margin-top: 12px; }
 

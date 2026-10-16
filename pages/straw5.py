@@ -9,6 +9,7 @@ import streamlit as st
 
 from components.ui import (coverage_panel, load_css, logic_panel, metric_card,
                            render_data_freshness, render_footer, render_header)
+from components.credit_transmission_views import render_structure_evidence
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
 from core.factor_registry import load_factor_results
@@ -172,6 +173,8 @@ with right:
     st.markdown('<div class="panel-title">⏳ 期限阶梯与错配窗口</div>', unsafe_allow_html=True)
     st.plotly_chart(_duration_figure(), use_container_width=True, config={"displayModeBar": False})
     st.caption("期限来自不同披露与行业样本，用于识别结构错配，不表示同一项目的完整现金流表。")
+
+render_structure_evidence()
 
 tab1, tab2, tab3 = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 with tab1:

@@ -12,8 +12,10 @@ from plotly.subplots import make_subplots
 from components.ui import (load_css, logic_panel, metric_card, model_evidence_panel, panel,
                            render_data_freshness, render_footer, render_header,
                            spacer)
+from components.credit_transmission_views import render_credit_market_evidence
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
+from core.ai_financing_news import load_financing_news, load_softbank_financing_releases
 from core.credit_history import build_credit_history_rows
 from core.credit_risk import COMPONENTS, compute_credit_metrics
 from core.macro_data import load_credit_stress_snapshot
@@ -37,12 +39,30 @@ CREDIT_EVENTS = [
 
 AI_DEALS = [
     {
+        "date": "2026-10-01",
+        "issuer": "Sharon AI",
+        "purpose": "以GPU及相关现金流作担保，为客户合同对应的AI算力部署融资；可观察资产抵押和融资成本。",
+        "size": "3.56亿美元承诺额度；不等于已提款金额",
+        "pricing": "固定利率9.95%，不含费用；高级担保SPV债务安排",
+        "status": "公司原始公告称已签署并完成交易；提款及后续表现待核验；不计分",
+        "source": "https://sharonai.com/press-releases/sharon-ai-enters-into-gpu-backed-debt-facility-expanding-funding-flexibility-for-ai-factory-deployments/",
+    },
+    {
+        "date": "2026-09-18",
+        "issuer": "CoreWeave",
+        "purpose": "净收益预计约36.445亿美元，其中约4.988亿美元拟用于封顶看涨交易；余款用于一般公司用途。AI云运营商融资，与本页再融资条件相关。",
+        "size": "37亿美元本金；承销商另有最多5亿美元增购选择权",
+        "pricing": "2.875%可转高级债，2033年到期；初始转换价约97.85美元/股",
+        "status": "官方公告已定价；原预计9月22日结算，实际结算及二级表现待核验；不计分",
+        "source": "https://investors.coreweave.com/news/news-details/2026/CoreWeave-Prices-Upsized-3-7-Billion-Convertible-Senior-Notes-Offering/default.aspx",
+    },
+    {
         "date": "2026-09-24",
         "issuer": "SoftBank Group",
         "purpose": "美元债100亿美元及欧元债10亿欧元；主要用于OpenAI后续100亿美元投资",
-        "size": "合计约111亿美元等值；预计9月29日发行",
+        "size": "合计约111亿美元等值；官方文件载明9月29日为预计发行日",
         "pricing": "美元债3.5/5.5/7.5年票息8.625%/9.250%/9.750%；欧元债4/6年为7.125%/8.000%",
-        "status": "条款已公布；待认购及二级市场验证",
+        "status": "截至9月24日条款已公布；后续认购及二级市场数据待验证",
         "source": "https://group.softbank/en/news/press/20260924",
     }
 ]
@@ -219,18 +239,75 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-deal_rows = "".join(
-    f'<tr><td>{escape(item["date"])}</td><td><a href="{escape(item["source"])}" target="_blank">{escape(item["issuer"])}</a></td>'
+render_credit_market_evidence()
+
+try:
+    news_leads, news_checked_at = load_financing_news()
+except Exception:
+    news_leads, news_checked_at = [], None
+
+# Do not repeat a reviewed issuer announcement as an unverified RSS headline.
+news_leads = [
+    lead for lead in news_leads
+    if not any(item["date"] == lead["date"] and item["issuer"].lower() in lead["headline"].lower()
+               for item in AI_DEALS)
+    and "tesla secures $30 billion credit facility to fund ai infrastructure" not in lead["headline"].lower()
+][:5]
+
+
+def _deal_rows(items: list[dict[str, str]]) -> str:
+    return "".join(
+    f'<tr><td>{escape(item["date"])}</td><td><a href="{escape(item["source"], quote=True)}" target="_blank" rel="noopener noreferrer">{escape(item["issuer"])}</a></td>'
     f'<td>{escape(item["purpose"])}</td><td>{escape(item["size"])}</td><td>{escape(item["pricing"])}</td><td>{escape(item["status"])}</td></tr>'
-    for item in AI_DEALS
-)
+    for item in items
+    )
+
+
+deal_rows = _deal_rows(sorted(AI_DEALS, key=lambda item: item["date"], reverse=True))
 st.markdown(
-    '<div class="panel"><div class="panel-title">🏦 AI融资交易观察</div><div class="table-scroll"><table class="gpu-table"><thead><tr><th>日期</th><th>发行人</th><th>用途</th><th>规模</th><th>发行条款</th><th>状态</th></tr></thead>'
+    '<div class="panel"><div class="panel-title">🏦 已核实的AI融资事件</div>'
+    '<div class="metric-sub">条款及交易状态依据发行人原始公告；已公布、已定价、已完成及已提款各有不同，均不自动计入CFRI评分。</div>'
+    '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>日期</th><th>发行人</th><th>用途／关联</th><th>规模</th><th>发行条款</th><th>核验状态</th></tr></thead>'
     f'<tbody>{deal_rows}</tbody></table></div><div class="metric-sub">'
-    '同一发行人4月美元债3.5年及5.5年票息分别为7.625%和8.250%，本次同期限均上移100bp；'
+    'SoftBank同一发行人4月美元债3.5年及5.5年票息分别为7.625%和8.250%，9月同期限均上移100bp；'
     '票息变化不等于信用利差变化，可能含基准利率、发行时点和融资需求影响。'
     '<a href="https://group.softbank/en/news/press/20260416" target="_blank">4月发行文件</a>。'
     '目前缺少可比国债利差、认购倍数和二级市场表现，故交易温度仍不计分。</div></div>',
+    unsafe_allow_html=True,
+)
+
+news_rows = _deal_rows(news_leads)
+if not news_rows:
+    news_rows = '<tr><td colspan="6">本轮没有符合关键词与事件类型筛选的新闻线索；不代表全网没有新事件。</td></tr>'
+st.markdown(
+    '<div class="panel"><div class="panel-title">🔎 自动发现 · 待核验新闻线索</div>'
+    '<div class="metric-sub">打开本页时检索近期公开新闻，缓存最多6小时；这是标题级初筛，不是全网无遗漏监控。'
+    '新闻标题可能误述融资用途、金额或完成状态；没有原始公告／监管文件核验前，不会晋升到上方事件表，也不计分。'
+    f'上次检索：{escape(news_checked_at) if news_checked_at else "本次失败，下次打开重试"}。</div>'
+    '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>报道日期</th><th>报道对象</th><th>新闻线索／关联</th><th>标题金额</th><th>条款</th><th>核验状态</th></tr></thead>'
+    f'<tbody>{news_rows}</tbody></table></div></div>',
+    unsafe_allow_html=True,
+)
+
+try:
+    recent_releases, checked_at = load_softbank_financing_releases()
+except Exception:
+    recent_releases, checked_at = [], None
+release_links = " · ".join(
+    f'<a href="{escape(item["url"], quote=True)}" target="_blank" rel="noopener noreferrer">'
+    f'{escape(item["date"][:4] + "-" + item["date"][4:6] + "-" + item["date"][6:])} '
+    f'{escape(item["title"])}</a>'
+    for item in recent_releases[:5]
+)
+scan_note = (
+    f'上次检查：{escape(checked_at)}。' if checked_at else '本次官方索引检索失败；下次打开会重试。'
+)
+st.markdown(
+    '<div class="panel"><div class="panel-title">🔎 官方披露线索（每周按访问刷新）</div>'
+    '<div class="metric-sub">仅检索 SoftBank 官方新闻索引，展示可能相关的融资或投资公告；'
+    '标题不是发行条款或成交验证，不自动改写上表，也不计入 CFRI。'
+    f'{scan_note}</div>'
+    f'<div class="metric-sub">{release_links or "本次未识别到匹配的官方公告。"}</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -294,5 +371,6 @@ with source_tab:
         {"name": "实际利率", "source": "FRED · DFII10", "updated_at": _latest_date(series["real_yield"]), "mode": "live"},
         {"name": "金融条件", "source": "FRED · NFCI", "updated_at": _latest_date(series["nfci"]), "mode": "live"},
         {"name": "AI融资交易", "source": "SoftBank官方发行文件；待认购与二级市场数据", "updated_at": "2026-09-24", "mode": "static"},
+        {"name": "SoftBank官方披露线索", "source": "SoftBank新闻索引；访问时最多每周检索一次", "updated_at": checked_at, "mode": "live"},
     ])
 render_footer(f"{source} · 发行文件与事件驱动信息")

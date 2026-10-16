@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 
 import pandas as pd
@@ -71,21 +72,34 @@ def _fmp(symbol: str) -> pd.Series:
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_macro_snapshot() -> tuple[pd.Series, pd.Series, pd.Series, str]:
     """Return 10Y, 30Y, S&P 500 and the actual source path used."""
-    try:
-        y10, y30 = _fred("DGS10"), _fred("DGS30")
-    except Exception:
-        y10, y30 = pd.Series(dtype=float), pd.Series(dtype=float)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs = {
+            "y10": pool.submit(_fred, "DGS10"),
+            "y30": pool.submit(_fred, "DGS30"),
+            "sp500": pool.submit(_fmp, "^GSPC"),
+        }
+        try:
+            y10 = jobs["y10"].result()
+        except Exception:
+            y10 = pd.Series(dtype=float)
+        try:
+            y30 = jobs["y30"].result()
+        except Exception:
+            y30 = pd.Series(dtype=float)
+        try:
+            sp500 = jobs["sp500"].result()
+        except Exception:
+            sp500 = pd.Series(dtype=float)
     yield_source = "FRED（DGS10、DGS30）"
     if y10.empty or y30.empty:
-        y10, y30 = _yahoo("^TNX"), _yahoo("^TYX")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            y10_job = pool.submit(_yahoo, "^TNX")
+            y30_job = pool.submit(_yahoo, "^TYX")
+            y10, y30 = y10_job.result(), y30_job.result()
         y10 = y10 / 10.0 if not y10.empty and float(y10.median()) > 15 else y10
         y30 = y30 / 10.0 if not y30.empty and float(y30.median()) > 15 else y30
         yield_source = "Yahoo Finance（FRED备用源）"
 
-    try:
-        sp500 = _fmp("^GSPC")
-    except Exception:
-        sp500 = pd.Series(dtype=float)
     equity_source = "FMP（标普500）"
     if sp500.empty:
         sp500 = _yahoo("^GSPC")
@@ -99,20 +113,18 @@ def load_macro_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
     y10, _y30, sp500, market_source = load_macro_snapshot()
     series = {"y10": y10, "sp500": sp500}
     missing = []
-    for key, fred_id in {
-        "y3m": "DGS3MO",
-        "stlfsi": "STLFSI4",
-    }.items():
-        try:
-            series[key] = _fred(fred_id)
-        except Exception:
-            series[key] = pd.Series(dtype=float)
-            missing.append(fred_id)
-    try:
-        series["vix"] = _yahoo("^VIX")
-    except Exception:
-        series["vix"] = pd.Series(dtype=float)
-        missing.append("VIX")
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs = {
+            "y3m": pool.submit(_fred, "DGS3MO"),
+            "stlfsi": pool.submit(_fred, "STLFSI4"),
+            "vix": pool.submit(_yahoo, "^VIX"),
+        }
+        for key, fred_id in {"y3m": "DGS3MO", "stlfsi": "STLFSI4", "vix": "VIX"}.items():
+            try:
+                series[key] = jobs[key].result()
+            except Exception:
+                series[key] = pd.Series(dtype=float)
+                missing.append(fred_id)
     source = f"{market_source} · FRED（DGS3MO、STLFSI4） · Yahoo Finance（VIX）"
     if missing:
         source += f" · 缺失：{', '.join(missing)}"

@@ -5,7 +5,7 @@ from html import escape
 import streamlit as st
 
 from components.ui import (dashboard_conclusion, dashboard_header, load_css,
-                           render_footer, source_strip)
+                           panel, render_footer, source_strip)
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.macro_data import load_macro_stress_snapshot
@@ -67,7 +67,14 @@ def _conclusion_report(system, results):
     ]
     return "".join(paragraphs)
 
-with st.spinner("正在汇总七个风险因子…"):
+st.markdown(
+    dashboard_header(
+        "📡 Compute-Dollar Risk Terminal",
+        "美元—算力系统性风险监测 · 七维风险分层评估",
+    ),
+    unsafe_allow_html=True,
+)
+with st.spinner("正在汇总七个风险因子…首次载入或缓存过期时需等待外部数据源"):
     results = load_factor_results()
 try:
     market_series, _ = load_macro_stress_snapshot()
@@ -77,13 +84,6 @@ except Exception:
 system = aggregate_factor_results(results, market_phase_result=observed_market_phase)
 scores = {key: item["score"] for key, item in results.items() if item.get("available")}
 
-st.markdown(
-    dashboard_header(
-        "📡 Compute-Dollar Risk Terminal",
-        "美元—算力系统性风险监测 · 七维风险分层评估",
-    ),
-    unsafe_allow_html=True,
-)
 st.markdown(render_system_card(scores, system_result=system), unsafe_allow_html=True)
 
 color = STATE_COLORS.get(system["state"], "#94a3b8")
@@ -101,6 +101,17 @@ for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6", "straw7"
     availability = f"{item['coverage']:.0f}%" if item["available"] else "不可用"
     source_items.append({"name": item["name"], "availability": availability, "source": item["source"]})
 st.markdown(source_strip(source_items), unsafe_allow_html=True)
+
+st.markdown(
+    panel(
+        "🔎 AI信用传导｜结构暴露与市场确认",
+        '<div class="metric-sub">五家云厂商的现金覆盖、RPO与融资关系已并入05；'
+        '发行人信用证据边界与核实交易在06。传导路径仍是待验证假说，不改变现有七因子分数。</div>'
+        '<a href="/factor-financing-structure">05 查看结构证据 →</a> · '
+        '<a href="/factor-credit-refinancing">06 查看市场证据 →</a>',
+    ),
+    unsafe_allow_html=True,
+)
 
 if st.button("刷新全部因子数据", use_container_width=False):
     st.cache_data.clear()
