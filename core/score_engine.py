@@ -125,12 +125,12 @@ def render_factor_navigation(scores: dict, results: dict | None = None) -> None:
             state = result.get("state") or score_to_state(score)
             color = STATE_COLORS.get(state, "#fbbf24")
             score_txt, bar_w = f"{score:.0f}", min(int(score), 100)
-        st.markdown(
-            f'<div class="factor-native-meta"><span>{score_txt} /100 · {state}</span>'
-            f'<div class="straw-bar-wrap"><div class="straw-bar-fill" style="width:{bar_w}%;background:{color};"></div></div></div>',
-            unsafe_allow_html=True,
-        )
         with st.container(border=True):
+            st.markdown(
+                f'<div class="factor-native-meta"><span>{score_txt} /100 · {state}</span>'
+                f'<div class="straw-bar-wrap"><div class="straw-bar-fill" style="width:{bar_w}%;background:{color};"></div></div></div>',
+                unsafe_allow_html=True,
+            )
             name_col, link_col = st.columns([1, 1], gap="small", vertical_alignment="center")
             with name_col:
                 st.markdown(f'<div class="factor-native-name">{label}</div>', unsafe_allow_html=True)
