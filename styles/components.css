@@ -348,13 +348,13 @@
 .compact-title { color:var(--text-dim); font-size:13px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
 .conclusion-eyebrow, .factor-section-title { color:var(--text-soft); font-size:16px; font-weight:800; letter-spacing:.6px; margin-bottom:12px; }
 .conclusion-state { font-size:30px; font-weight:900; margin-bottom:10px; }
-.conclusion-copy { color:var(--text-soft); font-size:13px; line-height:1.68; }
+.conclusion-copy { color:var(--text-soft); font-size:16px; line-height:1.6; }
 .conclusion-report p { margin:0 0 10px; }
 .conclusion-report p:last-child { margin-bottom:0; }
 .conclusion-report b { color:var(--text-main); }
 .conclusion-report strong { color:var(--text-soft); font-weight:800; }
-.conclusion-report .conclusion-summary { font-size:15px; font-weight:750; color:var(--text-main); margin-bottom:14px; }
-.conclusion-note, .coverage-text { color:var(--text-dim); font-size:13px; }
+.conclusion-report .conclusion-summary { font-size:16px; font-weight:750; color:var(--text-main); margin-bottom:14px; }
+.conclusion-note, .coverage-text { color:var(--text-dim); font-size:16px; }
 .conclusion-note { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-soft); }
 .factor-panel .straw-row { padding:14px 0; gap:12px; }
 .factor-panel .straw-name { width:230px; }

@@ -90,6 +90,25 @@ class DashboardNavigationTests(unittest.TestCase):
             r'\.nav-brand-kicker\s*\{[^}]*font-size:\s*14px;',
         )
 
+    def test_conclusion_text_matches_methodology_text_size(self):
+        with open("styles/components.css", encoding="utf-8") as source:
+            component_css = source.read()
+        with open("styles/pages.css", encoding="utf-8") as source:
+            page_css = source.read()
+
+        self.assertRegex(
+            component_css,
+            r'\.conclusion-copy\s*\{[^}]*font-size:\s*16px;',
+        )
+        self.assertRegex(
+            component_css,
+            r'\.conclusion-note,\s*\.coverage-text\s*\{[^}]*font-size:\s*16px;',
+        )
+        self.assertRegex(
+            page_css,
+            r'\.step-text,\s*\.logic-step p\s*\{[^}]*font-size:\s*16px',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
