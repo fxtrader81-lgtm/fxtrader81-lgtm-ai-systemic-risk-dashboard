@@ -24,7 +24,6 @@ from copy import deepcopy
 from html import escape
 from io import StringIO
 from concurrent.futures import ThreadPoolExecutor
-import yfinance as yf
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from components.ui import (load_css, metric_card, model_evidence_panel, panel, render_data_freshness,
                            render_footer, render_header, spacer,
@@ -32,6 +31,7 @@ from components.ui import (load_css, metric_card, model_evidence_panel, panel, r
 from core.alert_engine import render_alert, render_osci_card
 from core.macro_data import load_macro_stress_snapshot
 from core.market_outcome_data import load_sp500_daily
+from core.market_freshness import download_yahoo, repair_china_if_stale, repair_if_stale, stale_sessions
 from core.macro_risk import COMPONENTS, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
 from core.market_event_replay import build_history_rows, event_validation_scope
@@ -94,7 +94,7 @@ BOND_LINE = {
 }
 STOCK_LINE = {
     "S&P 500":    "#00D9FF",
-    "NASDAQ 100": "#FF9F1C",
+    "NASDAQ Composite": "#FF9F1C",
     "Dow Jones":  "#E879F9",
     "上证指数":   "#FF4D6D",
     "深证成指":   "#A78BFA",
@@ -106,7 +106,7 @@ NORM_FILL = {
     "10Y Treasury": "rgba(92,184,92,0.15)",
     "30Y Treasury": "rgba(88,120,255,0.15)",
     "S&P 500":      "rgba(79,142,247,0)",
-    "NASDAQ 100":   "rgba(255,127,80,0)",
+    "NASDAQ Composite": "rgba(255,127,80,0)",
     "Dow Jones":    "rgba(44,165,141,0)",
     "上证指数":     "rgba(230,57,70,0)",
     "深证成指":     "rgba(157,78,221,0)",
@@ -169,7 +169,7 @@ def fetch_fmp_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_yf_index(ticker: str, start: str = "1994-01-01") -> pd.Series:
     try:
-        df = yf.download(ticker, start=start, interval="1d", progress=False, auto_adjust=True)
+        df = download_yahoo(ticker, start=start, interval="1d", progress=False, auto_adjust=True)
         if df.empty:
             return pd.Series(dtype=float)
         s = df["Close"]
@@ -192,11 +192,17 @@ def fetch_yf_yield(ticker: str, start: str = "1994-01-01") -> pd.Series:
 
 
 def fetch_market_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
-    """优先使用 FMP；无历史数据时自动切换 Yahoo Finance。"""
+    """Prefer FMP history and fill missing recent sessions from Yahoo."""
     series = fetch_fmp_index(symbol, start)
-    if not series.empty:
-        return series
-    return fetch_yf_index(symbol, start)
+    if series.empty:
+        series = fetch_yf_index(symbol, start)
+    return repair_if_stale(series, symbol, "US")[0]
+
+
+def fetch_china_index(symbol: str, start: str = "1994-01-01") -> pd.Series:
+    """Keep Yahoo history; fill a missing completed close from dated Sina quotes."""
+    series = fetch_yf_index(symbol, start)
+    return repair_china_if_stale(series, symbol)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -222,10 +228,17 @@ def fetch_fred_daily(series_id: str, start: str = "1994-01-01") -> pd.Series:
 # =========================================================
 
 def compute_alert_metrics(stress: dict[str, pd.Series], sp500_daily: pd.Series) -> dict:
-    return compute_macro_metrics(
-        stress["y10"], stress["y3m"], stress["sp500"],
-        stress["stlfsi"], stress["vix"], sp500_daily,
+    lag = stale_sessions(sp500_daily, "US")
+    equity_is_stale = lag is None or lag > 1
+    empty = pd.Series(dtype=float)
+    metrics = compute_macro_metrics(
+        stress["y10"], stress["y3m"], empty if equity_is_stale else stress["sp500"],
+        stress["stlfsi"], stress["vix"], empty if equity_is_stale else sp500_daily,
     )
+    if equity_is_stale:
+        # Missing a core confirmation series is not a market SAFE signal.
+        metrics["composite"] = {**metrics["composite"], "score": None, "grade": "N/A"}
+    return metrics
 
 
 def grade_to_color(grade: str) -> str:
@@ -269,9 +282,92 @@ def filter_by_period(s: pd.Series, period: str) -> pd.Series:
     if period == "ALL" or s.empty:
         return s
     now = s.index[-1]
-    years = {"1Y": 1, "3Y": 3, "5Y": 5, "10Y": 10}
-    cutoff = now - pd.DateOffset(years=years.get(period, 100))
+    windows = {
+        "1M": pd.DateOffset(months=1), "3M": pd.DateOffset(months=3),
+        "6M": pd.DateOffset(months=6), "1Y": pd.DateOffset(years=1),
+        "3Y": pd.DateOffset(years=3), "5Y": pd.DateOffset(years=5),
+        "10Y": pd.DateOffset(years=10), "30Y": pd.DateOffset(years=30),
+    }
+    cutoff = now - windows[period]
     return s[s.index >= cutoff]
+
+
+def chart_date_range(period: str, *series: pd.Series):
+    """Keep every trace and historical marker inside the selected window."""
+    if period == "ALL":
+        return None
+    dates = [pd.Timestamp(s.index.max()) for s in series if not s.empty]
+    if not dates:
+        return None
+    end = max(dates)
+    windows = {
+        "1M": pd.DateOffset(months=1), "3M": pd.DateOffset(months=3),
+        "6M": pd.DateOffset(months=6), "1Y": pd.DateOffset(years=1),
+        "3Y": pd.DateOffset(years=3), "5Y": pd.DateOffset(years=5),
+        "10Y": pd.DateOffset(years=10), "30Y": pd.DateOffset(years=30),
+    }
+    return end - windows[period], end + pd.Timedelta(days=1)
+
+
+def show_recent_endpoint_tick(fig, bounds, period: str) -> None:
+    """Keep the last observed date legible on the daily three-month view."""
+    if period != "3M" or bounds is None:
+        return
+    start, right_edge = bounds
+    latest = pd.Timestamp(right_edge) - pd.Timedelta(days=1)
+    ticks = list(pd.date_range(pd.Timestamp(start).normalize(), latest, freq="21D"))
+    ticks = [tick for tick in ticks if latest - tick >= pd.Timedelta(days=10)]
+    ticks.append(latest)
+    fig.update_xaxes(
+        tickmode="array", tickvals=ticks,
+        ticktext=[f"{tick:%m/%d}" for tick in ticks[:-1]] + [f"{latest:%m/%d} 最新"],
+    )
+
+
+def chart_events(period: str, series: list[pd.Series]):
+    bounds = chart_date_range(period, *series)
+    if bounds is None:
+        return CRASH_EVENTS
+    return [event for event in CRASH_EVENTS if bounds[0] <= pd.Timestamp(event["date"]) <= bounds[1]]
+
+
+def chart_trace_last_dates(fig) -> str:
+    """Read endpoints from the traces actually passed to Plotly, not source cards."""
+    parts = []
+    for trace in fig.data:
+        if trace.name == SPREAD_NAME or trace.x is None or trace.y is None:
+            continue
+        for x, y in zip(reversed(trace.x), reversed(trace.y)):
+            if pd.notna(y):
+                parts.append(f"{trace.name} {pd.Timestamp(x):%Y-%m-%d}")
+                break
+    return " · ".join(parts) if parts else "当前选择的曲线无数据"
+
+
+def render_chart_asof_banner(fig, period: str) -> None:
+    """Show the last drawn observations prominently above the actual chart."""
+    st.markdown(
+        '<div style="background:#17243b;border:1px solid #4b6b99;border-radius:8px;'
+        'padding:10px 14px;margin:4px 0 10px;color:#eff6ff;font-size:15px;'
+        'font-weight:700;line-height:1.5;">📅 图上曲线末端：'
+        + chart_trace_last_dates(fig)
+        + ('<br><span style="font-weight:400;color:#b9cbe6">全历史跨度下相邻交易日会重叠；使用上方时间范围按钮放大查看。</span>' if period == "ALL" else '')
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def select_chart_period(scope: str) -> str:
+    """Zoom the existing chart without adding a duplicate short-period chart."""
+    choices = {
+        "3个月": "3M", "1年": "1Y", "3年": "3Y", "5年": "5Y",
+        "10年": "10Y", "30年": "30Y", "全历史": "ALL",
+    }
+    label = st.radio(
+        "图表时间范围", options=list(choices), index=len(choices) - 1,
+        horizontal=True, key=f"straw7_{scope}_chart_range_radio",
+    )
+    return choices[label]
 
 
 def add_crash_annotations(fig, events):
@@ -444,12 +540,12 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
             fillcolor=BOND_FILL[name],
             line=dict(color=BOND_LINE[name], width=1.6),
             mode="lines",
-            hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
+            hovertemplate=f"%{{x|%Y-%m-%d}}<br>{name}: %{{y:.2f}}%<extra></extra>",
         ), secondary_y=True)
 
     for series, name in [
         (sp500, "S&P 500"),
-        (nasdaq, "NASDAQ 100"),
+        (nasdaq, "NASDAQ Composite"),
         (dow, "Dow Jones"),
         (shcomp, "上证指数"),
         (szcomp, "深证成指"),
@@ -465,17 +561,18 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
             x=s.index, y=s.values, name=name,
             line=dict(color=STOCK_LINE[name], width=2.2),
             mode="lines",
-            hovertemplate=f"{name}: %{{y:,.1f}} 点<extra></extra>",
+            hovertemplate=f"%{{x|%Y-%m-%d}}<br>{name}: %{{y:,.1f}} 点<extra></extra>",
         ), secondary_y=False)
 
     if show_crashes:
-        add_crash_annotations(fig, CRASH_EVENTS)
-    add_inversion_bands(fig, y10, y30)
+        add_crash_annotations(fig, chart_events(period, [y10, y30, sp500, nasdaq, dow, shcomp, szcomp]))
+    add_inversion_bands(fig, filter_by_period(y10, period), filter_by_period(y30, period))
 
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 560
     layout["title"] = dict(text="全资产双轴走势 · 股指真实点位 / 利率实值 / 利差柱背景", font=dict(size=14, color="#e2e8f0"), x=0.01)
     layout["showlegend"] = False
+    layout["dragmode"] = "zoom"
     fig.update_layout(**layout)
     fig.update_yaxes(
         title_text="股票指数（实际点位）", secondary_y=False,
@@ -488,6 +585,10 @@ def build_overview_chart(y10, y30, sp500, nasdaq, dow, shcomp, szcomp, period, s
         rangemode="tozero",
     )
     fig.update_xaxes(showline=True, linecolor="rgba(255,255,255,0.20)", linewidth=1)
+    bounds = chart_date_range(period, y10, y30, sp500, nasdaq, dow, shcomp, szcomp)
+    if bounds:
+        fig.update_xaxes(range=bounds)
+        show_recent_endpoint_tick(fig, bounds, period)
     return fig
 
 
@@ -513,7 +614,7 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
             fillcolor=BOND_FILL[name],
             line=dict(color=BOND_LINE[name], width=1.6),
             mode="lines",
-            hovertemplate=f"{name}: %{{y:.2f}}%<extra></extra>",
+            hovertemplate=f"%{{x|%Y-%m-%d}}<br>{name}: %{{y:.2f}}%<extra></extra>",
         ), secondary_y=True)
 
     for series, name in stock_pairs:
@@ -527,17 +628,18 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
             x=s.index, y=s.values, name=name,
             line=dict(color=color, width=2.3),
             mode="lines",
-            hovertemplate=f"{name}: %{{y:,.0f}}<extra></extra>",
+            hovertemplate=f"%{{x|%Y-%m-%d}}<br>{name}: %{{y:,.0f}} 点<extra></extra>",
         ), secondary_y=False)
 
     if show_crashes:
-        add_crash_annotations(fig, CRASH_EVENTS)
-    add_inversion_bands(fig, y10, y30)
+        add_crash_annotations(fig, chart_events(period, [y10, y30] + [series for series, _ in stock_pairs]))
+    add_inversion_bands(fig, filter_by_period(y10, period), filter_by_period(y30, period))
 
     layout = deepcopy(PLOTLY_LAYOUT)
     layout["height"] = 500
     layout["title"] = dict(text=title, font=dict(size=14, color="#e2e8f0"), x=0.01)
     layout["showlegend"] = False
+    layout["dragmode"] = "zoom"
     fig.update_layout(**layout)
     fig.update_yaxes(
         title_text="指数点位", secondary_y=False,
@@ -550,6 +652,10 @@ def build_dual_axis_chart(y10, y30, stock_pairs, period, show_crashes, title, vi
         zerolinecolor="rgba(255,255,255,0.24)", rangemode="tozero",
     )
     fig.update_xaxes(showline=True, linecolor="rgba(255,255,255,0.20)", linewidth=1)
+    bounds = chart_date_range(period, y10, y30, *[series for series, _ in stock_pairs])
+    if bounds:
+        fig.update_xaxes(range=bounds)
+        show_recent_endpoint_tick(fig, bounds, period)
     return fig
 
 
@@ -792,6 +898,12 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
             "title": "结论：极端风险，多项宏观压力已形成共振",
             "body": "股票趋势、波动率、利率冲击和金融市场压力出现广泛恶化。下方逐项展示原始值、子评分、权重与贡献；当前应开展情景压力测试，而不是把历史事件视为确定性预测。",
         },
+        "N/A": {
+            "box": "alert-box", "icon": "⚠️",
+            "title_color": "#fbbf24",
+            "title": "结论：核心股指数据过期，暂不评级",
+            "body": "标普500日线缺少超过一个已完成的工作日；当前评分暂停，不能把旧价格解释为市场安全。请查看下方数据日期并重试刷新。",
+        },
     }
     conc = ALERT_CONCLUSIONS.get(master_grade, ALERT_CONCLUSIONS["WATCH"])
     phase_detail = market_phase["detail"].rstrip("。；; ")
@@ -889,7 +1001,7 @@ def render_method_tabs(daily_source):
             {"name": "市场波动率", "source": "Yahoo Finance · VIX", "updated_at": "每小时缓存", "mode": "live"},
             {"name": "10Y/30Y当前收益率", "source": "Yahoo Finance · Cboe ^TNX / ^TYX；最近分钟报价，不保证零延迟", "updated_at": "每次页面刷新重新请求；以卡片时间戳为准", "mode": "live"},
             {"name": "国债历史收益率", "source": "FRED · DGS10 / DGS30；日度观察值，非盘中报价", "updated_at": "日度发布；页面缓存最多1小时，手动刷新清缓存", "mode": "live"},
-            {"name": "股票指数", "source": "每日收盘价：FMP · Yahoo Finance 备用", "updated_at": "每小时缓存", "mode": "live"},
+            {"name": "股票指数", "source": "美股：FMP历史 + Yahoo近期；A股：Yahoo历史 + 新浪财经带日期收盘报价（仅补缺）", "updated_at": "近期最多5分钟缓存；长历史最多1小时", "mode": "live"},
             {"name": "历史事件说明", "source": f"静态事件库；事件评分中的距六个月高点及两项事后跌幅均使用{daily_source}", "updated_at": "2026-09", "mode": "static"},
         ])
 
@@ -898,7 +1010,7 @@ def render_method_tabs(daily_source):
 # 数据加载
 # =========================================================
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_all_data():
     # Independent sources can be requested together; each still has its own
     # one-hour cache and source-specific fallback/coverage rules.
@@ -909,8 +1021,8 @@ def load_all_data():
         y30_job = pool.submit(fetch_fred_daily, "DGS30")
         nasdaq_job = pool.submit(fetch_market_index, "^IXIC", "1994-01-01")
         dow_job = pool.submit(fetch_market_index, "^DJI", "1994-01-01")
-        shcomp_job = pool.submit(fetch_yf_index, "000001.SS", "1994-01-01")
-        szcomp_job = pool.submit(fetch_yf_index, "399001.SZ", "1994-01-01")
+        shcomp_job = pool.submit(fetch_china_index, "000001.SS", "1994-01-01")
+        szcomp_job = pool.submit(fetch_china_index, "399001.SZ", "1994-01-01")
         stress, stress_source = stress_job.result()
         sp500_daily, daily_source = sp500_job.result()
         y10, y30 = y10_job.result(), y30_job.result()
@@ -918,6 +1030,11 @@ def load_all_data():
         shcomp, szcomp = shcomp_job.result(), szcomp_job.result()
     # Do not substitute monthly fallback points into curves labelled daily.
     sp500 = sp500_daily
+    if not sp500_daily.empty:
+        # The market score must use the same fresh S&P closes as its chart.
+        stress = dict(stress)
+        stress["sp500"] = sp500_daily.resample("ME").last().dropna()
+        stress_source += f" · 标普500日线按月汇总：{daily_source}"
     return y10, y30, sp500, nasdaq, dow, shcomp, szcomp, stress, stress_source, sp500_daily, daily_source
 
 
@@ -934,17 +1051,11 @@ render_header(
     symbol="MACRO ALERT",
 )
 
-# 控制栏（时间范围 + 股灾标注 + 刷新）
-ctrl_col1, ctrl_col2, ctrl_col3, ctrl_spacer = st.columns([2, 2, 1.2, 4])
+# 控制栏（股灾标注 + 刷新）；时间范围放在每张原图上方。
+ctrl_col1, ctrl_col2, ctrl_spacer = st.columns([2, 1.2, 6])
 with ctrl_col1:
-    period = st.select_slider(
-        "时间范围",
-        options=["1Y", "3Y", "5Y", "10Y", "ALL"],
-        value="ALL",
-    )
-with ctrl_col2:
     show_crashes = st.toggle("显示股灾标注", value=True)
-with ctrl_col3:
+with ctrl_col2:
     if st.button("🔄 刷新", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
@@ -964,6 +1075,9 @@ top_composite = top_metrics["composite"]
 if top_composite["score"] is not None:
     register_score("straw7", top_composite["score"])
 current_market_phase = market_phase_from_series(stress)
+sp500_lag = stale_sessions(sp500_daily, "US")
+if sp500_lag is None or sp500_lag > 1:
+    current_market_phase = {"label": "股指数据过期", "detail": "标普500最新日线未达到可用于当前判断的时间范围"}
 top_state = top_composite["grade"]
 top_summary = {
     "SAFE": "结论：当前市场指标尚未形成同步压力。SAFE表示本模型尚未观察到广泛市场传导。",
@@ -975,7 +1089,11 @@ st.markdown(render_osci_card(
     "市场状态 · 宏观与跨市场传导确认",
     top_composite["score"], top_state, top_summary,
     bar_color=SEVERITY_COLOR.get(top_state, "#94a3b8"),
-    state_detail=f"有效数据覆盖率 {top_composite['coverage']}% · SAFE表示当前未发现广泛市场传导",
+    state_detail=(
+        f"有效数据覆盖率 {top_composite['coverage']}% · 核心股指已过期，暂停当前评级"
+        if top_state == "N/A" else
+        f"有效数据覆盖率 {top_composite['coverage']}% · SAFE表示当前未发现广泛市场传导"
+    ),
     components_html=(
         "标普500三个月收益 ×0.30 · 距近六个月每日收盘高点 ×0.20 · VIX ×0.20<br>"
         "10Y三个月变化 ×0.15 · STLFSI ×0.10 · 10Y−3M利差 ×0.05<br>"
@@ -991,6 +1109,30 @@ for event in CRASH_EVENTS:
 
 # KPI 行（全局共用）
 render_kpi_row(y10_quote, y30_quote, sp500, shcomp)
+index_dates = [
+    ("标普500", sp500, "US"), ("纳斯达克综合", nasdaq, "US"),
+    ("道琼斯", dow, "US"), ("上证指数", shcomp, "CN"),
+    ("深证成指", szcomp, "CN"),
+]
+index_status = []
+stale_indices = []
+for label, series, market in index_dates:
+    latest = pd.Timestamp(series.index.max()).strftime("%Y-%m-%d") if not series.empty else "无数据"
+    lag = stale_sessions(series, market)
+    index_status.append(f"{label} {latest}")
+    if lag is None or lag > 0:
+        stale_indices.append(f"{label} {latest}（缺少约{lag}个交易日）" if lag is not None else f"{label} 无数据")
+render_market_note(
+    "股指最新数据日期：" + " · ".join(index_status)
+    + "。A股近期缺口优先重试Yahoo，已收盘且Yahoo未更新时以新浪行情的带日期报价补齐；"
+    "打开页面或操作触发重载时，近期数据缓存最多5分钟；点击上方刷新按钮可立即重取。"
+)
+if stale_indices:
+    st.warning(
+        "⚠️ 股指数据未达到最近已完成交易日，不能把旧值当作当前市场："
+        + "；".join(stale_indices)
+        + "。已尝试近期备用数据；若交易所休市或供应商尚未发布，请以各指数日期为准。"
+    )
 last_10y_day = y10.last_valid_index()
 last_30y_day = y30.last_valid_index()
 history_through = (
@@ -1003,12 +1145,12 @@ render_market_note(
     "不是国债债券价格。历史曲线为FRED每日发布的DGS10/DGS30恒定期限收益率；两种来源不拼接，"
     f"FRED未发布的交易日或30Y历史停发期间保留空缺。{history_through}"
 )
-historical_spread = treasury_spread(y10, y30, period)
+historical_spread = treasury_spread(y10, y30, "ALL")
 if not historical_spread.empty:
     historical_day = pd.Timestamp(historical_spread.index[-1])
     render_market_note(
         "利差口径：上方卡片是卡片所示报价时间的当前30Y−10Y利差；图表柱形是每日FRED观察值。"
-        f"当前图示范围最后一个历史观察日为{historical_day:%Y-%m-%d}，利差{historical_spread.iloc[-1] * 100:+.1f}bps；"
+        f"最近一个历史观察日为{historical_day:%Y-%m-%d}，利差{historical_spread.iloc[-1] * 100:+.1f}bps；"
         "悬停其他日期时显示的是该日历史值，因此可与卡片数值不同。"
     )
 
@@ -1026,16 +1168,18 @@ tab_all, tab_us, tab_cn = st.tabs(["🌐  ALL — 全资产概览", "🇺🇸  U
 with tab_all:
     all_series = [
         "10Y Treasury", "30Y Treasury",
-        "S&P 500", "NASDAQ 100", "Dow Jones", "上证指数", "深证成指",
+        "S&P 500", "NASDAQ Composite", "Dow Jones", "上证指数", "深证成指",
     ]
     chart_col, legend_col = st.columns([5.2, 1.3])
     with legend_col:
         selected_all = render_series_selector("all", all_series, compact=True)
     with chart_col:
+        period = select_chart_period("all")
         fig_overview = build_overview_chart(
             y10, y30, sp500, nasdaq, dow, shcomp, szcomp,
             period=period, show_crashes=show_crashes, visible_series=selected_all,
         )
+        render_chart_asof_banner(fig_overview, period)
         st.plotly_chart(fig_overview, use_container_width=True, key="straw7_all_overview")
     render_market_note("股指采用日线连续曲线（已收市为收盘价，当日未收市则为暂值）；右侧勾选框控制折线，色块与曲线同色。期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示该日 bps。")
 
@@ -1045,18 +1189,20 @@ with tab_all:
 # Tab: US
 # ─────────────────────────────────────────────
 with tab_us:
-    us_series = ["10Y Treasury", "30Y Treasury", "S&P 500", "NASDAQ 100", "Dow Jones"]
+    us_series = ["10Y Treasury", "30Y Treasury", "S&P 500", "NASDAQ Composite", "Dow Jones"]
     chart_col, legend_col = st.columns([5.2, 1.3])
     with legend_col:
         selected_us = render_series_selector("us", us_series, compact=True)
     with chart_col:
+        period = select_chart_period("us")
         fig_us = build_dual_axis_chart(
             y10, y30,
-            [(sp500, "S&P 500"), (nasdaq, "NASDAQ 100"), (dow, "Dow Jones")],
+            [(sp500, "S&P 500"), (nasdaq, "NASDAQ Composite"), (dow, "Dow Jones")],
             period=period, show_crashes=show_crashes,
             title="美股三大指数（左轴）× 美债收益率山形背景（右轴）",
             visible_series=selected_us,
         )
+        render_chart_asof_banner(fig_us, period)
         st.plotly_chart(fig_us, use_container_width=True, key="straw7_us_markets")
     render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
@@ -1080,6 +1226,7 @@ with tab_cn:
     with legend_col:
         selected_cn = render_series_selector("cn", cn_series, compact=True)
     with chart_col:
+        period = select_chart_period("cn")
         fig_cn = build_dual_axis_chart(
             y10, y30,
             [(shcomp, "上证指数"), (szcomp, "深证成指")],
@@ -1087,6 +1234,7 @@ with tab_cn:
             title="A股指数（左轴）× 美债收益率山形背景（右轴）",
             visible_series=selected_cn,
         )
+        render_chart_asof_banner(fig_cn, period)
         st.plotly_chart(fig_cn, use_container_width=True, key="straw7_cn_markets")
     render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 

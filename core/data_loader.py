@@ -6,6 +6,7 @@
 import requests
 import streamlit as st
 from config.api_keys import FMP_API_KEY, FMP_BASE, FRED_API_KEY, FRED_BASE
+from core.market_freshness import download_yahoo
 
 
 # ─── 基础 HTTP 工具 ───────────────────────────────────────
@@ -103,10 +104,9 @@ def fred_latest_value(series_id: str) -> float | None:
 @st.cache_data(ttl=3600, show_spinner=False)
 def yf_history(ticker: str, period: str = "1y", interval: str = "1d"):
     """yfinance 历史价格 DataFrame。"""
-    import yfinance as yf
     try:
-        df = yf.download(ticker, period=period, interval=interval,
-                         progress=False, auto_adjust=True)
+        df = download_yahoo(ticker, period=period, interval=interval,
+                            progress=False, auto_adjust=True)
         return df
     except Exception:
         return None

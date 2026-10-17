@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 import streamlit as st
 import yfinance as yf
+from core.market_freshness import download_yahoo
 
 from config.thresholds import STRAW_WEIGHTS
 from core.credit_risk import compute_credit_metrics
@@ -181,7 +182,7 @@ def _straw2() -> dict:
 
 
 def _history(tickers: list[str], period: str = "1y") -> pd.DataFrame:
-    data = yf.download(tickers, period=period, interval="1d", progress=False, auto_adjust=True, threads=True)
+    data = download_yahoo(tickers, period=period, interval="1d", progress=False, auto_adjust=True)
     if data.empty:
         return pd.DataFrame()
     close = data["Close"] if isinstance(data.columns, pd.MultiIndex) else data[["Close"]].rename(columns={"Close": tickers[0]})
@@ -246,7 +247,7 @@ def _straw4() -> dict:
 
 def _single_close(ticker: str, period: str = "2y", interval: str = "1mo") -> pd.Series:
     """Return one numeric close series across yfinance's flat/MultiIndex variants."""
-    frame = yf.download(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
+    frame = download_yahoo(ticker, period=period, interval=interval, progress=False, auto_adjust=True)
     if not isinstance(frame, pd.DataFrame) or frame.empty or "Close" not in frame.columns:
         return pd.Series(dtype=float)
     close = frame["Close"]

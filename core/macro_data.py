@@ -8,9 +8,9 @@ from io import StringIO
 import pandas as pd
 import requests
 import streamlit as st
-import yfinance as yf
 
 from config.api_keys import FMP_API_KEY, FRED_API_KEY
+from core.market_freshness import download_yahoo
 
 
 def _fred(series_id: str) -> pd.Series:
@@ -41,7 +41,7 @@ def _fred(series_id: str) -> pd.Series:
 
 
 def _yahoo(ticker: str) -> pd.Series:
-    frame = yf.download(ticker, start="1994-01-01", interval="1mo", progress=False, auto_adjust=True)
+    frame = download_yahoo(ticker, start="1994-01-01", interval="1mo", progress=False, auto_adjust=True)
     if frame.empty or "Close" not in frame.columns:
         return pd.Series(dtype=float)
     series = frame["Close"]

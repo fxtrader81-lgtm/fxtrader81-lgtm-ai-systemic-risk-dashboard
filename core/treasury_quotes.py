@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 import yfinance as yf
+from core.market_freshness import YFINANCE_LOCK
 
 
 @dataclass(frozen=True)
@@ -33,9 +34,10 @@ def fetch_latest_treasury_quote(ticker: str) -> TreasuryQuote:
     if ticker not in {"^TNX", "^TYX"}:
         raise ValueError(f"Unsupported Treasury quote ticker: {ticker}")
     try:
-        frame = yf.Ticker(ticker).history(
-            period="5d", interval="1m", auto_adjust=False, prepost=False,
-        )
+        with YFINANCE_LOCK:
+            frame = yf.Ticker(ticker).history(
+                period="5d", interval="1m", auto_adjust=False, prepost=False,
+            )
         if frame.empty or "Close" not in frame:
             return TreasuryQuote()
         closes = pd.to_numeric(frame["Close"], errors="coerce").dropna()

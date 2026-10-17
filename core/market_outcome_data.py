@@ -5,11 +5,12 @@ from __future__ import annotations
 import pandas as pd
 import requests
 import streamlit as st
-import yfinance as yf
 
 from config.api_keys import FMP_API_KEY
+from core.market_freshness import download_yahoo, repair_if_stale
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def _fmp_daily() -> pd.Series:
     if not FMP_API_KEY:
         return pd.Series(dtype=float)
@@ -27,8 +28,9 @@ def _fmp_daily() -> pd.Series:
     return pd.to_numeric(frame.set_index("date")["close"], errors="coerce").dropna().sort_index()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
 def _yahoo_daily() -> pd.Series:
-    frame = yf.download("^GSPC", start="1994-01-01", interval="1d", progress=False, auto_adjust=True)
+    frame = download_yahoo("^GSPC", start="1994-01-01", interval="1d", progress=False, auto_adjust=True)
     if frame.empty or "Close" not in frame.columns:
         return pd.Series(dtype=float)
     series = frame["Close"]
@@ -39,19 +41,25 @@ def _yahoo_daily() -> pd.Series:
     return series.sort_index()
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_sp500_daily() -> tuple[pd.Series, str]:
-    """Prefer complete FMP daily history; fall back to Yahoo if coverage is short."""
+    """Prefer complete history, then repair missing recent sessions separately."""
     try:
         series = _fmp_daily()
     except Exception:
         series = pd.Series(dtype=float)
-    if not series.empty and series.index.min() <= pd.Timestamp("1997-10-31"):
-        return series, "FMP（^GSPC 日收盘价）"
-    try:
-        yahoo_series = _yahoo_daily()
-    except Exception:
-        yahoo_series = pd.Series(dtype=float)
-    if not yahoo_series.empty and (series.empty or yahoo_series.index.min() < series.index.min()):
-        return yahoo_series, "Yahoo Finance（^GSPC 日收盘价；FMP 历史覆盖不足时的备用源）"
-    return (series, "FMP（^GSPC 日收盘价；早期事件可能无数据）") if not series.empty else (pd.Series(dtype=float), "日线暂不可用")
+    source = "FMP（^GSPC 日收盘价）"
+    if series.empty or series.index.min() > pd.Timestamp("1997-10-31"):
+        try:
+            yahoo_series = _yahoo_daily()
+        except Exception:
+            yahoo_series = pd.Series(dtype=float)
+        if not yahoo_series.empty and (series.empty or yahoo_series.index.min() < series.index.min()):
+            series = yahoo_series
+            source = "Yahoo Finance（^GSPC 日收盘价；FMP 历史覆盖不足时的备用源）"
+        elif not series.empty:
+            source = "FMP（^GSPC 日收盘价；早期事件可能无数据）"
+    series, supplemented = repair_if_stale(series, "^GSPC", "US")
+    if supplemented:
+        source += "；近期缺失日期由 Yahoo Finance 补齐"
+    return (series, source) if not series.empty else (series, "日线暂不可用")
