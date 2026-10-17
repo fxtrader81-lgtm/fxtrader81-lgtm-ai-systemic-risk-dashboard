@@ -64,9 +64,31 @@ class DashboardNavigationTests(unittest.TestCase):
     def test_dashboard_does_not_repeat_credit_transmission_panel(self):
         with open("pages/dashboard.py", encoding="utf-8") as source:
             dashboard = source.read()
+        self.assertIn('st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])', dashboard)
+        self.assertIn("总览检测逻辑", dashboard)
+        self.assertIn("七个风险因子的当前证据", dashboard)
         self.assertNotIn("AI信用传导｜结构暴露与市场确认", dashboard)
         self.assertNotIn('href="/factor-financing-structure"', dashboard)
         self.assertNotIn('href="/factor-credit-refinancing"', dashboard)
+
+    def test_sidebar_brand_precedes_navigation_and_has_prominent_kicker(self):
+        with open("styles/base.css", encoding="utf-8") as source:
+            css = source.read()
+
+        self.assertIn('[data-testid="stSidebarUserContent"]', css)
+        self.assertIn('[data-testid="stSidebarNav"]', css)
+        self.assertRegex(
+            css,
+            r'\[data-testid="stSidebarUserContent"\]\s*\{\s*order:\s*1;',
+        )
+        self.assertRegex(
+            css,
+            r'\[data-testid="stSidebarNav"\]\s*\{\s*order:\s*2;',
+        )
+        self.assertRegex(
+            css,
+            r'\.nav-brand-kicker\s*\{[^}]*font-size:\s*14px;',
+        )
 
 
 if __name__ == "__main__":

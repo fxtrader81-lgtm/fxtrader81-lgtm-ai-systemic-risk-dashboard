@@ -4,7 +4,8 @@ from html import escape
 
 import streamlit as st
 
-from components.ui import (dashboard_conclusion, dashboard_header, load_css,
+from components.ui import (dashboard_conclusion, dashboard_header, evidence_table,
+                           load_css, logic_panel, model_evidence_panel,
                            render_footer, source_strip)
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
 from core.factor_registry import aggregate_factor_results, load_factor_results
@@ -100,7 +101,54 @@ for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6", "straw7"
     item = results[key]
     availability = f"{item['coverage']:.0f}%" if item["available"] else "不可用"
     source_items.append({"name": item["name"], "availability": availability, "source": item["source"]})
-st.markdown(source_strip(source_items), unsafe_allow_html=True)
+
+logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
+with logic_tab:
+    st.markdown(logic_panel([
+        {"text": "<b>01–05是结构层</b>：每个因子先独立计算0–100分，再进入结构总分。"},
+        {"text": "<b>结构总分权重</b>：01资本开支偏离25% · 02开源商业化压缩15% · 03数据中心资产减值20% · 04 AI能源约束15% · 05 AI融资结构脆弱性25%。"},
+        {"text": "<b>覆盖政策</b>：01–05有效权重低于70%时，总览输出N/A；缺失项不按SAFE、0分或50分处理。"},
+        {"text": "<b>06与07是传导确认层</b>：06观察信用与再融资条件，07观察宏观与跨市场压力；两者不混入01–05结构总分。"},
+        {"text": "<b>CASCADE条件</b>：05和06均至少达到WARNING，且07至少达到WATCH；只有形成跨层确认才标记风险传导。"},
+        {"text": "<b>统一状态切点</b>：", "thresholds": [
+            ("#22c55e", "0 ≤ Score < 25", "SAFE", "green"),
+            ("#fbbf24", "25 ≤ Score < 50", "WATCH", "yellow"),
+            ("#f97316", "50 ≤ Score < 75", "WARNING", "orange"),
+            ("#ef4444", "75 ≤ Score ≤ 100", "CRITICAL", "red"),
+        ]},
+    ], title="⚙️ 总览检测逻辑"), unsafe_allow_html=True)
+
+with evidence_tab:
+    factor_roles = {
+        "straw1": "投入与收入匹配",
+        "straw2": "开源竞争与商业化压力",
+        "straw3": "数据中心资产减值代理",
+        "straw4": "能源、电网与交付约束",
+        "straw5": "融资结构脆弱性",
+        "straw6": "信用与再融资外部确认",
+        "straw7": "宏观与跨市场传导确认",
+    }
+    evidence_rows = []
+    for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6", "straw7"):
+        item = results[key]
+        reading = f'{item["score"]:.1f}/100 · {item["state"]}' if item["available"] else "N/A · 数据不足"
+        evidence_rows.append((f'{key[-1].zfill(2)} · {item["name"]}', factor_roles[key], reading,
+                              f'{item["coverage"]:.0f}%', item["detail"]))
+    st.markdown(evidence_table(
+        "📋 七个风险因子的当前证据",
+        ["因子", "检测职责", "当前评分/状态", "覆盖率", "当前证据摘要"],
+        evidence_rows,
+        "当前证据摘要来自各因子本次计算；06与07是传导确认层，不进入01–05结构总分。",
+    ), unsafe_allow_html=True)
+    st.markdown(model_evidence_panel(
+        sample="历史审计包含19个领先压力信号起点；其5条正例归属2008、2020和2022三轮独立下跌，不是19次独立危机。",
+        validation="2017年后21个重叠联合信号月中7个月份随后出现回调，表观比例33.3%；不作为预测概率，也不能把重叠月份当成独立样本。",
+        boundary="07在三轮独立下跌中的月末确认均晚于标普500较近期高点下跌5%；外生冲击不在预测范围。06的早期历史事件使用BAA−10Y代理，与当前HY OAS口径不同。",
+        calibration="当前切点仍是探索性规则；STLFSI4历史回填、NFCI修订与HY OAS历史长度限制，意味着尚未完成按历史发布版本的独立样本外校准。",
+    ), unsafe_allow_html=True)
+
+with source_tab:
+    st.markdown(source_strip(source_items), unsafe_allow_html=True)
 
 if st.button("刷新全部因子数据", use_container_width=False):
     st.cache_data.clear()

@@ -84,6 +84,20 @@ section[data-testid="stSidebar"] > div {
   background: transparent !important;
 }
 
+/* Streamlit默认把页面导航放在用户自定义侧栏内容之前。
+   品牌是整个系统的标识，固定在导航上方。 */
+section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
+  order: 0;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+  order: 1;
+}
+
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+  order: 2;
+}
+
 .nav-brand {
   margin: 4px 8px 18px;
   padding: 16px 14px 15px;
@@ -94,9 +108,10 @@ section[data-testid="stSidebar"] > div {
 
 .nav-brand-kicker {
   color: var(--yellow);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 1.8px;
+  letter-spacing: 2px;
+  line-height: 1.2;
 }
 
 .nav-brand-title {
