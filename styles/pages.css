@@ -256,12 +256,18 @@
   padding-top: 24px;
 }
 
-/* Streamlit's radio labels otherwise inherit dark light-theme text on this dark page. */
-[data-testid="stRadio"] [data-testid="stWidgetLabel"] p,
-[data-testid="stRadio"] label[data-baseweb="radio"] p {
+/* Streamlit changes the nested element used for radio option text between
+   releases.  Style the complete label tree so the period controls stay
+   readable on the dark canvas regardless of whether the text is a p, span,
+   or div.  The radio indicator itself keeps its native selected colour. */
+[data-testid="stRadio"] [data-testid="stWidgetLabel"],
+[data-testid="stRadio"] [data-testid="stWidgetLabel"] *,
+[data-testid="stRadio"] [role="radiogroup"] label,
+[data-testid="stRadio"] [role="radiogroup"] label * {
   color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
   opacity: 1 !important;
-  font-weight: 650;
+  font-weight: 650 !important;
 }
 
 .history-row {
