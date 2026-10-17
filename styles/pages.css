@@ -292,44 +292,61 @@
   box-shadow: 0 0 18px rgba(96,165,250,0.10);
 }
 
-/* Historical events are collapsed by default: the summary keeps only the
-   date, event name and classified state; the existing full row lives inside. */
+/* Historical events use compact aligned summaries while keeping the complete
+   existing evidence row inside each disclosure. */
 .st-key-straw7_event_list {
   margin-top: 12px;
-  padding: 18px 20px 20px;
+  padding: 16px 18px 18px;
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
   border-radius: 12px;
 }
 
-.st-key-straw7_event_list [data-testid="stExpander"] details {
-  margin-top: 10px;
+.history-event-accordion {
+  margin-top: 5px;
   background: rgba(8, 15, 30, 0.56);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 9px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.st-key-straw7_event_list [data-testid="stExpander"] details:hover {
+.history-event-accordion:hover {
   border-color: rgba(96, 165, 250, 0.42);
 }
 
-.st-key-straw7_event_list [data-testid="stExpander"] summary {
-  min-height: 58px;
-  padding: 12px 16px;
+.history-event-accordion > summary {
+  display: grid;
+  grid-template-columns: 22px 88px minmax(190px, 1fr) 85px 120px 120px 165px;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 7px 13px;
+  cursor: pointer;
+  list-style: none;
+  color: #e2e8f0;
 }
 
-.st-key-straw7_event_list [data-testid="stExpander"] summary p,
-.st-key-straw7_event_list [data-testid="stExpander"] summary span {
-  color: #e2e8f0;
-  font-size: 16px;
-  line-height: 1.5;
+.history-event-accordion > summary::-webkit-details-marker { display: none; }
+.history-event-accordion > summary::marker { content: ""; }
+.history-event-chevron { color:#cbd5e1; font-size:22px; font-weight:800; transition:transform .14s ease; }
+.history-event-accordion[open] .history-event-chevron { transform:rotate(90deg); }
+.history-summary-date { color:#aab8ce; font-size:14px; font-weight:750; white-space:nowrap; }
+.history-summary-event { color:#f1f5f9; font-size:15px; font-weight:800; min-width:0; overflow-wrap:anywhere; }
+.history-summary-value { font-size:14px; font-weight:750; text-align:center; white-space:nowrap; }
+.history-summary-yield { color:#5cb85c; }
+.history-summary-drawdown { color:var(--red); }
+.history-summary-score { font-size:14px; font-weight:850; text-align:center; white-space:nowrap; }
+.history-event-accordion[open] > summary { background:rgba(96,165,250,.07); }
+
+@media (max-width: 1050px) {
+  .history-event-accordion { overflow-x:auto; }
+  .history-event-accordion > summary { min-width:760px; }
 }
 
 .st-key-straw7_event_list .history-row-expanded {
   border-top: 1px solid rgba(148, 163, 184, 0.12);
   border-bottom: 0;
-  padding: 16px 4px 6px;
+  padding: 13px 4px 5px;
 }
 
 .alert-system-heading {

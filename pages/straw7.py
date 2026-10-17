@@ -912,10 +912,6 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
             pass
 
         selected_event = st.session_state.get("straw7_selected_event")
-        state_markdown_colors = {
-            "SAFE": "green", "WATCH": "orange", "WARNING": "orange",
-            "CRITICAL": "red", "N/A": "gray",
-        }
         with st.container(key="straw7_event_list"):
             st.markdown("""
               <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
@@ -926,10 +922,19 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
                 date, event = row["month"], row["event"]
                 sev = row.get("state", "N/A")
                 color = SEVERITY_COLOR.get(sev, "#94a3b8")
-                state_color = state_markdown_colors.get(sev, "gray")
-                expander_label = f"**{date}　　{event}**　　:{state_color}[**{sev}**]"
-                with st.expander(expander_label, expanded=date == selected_event):
-                    st.markdown(f"""
+                score_text = "N/A" if row.get("score") is None else f'{row["score"]}/100'
+                open_attr = " open" if date == selected_event else ""
+                st.markdown(f"""
+                    <details class="history-event-accordion"{open_attr}>
+                      <summary title="点击展开完整事件复盘">
+                        <span class="history-event-chevron">›</span>
+                        <span class="history-summary-date">{escape(str(date))}</span>
+                        <span class="history-summary-event">{escape(str(event))}</span>
+                        <span class="history-summary-value history-summary-yield" title="10Y收益率">{escape(str(row.get('y10', 'N/A')))}</span>
+                        <span class="history-summary-value history-summary-drawdown" title="六个月相对基准最深跌幅">{escape(str(row.get('drawdown', 'N/A')))}</span>
+                        <span class="history-summary-value history-summary-drawdown" title="首轮跌破区间最深跌幅">{escape(str(row.get('initial_drawdown', 'N/A')))}</span>
+                        <span class="history-summary-score" style="color:{color};" title="事件当月评分与状态">{escape(score_text)} · {escape(str(sev))}</span>
+                      </summary>
                     <div class="history-row history-row-expanded">
                       <div class="h-date history-cell-date">{date}</div>
                       <div class="h-event"><b>{event}</b>
@@ -944,9 +949,10 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
                       <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
                       <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{'未跌破事前基准' if row.get('drawdown_days') in ('—', 'N/A', None) else '第' + str(row['drawdown_days']) + '个自然日触及最低收盘'}<br>期末{row.get('window_end_close', 'N/A')}点</small></div>
                       <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('first_underwater_days', 'N/A')}<br>{'曾超过事前六个月高点' if row.get('new_high_date') not in ('—', 'N/A', None) else '未超过事前六个月高点' if row.get('new_high_status') != 'N/A' else '高点数据不足'}</small></div>
-                      <div class="history-score history-cell-score" style="color:{color};"><strong>{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</strong><span>{sev}</span></div>
+                      <div class="history-score history-cell-score" style="color:{color};"><strong>{score_text}</strong><span>{sev}</span></div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    </details>
+                """, unsafe_allow_html=True)
 
     return history_rows
 
