@@ -79,7 +79,11 @@ class DashboardNavigationTests(unittest.TestCase):
         self.assertIn('[data-testid="stSidebarNav"]', css)
         self.assertRegex(
             css,
-            r'\[data-testid="stSidebarUserContent"\]\s*\{\s*order:\s*1;',
+            r'\[data-testid="stSidebarContent"\]\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;',
+        )
+        self.assertRegex(
+            css,
+            r'\[data-testid="stSidebarUserContent"\]\s*\{[^}]*order:\s*1;[^}]*padding-top:\s*0\s*!important;',
         )
         self.assertRegex(
             css,

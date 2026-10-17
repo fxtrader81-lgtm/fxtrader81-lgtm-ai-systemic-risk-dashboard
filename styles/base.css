@@ -86,16 +86,26 @@ section[data-testid="stSidebar"] > div {
 
 /* Streamlit默认把页面导航放在用户自定义侧栏内容之前。
    品牌是整个系统的标识，固定在导航上方。 */
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+  display: flex;
+  flex-direction: column;
+}
+
 section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
   order: 0;
+  flex: 0 0 auto;
 }
 
 section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
   order: 1;
+  flex: 0 0 auto;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
   order: 2;
+  flex: 0 0 auto;
 }
 
 .nav-brand {
