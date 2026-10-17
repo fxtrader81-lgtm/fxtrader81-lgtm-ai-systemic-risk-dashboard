@@ -54,6 +54,8 @@ class DashboardNavigationTests(unittest.TestCase):
         self.assertLess(first_link, first_status)
         self.assertEqual(fake.calls[first_link][1], FACTOR_FILES["straw1"])
         self.assertEqual(len([call for call in fake.calls if call[0] == "page_link"]), 7)
+        containers = [call for call in fake.calls if call[0] == "container"]
+        self.assertEqual(containers[0][1]["key"], "factor_card_straw1")
 
     def test_dashboard_does_not_repeat_credit_transmission_panel(self):
         with open("pages/dashboard.py", encoding="utf-8") as source:

@@ -125,7 +125,7 @@ def render_factor_navigation(scores: dict, results: dict | None = None) -> None:
             state = result.get("state") or score_to_state(score)
             color = STATE_COLORS.get(state, "#fbbf24")
             score_txt, bar_w = f"{score:.0f}", min(int(score), 100)
-        with st.container(border=True):
+        with st.container(border=True, key=f"factor_card_{straw_id}"):
             name_col, link_col = st.columns([1, 1], gap="small", vertical_alignment="center")
             with name_col:
                 st.markdown(f'<div class="factor-native-name">{label}</div>', unsafe_allow_html=True)
