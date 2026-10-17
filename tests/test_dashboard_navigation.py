@@ -44,6 +44,10 @@ class DashboardNavigationTests(unittest.TestCase):
         with patch("core.score_engine.st", fake):
             render_factor_navigation({}, results=results)
 
+        section_title = next(call[1] for call in fake.calls
+                             if call[0] == "markdown" and "factor-section-title" in call[1])
+        self.assertIn("各风险因子情况", section_title)
+        self.assertNotIn("点击进入详情", section_title)
         first_status = next(i for i, call in enumerate(fake.calls)
                             if call[0] == "markdown" and "factor-native-meta" in call[1])
         first_name = next(i for i, call in enumerate(fake.calls)

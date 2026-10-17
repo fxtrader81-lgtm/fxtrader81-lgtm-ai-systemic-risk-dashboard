@@ -115,7 +115,7 @@ FACTOR_FILES = {
 
 def render_factor_navigation(scores: dict, results: dict | None = None) -> None:
     """Use Streamlit's native router so these links behave exactly like the sidebar."""
-    st.markdown('<div class="compact-title">风险因子 · 点击进入详情</div>', unsafe_allow_html=True)
+    st.markdown('<div class="factor-section-title">各风险因子情况</div>', unsafe_allow_html=True)
     for straw_id, label in FACTOR_LABELS.items():
         result = (results or {}).get(straw_id, {})
         score = result.get("score") if results is not None else scores.get(straw_id)

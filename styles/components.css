@@ -345,7 +345,8 @@
 .factor-block { min-width:0; }
 .dashboard-conclusion, .factor-panel { min-height:390px; height:100%; }
 .factor-panel { padding:22px 26px; }
-.conclusion-eyebrow, .compact-title { color:var(--text-dim); font-size:13px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
+.compact-title { color:var(--text-dim); font-size:13px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; margin-bottom:12px; }
+.conclusion-eyebrow, .factor-section-title { color:var(--text-soft); font-size:16px; font-weight:800; letter-spacing:.6px; margin-bottom:12px; }
 .conclusion-state { font-size:30px; font-weight:900; margin-bottom:10px; }
 .conclusion-copy { color:var(--text-soft); font-size:13px; line-height:1.68; }
 .conclusion-report p { margin:0 0 10px; }
@@ -420,15 +421,7 @@ div[class*="st-key-factor_card_"] [data-testid="stPageLink"] a { min-height:28px
 }
 .system-score-meta { color:var(--text-dark); font-size:13px; text-align:right; }
 .source-strip { margin-top:20px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; }
-.source-strip > .compact-title {
-  grid-column:1/-1;
-  margin-bottom:10px;
-  color:var(--text-soft);
-  font-size:20px;
-  font-weight:700;
-  letter-spacing:0;
-  text-transform:none;
-}
+.source-strip > .compact-title { grid-column:1/-1; margin-bottom:2px; }
 .source-status { background:rgba(255,255,255,.02); border-radius:9px; padding:10px; display:grid; gap:5px; }
 .source-status b { color:var(--text-soft); font-size:12px; }
 .source-status span { color:var(--blue); font-size:16px; font-weight:800; }
