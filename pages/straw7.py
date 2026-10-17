@@ -331,32 +331,6 @@ def chart_events(period: str, series: list[pd.Series]):
     return [event for event in CRASH_EVENTS if bounds[0] <= pd.Timestamp(event["date"]) <= bounds[1]]
 
 
-def chart_trace_last_dates(fig) -> str:
-    """Read endpoints from the traces actually passed to Plotly, not source cards."""
-    parts = []
-    for trace in fig.data:
-        if trace.name == SPREAD_NAME or trace.x is None or trace.y is None:
-            continue
-        for x, y in zip(reversed(trace.x), reversed(trace.y)):
-            if pd.notna(y):
-                parts.append(f"{trace.name} {pd.Timestamp(x):%Y-%m-%d}")
-                break
-    return " · ".join(parts) if parts else "当前选择的曲线无数据"
-
-
-def render_chart_asof_banner(fig, period: str) -> None:
-    """Show the last drawn observations prominently above the actual chart."""
-    st.markdown(
-        '<div style="background:#17243b;border:1px solid #4b6b99;border-radius:8px;'
-        'padding:10px 14px;margin:4px 0 10px;color:#eff6ff;font-size:15px;'
-        'font-weight:700;line-height:1.5;">📅 图上曲线末端：'
-        + chart_trace_last_dates(fig)
-        + ('<br><span style="font-weight:400;color:#b9cbe6">全历史跨度下相邻交易日会重叠；使用上方时间范围按钮放大查看。</span>' if period == "ALL" else '')
-        + '</div>',
-        unsafe_allow_html=True,
-    )
-
-
 def select_chart_period(scope: str) -> str:
     """Zoom the existing chart without adding a duplicate short-period chart."""
     choices = {
@@ -937,45 +911,42 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
         except (AttributeError, IndexError, TypeError):
             pass
 
-        st.markdown("""
-        <div class="panel">
-          <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
-          <div class="history-help">悬停事件线查看市场路径；点击事件点可锁定对应事件。事前基准＝观察日前一交易日的标普500日收盘；「六个月内相对基准最深跌幅」＝六个月内最低日收盘÷基准−1，触底历时不是连续下跌时长。「首轮跌破区间」从首次日收盘低于基准开始，到首次日收盘重新达到基准结束；若未收复，持续时间截至最后可用交易日。创新高单独指超过观察日前六个月最高日收盘。首次跌破在前5个有数据交易日属短期观察，第6—20日属传导观察，此后属较晚走势；这些只是展示分类，不证明事件造成下跌。六个月是价格路径观察期，不是事件影响期限。评分与颜色仅表示事件当月指标状态；持续性事件使用代表观察日；历史压力序列可能包含修订值。</div>
-          <div class="history-header">
-            <div class="history-header-date">时间</div>
-            <div class="history-header-event">事件与计算依据</div>
-            <div class="history-header-yield history-cell-yield">10Y</div>
-            <div class="history-header-drawdown">六个月相对基准<br>最深跌幅</div>
-            <div class="history-header-drawdown">首轮跌破区间<br>最深跌幅</div>
-            <div class="history-header-score">事件当月<br>指标状态</div>
-          </div>
-        """, unsafe_allow_html=True)
-
-        for row in history_rows:
-            date, event = row["month"], row["event"]
-            sev = row.get("state", "N/A")
-            color = SEVERITY_COLOR.get(sev, "#94a3b8")
-            active_class = " history-row-active" if date == st.session_state.get("straw7_selected_event") else ""
-            st.markdown(f"""
-            <div class="history-row{active_class}">
-              <div class="h-date history-cell-date">{date}</div>
-              <div class="h-event"><b>{event}</b>
-                <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
-                <small class="event-path-summary"><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
-                <small>观察日类型：{next((e['anchor'] for e in CRASH_EVENTS if e['date'] == row.get('event_date')), '日期待确认')}</small>
-                <small>{row.get('scope', '')}</small>
-                <small>事件观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
-                <details class="history-calculation"><summary>查看跌幅计算与数据追溯</summary><div>以{row.get('event_date', 'N/A')}为观察日，事前交易日{row.get('baseline_date', 'N/A')}收盘{row.get('baseline_close', 'N/A')}点；六个月内最低日收盘 ÷ 固定基准 − 1：{row.get('drawdown_formula', 'N/A')}；六个月最低日：{row.get('drawdown_date', 'N/A')}。首次跌破：{row.get('first_breach_date', 'N/A')}（{row.get('breach_timing', 'N/A')}）；首次收复：{row.get('recovery_date', 'N/A')}；首轮低于基准时长：{row.get('first_underwater_days', 'N/A')}；首轮最深跌幅：{row.get('initial_drawdown', 'N/A')}。事前六个月最高收盘：{row.get('prior_peak_close', 'N/A')}点（{row.get('prior_peak_date', 'N/A')}）；{row.get('new_high_status', 'N/A')}。{row.get('window_end_label', '观察期末')}{row.get('window_end_date', 'N/A')}收盘{row.get('window_end_close', 'N/A')}点（相对基准{row.get('window_end_return', 'N/A')}）。后续再次下跌不自动归因于原事件。</div></details>
-                <details class="history-calculation"><summary>查看评分计算与数据追溯</summary><div>{row.get('components', '该事件时点的源数据不足，未生成评分。')}</div></details>
-              </div>
-              <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
-              <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{'未跌破事前基准' if row.get('drawdown_days') in ('—', 'N/A', None) else '第' + str(row['drawdown_days']) + '个自然日触及最低收盘'}<br>期末{row.get('window_end_close', 'N/A')}点</small></div>
-              <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('first_underwater_days', 'N/A')}<br>{'曾超过事前六个月高点' if row.get('new_high_date') not in ('—', 'N/A', None) else '未超过事前六个月高点' if row.get('new_high_status') != 'N/A' else '高点数据不足'}</small></div>
-              <div class="history-score history-cell-score" style="color:{color};"><strong>{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</strong><span>{sev}</span></div>
-            </div>
+        selected_event = st.session_state.get("straw7_selected_event")
+        state_markdown_colors = {
+            "SAFE": "green", "WATCH": "orange", "WARNING": "orange",
+            "CRITICAL": "red", "N/A": "gray",
+        }
+        with st.container(key="straw7_event_list"):
+            st.markdown("""
+              <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
+              <div class="history-help">每个事件均可单独展开。悬停事件线查看市场路径；点击事件点会自动展开对应事件。事前基准＝观察日前一交易日的标普500日收盘；「六个月内相对基准最深跌幅」＝六个月内最低日收盘÷基准−1，触底历时不是连续下跌时长。「首轮跌破区间」从首次日收盘低于基准开始，到首次日收盘重新达到基准结束；若未收复，持续时间截至最后可用交易日。创新高单独指超过观察日前六个月最高日收盘。首次跌破在前5个有数据交易日属短期观察，第6—20日属传导观察，此后属较晚走势；这些只是展示分类，不证明事件造成下跌。六个月是价格路径观察期，不是事件影响期限。评分与颜色仅表示事件当月指标状态；持续性事件使用代表观察日；历史压力序列可能包含修订值。</div>
             """, unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            for row in history_rows:
+                date, event = row["month"], row["event"]
+                sev = row.get("state", "N/A")
+                color = SEVERITY_COLOR.get(sev, "#94a3b8")
+                state_color = state_markdown_colors.get(sev, "gray")
+                expander_label = f"**{date}　　{event}**　　:{state_color}[**{sev}**]"
+                with st.expander(expander_label, expanded=date == selected_event):
+                    st.markdown(f"""
+                    <div class="history-row history-row-expanded">
+                      <div class="h-date history-cell-date">{date}</div>
+                      <div class="h-event"><b>{event}</b>
+                        <span class="history-state-badge" style="background:{color}22; color:{color};">{sev}</span>
+                        <small class="event-path-summary"><b>{row.get('kind', '')}</b> · {row.get('summary', row['description'])}</small>
+                        <small>观察日类型：{next((e['anchor'] for e in CRASH_EVENTS if e['date'] == row.get('event_date')), '日期待确认')}</small>
+                        <small>{row.get('scope', '')}</small>
+                        <small>事件观察月：{row.get('as_of', 'N/A')} · 有效权重覆盖率 {row.get('coverage', 0)}%</small>
+                        <details class="history-calculation"><summary>查看跌幅计算与数据追溯</summary><div>以{row.get('event_date', 'N/A')}为观察日，事前交易日{row.get('baseline_date', 'N/A')}收盘{row.get('baseline_close', 'N/A')}点；六个月内最低日收盘 ÷ 固定基准 − 1：{row.get('drawdown_formula', 'N/A')}；六个月最低日：{row.get('drawdown_date', 'N/A')}。首次跌破：{row.get('first_breach_date', 'N/A')}（{row.get('breach_timing', 'N/A')}）；首次收复：{row.get('recovery_date', 'N/A')}；首轮低于基准时长：{row.get('first_underwater_days', 'N/A')}；首轮最深跌幅：{row.get('initial_drawdown', 'N/A')}。事前六个月最高收盘：{row.get('prior_peak_close', 'N/A')}点（{row.get('prior_peak_date', 'N/A')}）；{row.get('new_high_status', 'N/A')}。{row.get('window_end_label', '观察期末')}{row.get('window_end_date', 'N/A')}收盘{row.get('window_end_close', 'N/A')}点（相对基准{row.get('window_end_return', 'N/A')}）。后续再次下跌不自动归因于原事件。</div></details>
+                        <details class="history-calculation"><summary>查看评分计算与数据追溯</summary><div>{row.get('components', '该事件时点的源数据不足，未生成评分。')}</div></details>
+                      </div>
+                      <div class="h-yield history-cell-yield">{row.get('y10', 'N/A')}</div>
+                      <div class="h-drop history-cell-drawdown">{row.get('drawdown', 'N/A')}<small>{'未跌破事前基准' if row.get('drawdown_days') in ('—', 'N/A', None) else '第' + str(row['drawdown_days']) + '个自然日触及最低收盘'}<br>期末{row.get('window_end_close', 'N/A')}点</small></div>
+                      <div class="h-drop history-cell-drawdown">{row.get('initial_drawdown', 'N/A')}<small>{row.get('first_underwater_days', 'N/A')}<br>{'曾超过事前六个月高点' if row.get('new_high_date') not in ('—', 'N/A', None) else '未超过事前六个月高点' if row.get('new_high_status') != 'N/A' else '高点数据不足'}</small></div>
+                      <div class="history-score history-cell-score" style="color:{color};"><strong>{'N/A' if row.get('score') is None else f'{row["score"]}/100'}</strong><span>{sev}</span></div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     return history_rows
 
@@ -1179,7 +1150,6 @@ with tab_all:
             y10, y30, sp500, nasdaq, dow, shcomp, szcomp,
             period=period, show_crashes=show_crashes, visible_series=selected_all,
         )
-        render_chart_asof_banner(fig_overview, period)
         st.plotly_chart(fig_overview, use_container_width=True, key="straw7_all_overview")
     render_market_note("股指采用日线连续曲线（已收市为收盘价，当日未收市则为暂值）；右侧勾选框控制折线，色块与曲线同色。期限利差背景柱固定显示：绿色为正利差、红色为倒挂，悬停显示该日 bps。")
 
@@ -1202,7 +1172,6 @@ with tab_us:
             title="美股三大指数（左轴）× 美债收益率山形背景（右轴）",
             visible_series=selected_us,
         )
-        render_chart_asof_banner(fig_us, period)
         st.plotly_chart(fig_us, use_container_width=True, key="straw7_us_markets")
     render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
@@ -1234,7 +1203,6 @@ with tab_cn:
             title="A股指数（左轴）× 美债收益率山形背景（右轴）",
             visible_series=selected_cn,
         )
-        render_chart_asof_banner(fig_cn, period)
         st.plotly_chart(fig_cn, use_container_width=True, key="straw7_cn_markets")
     render_market_note("股指采用日线连续曲线（当日未收市时为暂值）；右侧色块与曲线同色。期限利差背景柱固定显示，绿色为正、红色为倒挂。")
 
