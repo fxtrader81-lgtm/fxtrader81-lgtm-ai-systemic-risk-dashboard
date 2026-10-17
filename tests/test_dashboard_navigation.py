@@ -34,7 +34,7 @@ class _FakeStreamlit:
 
 
 class DashboardNavigationTests(unittest.TestCase):
-    def test_status_precedes_name_and_internal_detail_link(self):
+    def test_name_and_internal_link_precede_status_bar(self):
         fake = _FakeStreamlit()
         results = {
             straw_id: {"score": 10, "state": "SAFE"}
@@ -50,8 +50,8 @@ class DashboardNavigationTests(unittest.TestCase):
                           if call[0] == "markdown" and "factor-native-name" in call[1])
         first_link = next(i for i, call in enumerate(fake.calls) if call[0] == "page_link")
 
-        self.assertLess(first_status, first_name)
         self.assertLess(first_name, first_link)
+        self.assertLess(first_link, first_status)
         self.assertEqual(fake.calls[first_link][1], FACTOR_FILES["straw1"])
         self.assertEqual(len([call for call in fake.calls if call[0] == "page_link"]), 7)
 
