@@ -916,6 +916,15 @@ def render_alert_system(stress, y30, sp500_daily, market_phase, show_hist_chart=
             st.markdown("""
               <div class="panel-title">📋 历史事件复盘 <span class="source-tag-warn static-data-badge">⚠ 静态事件库</span></div>
               <div class="history-help">每个事件均可单独展开。悬停事件线查看市场路径；点击事件点会自动展开对应事件。事前基准＝观察日前一交易日的标普500日收盘；「六个月内相对基准最深跌幅」＝六个月内最低日收盘÷基准−1，触底历时不是连续下跌时长。「首轮跌破区间」从首次日收盘低于基准开始，到首次日收盘重新达到基准结束；若未收复，持续时间截至最后可用交易日。创新高单独指超过观察日前六个月最高日收盘。首次跌破在前5个有数据交易日属短期观察，第6—20日属传导观察，此后属较晚走势；这些只是展示分类，不证明事件造成下跌。六个月是价格路径观察期，不是事件影响期限。评分与颜色仅表示事件当月指标状态；持续性事件使用代表观察日；历史压力序列可能包含修订值。</div>
+              <div class="history-event-table-header">
+                <span aria-hidden="true"></span>
+                <span>时间</span>
+                <span class="history-header-event-name">事件名称</span>
+                <span>10Y收益率</span>
+                <span>六个月相对基准<br>最深跌幅</span>
+                <span>首轮跌破区间<br>最深跌幅</span>
+                <span>评分 · 状态</span>
+              </div>
             """, unsafe_allow_html=True)
 
             for row in history_rows:
