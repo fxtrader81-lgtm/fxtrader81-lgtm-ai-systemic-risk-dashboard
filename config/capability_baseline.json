@@ -1,0 +1,24 @@
+{
+  "source": "LiveBench 官方公开结果",
+  "release": "2026-06-25",
+  "source_url": "https://raw.githubusercontent.com/LiveBench/new-livebench/main/public/table_2026_06_25.csv",
+  "source_page": "https://github.com/LiveBench/new-livebench/blob/main/public/table_2026_06_25.csv",
+  "source_sha256": "09d810986777c92b75b40a58a1829e0318e34cb5693ecae970b3145852271ba7",
+  "checked_at": "2026-10-18T08:16:35.144956+00:00",
+  "closed_model": "gpt-6.1-sol-max",
+  "open_model": "deepseek-v4.1-flash-max",
+  "tasks": ["math_comp", "code_generation", "logic_with_navigation"],
+  "closed_scores": [97.059, 80.282, 86.0],
+  "open_scores": [96.078, 77.465, 68.0],
+  "model_evaluated_at": null,
+  "caveat": "评测版本日期不等于测试日期。DeepSeek行未标注1017；不能称为1017新版成绩。仅为三个固定任务的能力切片，不代表整体智能或已发生商业替代。",
+  "legacy": {
+    "recorded_period": "2025-01",
+    "closed_model": "GPT-4o (2024-11)",
+    "open_model": "DeepSeek-V3",
+    "tasks": ["MMLU", "HumanEval", "MATH"],
+    "closed_scores": [85.7, 90.2, 76.6],
+    "open_scores": [88.5, 89.1, 75.7],
+    "note": "原项目录入值，原始出处和测试配置尚未逐项核验；分数为旧规则复算，不是当时保存的02完整总分。"
+  }
+}

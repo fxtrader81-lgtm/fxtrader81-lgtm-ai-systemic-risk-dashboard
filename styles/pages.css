@@ -669,3 +669,95 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
   stroke-width: 5px !important;
   filter: drop-shadow(0 0 3px currentColor);
 }
+/* One normal-flow text block avoids squeezing separately measured captions. */
+.capability-refresh-notes {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding-bottom: 8px;
+}
+.st-key-capability_controls [data-testid="stMarkdownContainer"] .capability-refresh-notes p {
+  display: block;
+  position: static;
+  margin: 0 0 8px !important;
+  line-height: 1.65 !important;
+  color: var(--text-dim) !important;
+}
+.st-key-capability_controls [data-testid="stExpander"] summary,
+.st-key-capability_controls [data-testid="stExpander"] summary p,
+.st-key-capability_controls [data-testid="stExpander"] summary span,
+.st-key-capability_controls [data-testid="stExpander"] summary svg,
+.st-key-capability_evidence [data-testid="stExpander"] summary,
+.st-key-capability_evidence [data-testid="stExpander"] summary p,
+.st-key-capability_evidence [data-testid="stExpander"] summary span,
+.st-key-capability_evidence [data-testid="stExpander"] summary svg,
+.st-key-capability_history [data-testid="stExpander"] summary,
+.st-key-capability_history [data-testid="stExpander"] summary p,
+.st-key-capability_history [data-testid="stExpander"] summary span,
+.st-key-capability_history [data-testid="stExpander"] summary svg {
+  color: var(--text-soft) !important;
+  font-size: 16px !important;
+  opacity: 1 !important;
+}
+
+/* Native Streamlit prose has its own light-theme foreground. Expander-title
+   styling alone does not cover formulas, summaries or nested history text. */
+:is(.st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stExpander"] summary,
+:is(.st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stExpander"] summary :is(p, span) {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4, h5, h6) {
+  color: var(--text-soft) !important;
+  opacity: 1 !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stCaptionContainer"],
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stCaptionContainer"] :is(p, strong, em) {
+  color: var(--text-dim) !important;
+  opacity: 1 !important;
+  overflow-wrap: anywhere;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stMarkdownContainer"] a {
+  color: var(--blue) !important;
+}
+
+/* Style both foreground and surface for every native interaction state;
+   otherwise Streamlit's light default can turn white text onto white. */
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button {
+  background: var(--bg-input) !important;
+  color: var(--text-soft) !important;
+  border: 1px solid var(--text-dim) !important;
+  box-shadow: none !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button:is(:hover, :focus, :active) {
+  background: var(--bg-panel-2) !important;
+  color: var(--text-soft) !important;
+  border-color: var(--blue) !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stExpander"] summary {
+  background: var(--bg-panel) !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stExpander"] summary:is(:hover, :focus, :active),
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  [data-testid="stExpander"] details[open] > summary {
+  background: var(--bg-panel-2) !important;
+}
+:is(.st-key-capability_controls, .st-key-capability_evidence, .st-key-capability_history)
+  :is(button, summary):focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 2px;
+}

@@ -1,0 +1,11 @@
+{
+  "version": "reviewed-livebench-openrouter-v1",
+  "models": {
+    "claude-fable-5-1-max-effort": {"id": "anthropic/claude-fable-5.1", "note": "同一Fable 5.1基础型号；Max Effort为评测推理档位，比较Token目录单价而非实际推理用量。"},
+    "gpt-6-astra-max": {"id": "openai/gpt-6-astra", "note": "同一GPT-6 Astra基础型号；Max Effort不替换为Pro或latest。"},
+    "muse-spark-1.3-xhigh": {"id": "meta/muse-spark-1.3", "note": "同一Muse Spark 1.3；xHigh是推理档位，不替换为Open或Contributor。"},
+    "deepseek-v4.1-flash-max": {"id": "deepseek/deepseek-v4.1-flash", "note": "同一DeepSeek V4.1 Flash基础型号；不替换为1017或batch。"},
+    "qwen3.8-max": {"id": "qwen/qwen3.8-2.4t-a95b", "note": "LiveBench本期元数据的huggingface链接明确指向Qwen/Qwen3.8-2.4T-A95B；不使用Max Prime或0902。", "required_huggingface": "https://huggingface.co/Qwen/Qwen3.8-2.4T-A95B"},
+    "kimi-k3": {"id": "moonshotai/kimi-k3", "note": "同一Kimi K3，不使用batch。"}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "policy_version": "country-openness-reviewed-products-v1",
+  "note": "国别按已核验发布平台归属，不代表基础模型全部技术来源。开放权重按同提交LiveBench标记核对；未标记开放权重的型号仅限已核验闭源产品线。未知平台/产品线待核验，不猜测。",
+  "platforms": {
+    "OpenAI": {"company": "OpenAI", "country": "US", "closed_pattern": "gpt-(?!oss)[a-z0-9.\\-]+", "source": "https://openai.com/about/"},
+    "Anthropic": {"company": "Anthropic", "country": "US", "closed_pattern": "claude-[a-z0-9.\\-]+", "source": "https://www.anthropic.com/company"},
+    "Google": {"company": "Google", "country": "US", "closed_pattern": "gemini-[a-z0-9.\\-]+", "source": "https://about.google/"},
+    "Meta": {"company": "Meta", "country": "US", "closed_pattern": "muse-[a-z0-9.\\-]+", "source": "https://about.meta.com/"},
+    "xAI": {"company": "xAI", "country": "US", "closed_pattern": "grok-[a-z0-9.\\-]+", "source": "https://x.ai/"},
+    "NVIDIA": {"company": "NVIDIA", "country": "US", "source": "https://www.nvidia.com/en-us/about-nvidia/"},
+    "Abacus.AI": {"company": "Abacus.AI", "country": "US", "source": "https://abacus.ai/about"},
+    "AbacusAI": {"company": "Abacus.AI", "country": "US", "source": "https://abacus.ai/about"},
+    "Thinking Machines": {"company": "Thinking Machines", "country": "US", "source": "https://thinkingmachines.ai/"},
+    "Alibaba": {"company": "Alibaba", "country": "CN", "source": "https://www.alibabagroup.com/"},
+    "Qwen": {"company": "Alibaba", "country": "CN", "source": "https://qwen.ai/"},
+    "Moonshot AI": {"company": "Moonshot AI", "country": "CN", "source": "https://www.moonshot.ai/"},
+    "Moonshot": {"company": "Moonshot AI", "country": "CN", "source": "https://www.moonshot.ai/"},
+    "Z.AI": {"company": "Z.AI", "country": "CN", "source": "https://z.ai/"},
+    "DeepSeek": {"company": "DeepSeek", "country": "CN", "source": "https://www.deepseek.com/"},
+    "Minimax": {"company": "MiniMax", "country": "CN", "source": "https://www.minimax.io/"},
+    "MiniMax": {"company": "MiniMax", "country": "CN", "source": "https://www.minimax.io/"}
+  }
+}

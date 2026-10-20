@@ -23,6 +23,10 @@ from core.macro_data import load_credit_stress_snapshot, load_macro_stress_snaps
 from core.macro_risk import compute_macro_metrics
 from core.straw5_engine import load_straw5_analysis
 from core.transmission_phase import market_phase, system_phase
+from core.capability_gap import ensure_full_baseline as current_capability_snapshot
+from core.model_prices import load_prices
+from core.deployment_interest import load_deployment
+from core.ecology_downloads import load_ecology
 
 
 @dataclass
@@ -126,51 +130,32 @@ def _get_json(url: str):
 
 
 def _straw2() -> dict:
-    # Static capability benchmark remains a documented quarterly input.
-    closed_avg = np.mean([85.7, 90.2, 76.6])
-    open_avg = np.mean([88.5, 89.1, 75.7])
-    gap = max(0.0, closed_avg - open_avg)
-    components = [(0.20, clamp((25 - gap) / 25 * 60), "能力基准")]
-    sources = ["季度能力基准"]
+    # All four factor-02 component inputs are shared with the detail page.
+    capability = current_capability_snapshot()
+    components = [(0.20, capability["metrics"]["score"], "能力基准")]
+    sources = [f"LiveBench {capability['release']} · 能力相对差距"]
 
     try:
-        models = _get_json("https://openrouter.ai/api/v1/models").get("data", [])
-        closed_ids = ("openai/gpt-4o", "anthropic/claude-3.5-sonnet", "google/gemini-pro-1.5")
-        open_ids = ("meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-chat", "qwen/qwen-2.5-72b-instruct")
-        prices = {"closed": [], "open": []}
-        for model in models:
-            prompt = model.get("pricing", {}).get("prompt")
-            if prompt in (None, ""):
-                continue
-            price = float(prompt) * 1_000_000
-            mid = model.get("id", "")
-            if mid in closed_ids:
-                prices["closed"].append(price)
-            if mid in open_ids:
-                prices["open"].append(price)
-        if prices["closed"] and prices["open"]:
-            ratio = np.mean(prices["open"]) / np.mean(prices["closed"]) * 100
-            compression = 100 - ratio
-            components.append((0.35, clamp((compression - 10) / 50 * 100), "价格"))
-            sources.append("OpenRouter")
+        prices = load_prices(capability)
+        if prices["available"]:
+            components.append((0.35, prices["metrics"]["score"], "价格"))
+            sources.append("OpenRouter · 同本期六型号输入价")
     except Exception:
         pass
 
     try:
-        repos = ("ollama/ollama", "vllm-project/vllm", "ggerganov/llama.cpp")
-        stars = sum(int(_get_json(f"https://api.github.com/repos/{repo}")["stargazers_count"]) for repo in repos)
-        proxy = 30 if stars < 150_000 else 80 if stars < 300_000 else 140 if stars < 500_000 else 220
-        components.append((0.30, clamp((proxy - 20) / 180 * 100), "部署"))
-        sources.append("GitHub")
+        deployment = load_deployment()
+        if deployment["available"]:
+            components.append((0.30, deployment["metrics"]["score"], "部署工具关注度"))
+            sources.append("GitHub · 固定三仓库累计stars代理")
     except Exception:
         pass
 
     try:
-        models = ("meta-llama/Llama-3.3-70B-Instruct", "deepseek-ai/DeepSeek-V3", "Qwen/Qwen2.5-72B-Instruct")
-        downloads = sum(int(_get_json(f"https://huggingface.co/api/models/{model}").get("downloads", 0)) for model in models)
-        velocity = 15 if downloads < 500_000 else 40 if downloads < 2_000_000 else 65 if downloads < 8_000_000 else 85
-        components.append((0.15, velocity, "生态"))
-        sources.append("Hugging Face")
+        ecology = load_ecology(capability)
+        if ecology["available"]:
+            components.append((0.15, ecology["metrics"]["score"], "入选模型下载热度"))
+            sources.append("Hugging Face · 本期三模型近30天下载")
     except Exception:
         pass
 
@@ -307,7 +292,7 @@ PROVIDERS: dict[str, Callable[[], dict]] = {
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_factor_results() -> dict[str, dict]:
-    """Load independent providers in parallel and cache the small normalized result."""
+    """Load providers; capability refresh explicitly invalidates this result cache."""
     results: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=len(PROVIDERS)) as pool:
         future_map = {pool.submit(provider): straw_id for straw_id, provider in PROVIDERS.items()}
