@@ -4,6 +4,14 @@ import plotly.graph_objects as go
 from components.ui import evidence_table, load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
+from core.aof import load_aof, score_aof, history as aof_history
+from components.aof_panel import render_current as render_aof_current, render_history as render_aof_history
+from core.reit_pressure import load_reit, history as reit_history
+from components.reit_panel import render_current as render_reit_current, render_history as render_reit_history
+from core.liquid_signal import load_liquid, history as liquid_history
+from components.liquid_panel import render_current as render_liquid_current, render_history as render_liquid_history
+from core.power_infrastructure import load_power, history as power_history
+from components.power_panel import render_current as render_power_current, render_history as render_power_history
 
 load_css()
 
@@ -11,20 +19,11 @@ load_css()
 # 全局基准参数
 # =========================================================
 
-LEGACY_RACK_LIMIT_KW   = 25
-UPGRADED_RACK_LIMIT_KW = 50
-CURRENT_DEPLOY_GPU     = "H100"
-CURRENT_RACK_KW        = 60
-AOF = round(CURRENT_RACK_KW / LEGACY_RACK_LIMIT_KW, 2)   # → 2.4x
-
-GPU_GENERATIONS = [
-    {"gen": "V100\n(2017)",  "year": 2017, "rack_kw_min": 10,  "rack_kw_max": 20,  "status": "legacy"},
-    {"gen": "A100\n(2020)",  "year": 2020, "rack_kw_min": 20,  "rack_kw_max": 30,  "status": "legacy"},
-    {"gen": "H100\n(2022)",  "year": 2022, "rack_kw_min": 40,  "rack_kw_max": 80,  "status": "active"},
-    {"gen": "H200\n(2024)",  "year": 2024, "rack_kw_min": 60,  "rack_kw_max": 100, "status": "active"},
-    {"gen": "B200\n(2025)",  "year": 2025, "rack_kw_min": 100, "rack_kw_max": 140, "status": "current"},
-    {"gen": "Rubin\n(2026e)","year": 2026, "rack_kw_min": 180, "rack_kw_max": 220, "status": "next"},
-]
+aof_snapshot = load_aof()
+LEGACY_RACK_LIMIT_KW = aof_snapshot["reference"]["baseline_kw"]
+CURRENT_DEPLOY_GPU = aof_snapshot["reference"]["model"]
+CURRENT_RACK_KW = aof_snapshot["reference"]["rack_kw"]
+AOF = aof_snapshot["metrics"]["aof"]
 
 # =========================================================
 # 页面配置
@@ -112,99 +111,6 @@ def average_present(values):
 # 三大指标数据获取函数（全部改用 yfinance）
 # =========================================================
 
-@st.cache_data(ttl=3600)
-def get_reit_data():
-    """数据中心 REIT 财务压力：EQIX / DLR"""
-    results = {}
-    for ticker in ["EQIX", "DLR"]:
-        info = fetch_yf_info(ticker)
-        if not info:
-            continue
-
-        current_p   = safe_get(info, "currentPrice", 0)
-        week52_high = safe_get(info, "fiftyTwoWeekHigh")
-        week52_low  = safe_get(info, "fiftyTwoWeekLow")
-        rev_raw = safe_get(info, "revenueGrowth")
-        gross_raw = safe_get(info, "grossMargins")
-        rev_growth = rev_raw * 100 if rev_raw is not None else None
-        gross_margin = gross_raw * 100 if gross_raw is not None else None
-
-        from_high = ((week52_high - current_p) / week52_high * 100
-                     if week52_high > 0 else 0)
-
-        results[ticker] = {
-            "rev_growth":    rev_growth,
-            "gross_margin":  gross_margin,
-            "current_price": current_p,
-            "week52_high":   week52_high,
-            "week52_low":    week52_low,
-            "from_high_pct": from_high,
-        }
-    return results if results else None
-
-
-@st.cache_data(ttl=3600)
-def get_liquid_cooling_data():
-    """液冷设备厂商加速信号：VRT / SMCI"""
-    results = {}
-    for ticker in ["VRT", "SMCI"]:
-        info = fetch_yf_info(ticker)
-        if not info:
-            continue
-
-        current_p    = safe_get(info, "currentPrice", 0)
-        week52_high  = safe_get(info, "fiftyTwoWeekHigh")
-        week52_low   = safe_get(info, "fiftyTwoWeekLow")
-        rev_raw = safe_get(info, "revenueGrowth")
-        gross_raw = safe_get(info, "grossMargins")
-        rev_growth = rev_raw * 100 if rev_raw is not None else None
-        gross_margin = gross_raw * 100 if gross_raw is not None else None
-
-        price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
-                     if week52_high > week52_low else 50)
-
-        results[ticker] = {
-            "rev_growth":    rev_growth,
-            "gross_margin":  gross_margin,
-            "current_price": current_p,
-            "week52_high":   week52_high,
-            "week52_low":    week52_low,
-            "price_pos_pct": price_pos,
-        }
-    return results if results else None
-
-
-@st.cache_data(ttl=3600)
-def get_power_data():
-    """电力基础设施压力信号：NEE / SO"""
-    results = {}
-    for ticker in ["NEE", "SO"]:
-        info = fetch_yf_info(ticker)
-        if not info:
-            continue
-
-        current_p   = safe_get(info, "currentPrice", 0)
-        week52_high = safe_get(info, "fiftyTwoWeekHigh")
-        week52_low  = safe_get(info, "fiftyTwoWeekLow")
-        rev_raw = safe_get(info, "revenueGrowth")
-        op_raw = safe_get(info, "operatingMargins")
-        rev_growth = rev_raw * 100 if rev_raw is not None else None
-        op_margin = op_raw * 100 if op_raw is not None else None
-
-        price_pos = ((current_p - week52_low) / (week52_high - week52_low) * 100
-                     if week52_high > week52_low else 50)
-
-        results[ticker] = {
-            "rev_growth":    rev_growth,
-            "op_margin":     op_margin,
-            "current_price": current_p,
-            "week52_high":   week52_high,
-            "week52_low":    week52_low,
-            "price_pos_pct": price_pos,
-        }
-    return results if results else None
-
-
 # =========================================================
 # DCOI 评分计算
 # =========================================================
@@ -232,68 +138,6 @@ def get_state(dcoi):
 # 分项评分函数（与 v1 完全一致）
 # =========================================================
 
-def score_aof(aof):
-    if aof < 1.5:
-        return 0, "green", "↗", "SAFE"
-    elif aof < 2.5:
-        return round((aof - 1.5) / 1.0 * 33), "yellow", "→", "WATCH"
-    elif aof < 3.5:
-        return round(33 + (aof - 2.5) / 1.0 * 34), "orange", "↘", "WARNING"
-    else:
-        return round(min(100, 67 + (aof - 3.5) / 0.5 * 33)), "red", "↓", "CRITICAL"
-
-
-def score_reit(reit_data):
-    if not reit_data:
-        return 50, "gray", "—", "N/A"
-    scores = []
-    for d in reit_data.values():
-        fh = d.get("from_high_pct", 0)
-        rg = d.get("rev_growth")
-        ps = 10 if fh < 5 else (35 if fh < 15 else (60 if fh < 25 else (80 if fh < 40 else 95)))
-        gs = 50 if rg is None else (10 if rg > 12 else (30 if rg > 6 else (55 if rg > 0 else 80)))
-        scores.append(ps * 0.65 + gs * 0.35)
-    avg = sum(scores) / len(scores)
-    if avg < 25:   return round(avg), "green",  "↗", "SAFE"
-    elif avg < 50: return round(avg), "yellow", "→", "WATCH"
-    elif avg < 70: return round(avg), "orange", "↘", "WARNING"
-    else:          return round(avg), "red",    "↓", "CRITICAL"
-
-
-def score_liquid(lc_data):
-    if not lc_data:
-        return 50, "gray", "—", "N/A"
-    scores = []
-    for d in lc_data.values():
-        g  = d.get("rev_growth")
-        pp = d.get("price_pos_pct", 50)
-        gs = 50 if g is None else (10 if g < 10 else (30 if g < 30 else (55 if g < 60 else (75 if g < 100 else 90))))
-        ps = 80 if pp > 80 else (60 if pp > 60 else (40 if pp > 40 else 20))
-        scores.append(gs * 0.65 + ps * 0.35)
-    avg = sum(scores) / len(scores)
-    if avg < 25:   return round(avg), "green",  "↗", "SAFE"
-    elif avg < 50: return round(avg), "yellow", "→", "WATCH"
-    elif avg < 70: return round(avg), "orange", "↘", "WARNING"
-    else:          return round(avg), "red",    "↓", "CRITICAL"
-
-
-def score_power(power_data):
-    if not power_data:
-        return 30, "gray", "—", "N/A"
-    scores = []
-    for d in power_data.values():
-        g  = d.get("rev_growth")
-        pp = d.get("price_pos_pct", 50)
-        gs = 50 if g is None else (15 if g < 3 else (35 if g < 8 else (60 if g < 15 else 80)))
-        ps = 70 if pp > 75 else (50 if pp > 50 else (30 if pp > 25 else 15))
-        scores.append(gs * 0.6 + ps * 0.4)
-    avg = sum(scores) / len(scores)
-    if avg < 25:   return round(avg), "green",  "↗", "SAFE"
-    elif avg < 45: return round(avg), "yellow", "→", "WATCH"
-    elif avg < 65: return round(avg), "orange", "↘", "WARNING"
-    else:          return round(avg), "red",    "↓", "CRITICAL"
-
-
 # =========================================================
 # 顶部标题
 # =========================================================
@@ -305,22 +149,48 @@ render_header("🏗️ 数据中心资产减值", "核心监测维度：GPU迭�
 # =========================================================
 
 with st.spinner("正在通过 yfinance 拉取 REIT · 液冷厂商 · 电力数据..."):
-    reit_data  = get_reit_data()
-    lc_data    = get_liquid_cooling_data()
-    power_data = get_power_data()
+    reit_snapshot = load_reit()
+    liquid_snapshot = load_liquid()
+    power_snapshot = load_power()
 
 # =========================================================
 # 各分项评分
 # =========================================================
 
 aof_s,   aof_color,   aof_arrow,   aof_status   = score_aof(AOF)
-reit_s,  reit_color,  reit_arrow,  reit_status  = score_reit(reit_data)
-lc_s,    lc_color,    lc_arrow,    lc_status    = score_liquid(lc_data)
-power_s, power_color, power_arrow, power_status = score_power(power_data)
+reit_metrics = reit_snapshot["metrics"]
+if reit_metrics:
+    reit_s, reit_color, reit_arrow, reit_status = (reit_metrics["score"], reit_metrics["color"],
+                                                 reit_metrics["arrow"], reit_metrics["state"])
+else:
+    reit_s, reit_color, reit_arrow, reit_status = None, "gray", "—", "N/A"
+liquid_metrics = liquid_snapshot["metrics"]
+if liquid_metrics:
+    lc_s, lc_color, lc_arrow, lc_status = (liquid_metrics["score"], liquid_metrics["color"],
+                                          liquid_metrics["arrow"], liquid_metrics["state"])
+else:
+    lc_s, lc_color, lc_arrow, lc_status = None, "gray", "—", "N/A"
+power_metrics = power_snapshot["metrics"]
+if power_metrics:
+    power_s, power_color, power_arrow, power_status = (power_metrics["score"], power_metrics["color"],
+                                                       power_metrics["arrow"], power_metrics["state"])
+else:
+    power_s, power_color, power_arrow, power_status = None, "gray", "—", "N/A"
 
-dcoi = compute_dcoi(aof_s, reit_s, lc_s, power_s)
-register_score("straw3", dcoi)
-state, state_color, state_hex, state_eng, state_cn = get_state(dcoi)
+if reit_metrics and liquid_metrics and power_metrics:
+    dcoi = compute_dcoi(aof_s, reit_s, lc_s, power_s)
+    register_score("straw3", dcoi)
+    state, state_color, state_hex, state_eng, state_cn = get_state(dcoi)
+else:
+    dcoi = None
+    st.session_state.get("straw_scores", {}).pop("straw3", None)
+    state, state_color, state_hex = "N/A", "gray", "94a3b8"
+    missing_components = []
+    if not reit_metrics: missing_components.append("REIT")
+    if not liquid_metrics: missing_components.append("液冷相关企业")
+    if not power_metrics: missing_components.append("电力相关企业")
+    state_eng = " / ".join(missing_components) + " evidence incomplete"
+    state_cn = "、".join(missing_components) + "必要数据不完整，完整DCOI暂不可用，不补预设分"
 
 bar_color_map = {"green": "#22c55e", "yellow": "#fbbf24", "orange": "#f97316", "red": "#ef4444"}
 bar_color = bar_color_map.get(state_color, "#94a3b8")
@@ -330,10 +200,10 @@ bar_color = bar_color_map.get(state_color, "#94a3b8")
 # =========================================================
 
 st.markdown(render_osci_card(
-    "DATA CENTER OBSOLESCENCE INDEX", dcoi, state, f"综合评分：{state_cn}",
+    "DATA CENTER OBSOLESCENCE INDEX", dcoi, state, f"综合评分：原规则{state}档；参考情景与市场代理组合，非已确认减值" if dcoi is not None else state_cn,
     bar_color=bar_color, state_detail=state_eng,
     components_html="GPU功率压力 ×0.25 · REIT估值 ×0.35<br>液冷信号 ×0.25 · 电力压力 ×0.15",
-    score_display=f"{dcoi:.0f}",
+    score_display=f"{dcoi:.0f}" if dcoi is not None else "N/A",
 ), unsafe_allow_html=True)
 
 # =========================================================
@@ -344,63 +214,55 @@ c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown(metric_card(
-        'AOF 资产淘汰 <span class="source-tag-warn static-data-badge">⚠ 静态基准</span>',
+        'AOF 机柜适配压力 <span class="source-tag-warn static-data-badge">参考情景</span>',
         f"{AOF}x", aof_color, aof_arrow,
-        f"{CURRENT_DEPLOY_GPU} 机柜 {CURRENT_RACK_KW}kW ÷ 老机房上限 {LEGACY_RACK_LIMIT_KW}kW<br>"
-        "倍数越高，存量风冷机房技术性报废越严重",
+        f"{CURRENT_DEPLOY_GPU} {CURRENT_RACK_KW}kW ÷ 旧机房参考情景 {LEGACY_RACK_LIMIT_KW}kW<br>"
+        f"分项{aof_s}分 · {aof_status} · 贡献{aof_s*.25:g}分；不代表全市场资产已减值",
     ), unsafe_allow_html=True)
 
 with c2:
-    if reit_data:
-        eqix   = reit_data.get("EQIX", {})
-        dlr    = reit_data.get("DLR",  {})
-        eqix_h = eqix.get("from_high_pct", 0)
-        dlr_h  = dlr.get("from_high_pct",  0)
-        avg_h  = (eqix_h + dlr_h) / 2
-        eqix_g = eqix.get("rev_growth")
-        dlr_g  = dlr.get("rev_growth")
-        desc2    = f"EQIX 距52周高点 -{eqix_h:.1f}% · DLR -{dlr_h:.1f}%<br>营收增速 EQIX {fmt_pct(eqix_g)} · DLR {fmt_pct(dlr_g)}"
-        display2 = f"-{avg_h:.1f}%"
+    if reit_metrics:
+        eqix, dlr = reit_snapshot["rows"]
+        desc2 = (f"EQIX距一年高点 -{eqix['metrics']['from_high_pct']:.1f}% · "
+                 f"DLR -{dlr['metrics']['from_high_pct']:.1f}%<br>"
+                 f"年度营收同比 EQIX {fmt_pct(eqix['metrics']['rev_growth'])} · "
+                 f"DLR {fmt_pct(dlr['metrics']['rev_growth'])}<br>"
+                 f"分项{reit_s}分 · {reit_status} · 价格/财年与完整算式见下方说明")
+        display2 = f"-{reit_metrics['mean_drawdown']:.1f}%"
     else:
-        desc2    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
+        desc2 = f"必要数据覆盖{reit_snapshot['coverage']}/2家公司，暂不评分<br>不按一家求平均、不补0或50分；历史有效值保留供查阅"
         display2 = "N/A"
-    st.markdown(metric_card('REIT 估值压力 <span class="source-tag">YF</span>', display2,
+    st.markdown(metric_card('REIT 估值压力 <span class="source-tag">YF · 自动取数</span>', display2,
                             reit_color, reit_arrow, desc2), unsafe_allow_html=True)
 
 with c3:
-    if lc_data:
-        vrt      = lc_data.get("VRT",  {})
-        smci     = lc_data.get("SMCI", {})
-        vrt_g    = vrt.get("rev_growth")
-        smci_g   = smci.get("rev_growth")
-        vrt_pos  = vrt.get("price_pos_pct", 50)
-        smci_pos = smci.get("price_pos_pct", 50)
-        avg_g    = average_present([vrt_g, smci_g])
-        desc3    = (f"Vertiv营收增速 {fmt_pct(vrt_g)} · SMCI {fmt_pct(smci_g)}<br>"
-                    f"股价位置 VRT {vrt_pos:.0f}% · SMCI {smci_pos:.0f}% (52周区间)")
-        display3 = fmt_pct(avg_g)
+    if liquid_metrics:
+        vrt, smci = liquid_snapshot["rows"]
+        desc3 = (f"年度总营收同比 VRT {fmt_pct(vrt['metrics']['rev_growth'])} · "
+                 f"SMCI {fmt_pct(smci['metrics']['rev_growth'])}<br>"
+                 f"股价位置 VRT {vrt['metrics']['price_pos_pct']:.0f}% · "
+                 f"SMCI {smci['metrics']['price_pos_pct']:.0f}%（一年区间）<br>"
+                 f"分项{lc_s}分 · {lc_status} · 公司总营收代理，非液冷业务收入；财年/算式见下方")
+        display3 = fmt_pct(liquid_metrics["mean_growth"])
     else:
-        desc3    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
+        desc3 = f"必要数据覆盖{liquid_snapshot['coverage']}/2家公司，暂不评分<br>不按一家平均、不补0或50分；历史资料保留供查阅"
         display3 = "N/A"
-    st.markdown(metric_card('液冷加速信号 <span class="source-tag">YF</span>', display3,
+    st.markdown(metric_card('液冷加速信号（相关企业代理） <span class="source-tag">YF · 自动取数</span>', display3,
                             lc_color, lc_arrow, desc3), unsafe_allow_html=True)
 
 with c4:
-    if power_data:
-        nee     = power_data.get("NEE", {})
-        so      = power_data.get("SO",  {})
-        nee_g   = nee.get("rev_growth")
-        so_g    = so.get("rev_growth")
-        nee_pos = nee.get("price_pos_pct", 50)
-        so_pos  = so.get("price_pos_pct",  50)
-        avg_pg  = average_present([nee_g, so_g])
-        desc4   = (f"NEE增速 {fmt_pct(nee_g)} · SO增速 {fmt_pct(so_g)}<br>"
-                   f"股价位置 NEE {nee_pos:.0f}% · SO {so_pos:.0f}% (52周区间)")
-        display4 = fmt_pct(avg_pg)
+    if power_metrics:
+        nee, so = power_snapshot["rows"]
+        desc4 = (f"年度公司总营收同比 NEE {fmt_pct(nee['metrics']['rev_growth'])} · "
+                 f"SO {fmt_pct(so['metrics']['rev_growth'])}<br>"
+                 f"股价位置 NEE {nee['metrics']['price_pos_pct']:.0f}% · "
+                 f"SO {so['metrics']['price_pos_pct']:.0f}%（一年区间）<br>"
+                 f"分项{power_s}分 · {power_status} · 相关企业代理，非实际用电量或电网容量；财年/算式见下方")
+        display4 = fmt_pct(power_metrics["mean_growth"])
     else:
-        desc4    = "yfinance 数据暂时无法获取<br>请稍后刷新重试"
+        desc4 = f"必要数据覆盖{power_snapshot['coverage']}/2家公司，暂不评分<br>不按一家平均，不补0/50或整项30分；历史记录保留供查阅"
         display4 = "N/A"
-    st.markdown(metric_card('电力基础设施 <span class="source-tag">YF</span>', display4,
+    st.markdown(metric_card('电力基础设施（相关企业代理） <span class="source-tag">YF · 自动取数</span>', display4,
                             power_color, power_arrow, desc4), unsafe_allow_html=True)
 
 # =========================================================
@@ -410,26 +272,30 @@ with c4:
 alert_map = {
     "SAFE": {
         "box_class": "alert-box-green", "icon": "✅", "title_color": "#22c55e",
-        "title": "结论：数据中心基础设施与GPU路线图仍然兼容，资产减值风险低",
-        "body": f'当前 DCOI = <span class="green"><b>{dcoi}</b></span>，处于安全区间。现有数据中心资产能够支撑当前主流GPU部署需求，REIT估值稳定，市场尚未对底层资产进行系统性重新定价。'
+        "title": "结论：当前组合评分较低，仍需核验机柜适配和资产减值情况",
+        "body": f'当前 DCOI = <span class="green"><b>{dcoi}</b></span>，处于原规则的安全区间。AOF只描述选定机柜与25kW参考情景的适配压力，不能据此证明所有存量机房兼容或没有资产减值。'
     },
     "WATCH": {
         "box_class": "alert-box", "icon": "👁", "title_color": "#fbbf24",
-        "title": "结论：GPU功率密度跃迁压力出现，液冷改造需求开始爆发",
-        "body": f'当前 DCOI = <span class="yellow"><b>{dcoi}</b></span>，进入观察区间。AOF系数显示老机房兼容性开始下降，液冷厂商订单加速是风冷资产进入折旧加速期的领先信号。建议关注 EQIX/DLR 下季度财报中的 impairment charges 与 retrofit CapEx 数字。'
+        "title": "结论：组合评分进入观察区，关注机柜升级和资产端信号",
+        "body": f'当前 DCOI = <span class="yellow"><b>{dcoi}</b></span>，进入原规则的观察区间。AOF反映参考方案的适配压力，不证明存量机房正在报废。需核验运营商实际改造资本开支、订单和财报减值披露。'
     },
     "WARNING": {
         "box_class": "alert-box", "icon": "⚠️", "title_color": "#f97316",
-        "title": "结论：风冷资产开始系统性折价，数据中心REIT估值承压",
-        "body": f'当前 DCOI = <span class="orange"><b>{dcoi}</b></span>，进入高危区间。市场正在重新定价 AI 基础设施资产：AI-ready液冷机房溢价扩大，传统风冷机房折价加剧。注意：这是资产端信号，尚未构成金融传导事件。需联动资本开支偏离共同确认。'
+        "title": "结论：组合评分偏高，需核验机柜改造压力与资产重新定价",
+        "body": f'当前 DCOI = <span class="orange"><b>{dcoi}</b></span>，进入原规则的高危区间。AOF参考机柜的切换本身会抬高评分，不能将分差解释为市场突然恶化或已确认资产减值；需结合运营商改造支出与实际减值披露核验，金融传导另需跨因子确认。'
     },
     "CRITICAL": {
         "box_class": "alert-box-red", "icon": "🔴", "title_color": "#ef4444",
-        "title": "结论：AI基础设施技术性减值信号明确，需与资本开支偏离联动确认传导",
-        "body": f'当前 DCOI = <span class="red"><b>{dcoi}</b></span>，进入危机区间。大量存量数据中心资产面临提前技术性报废：GPU迭代速度已远超机房设计寿命，液冷改造成本接近重建，REIT底层资产价值受损。注意：CASCADE事件（CMBS暴雷/信贷收缩）需要资本开支偏离与资产减值联动触发；本因子单独不构成系统性金融危机。建议监控各大银行10-Q中对数据中心抵押贷款的拨备变化。'
+        "title": "结论：组合评分达到高风险档，不等于已确认会计减值或金融传导",
+        "body": f'当前 DCOI = <span class="red"><b>{dcoi}</b></span>，进入原规则的危机区间。AOF只是特定高密度机柜对25kW旧机房容量情景的压力，不能证明市场普遍报废、改造成本接近重建或已发生资产减值。应核验运营商实际改造支出、财报减值与信贷数据；本因子单独不构成系统性金融危机。'
     }
 }
 
+alert_map["N/A"] = {
+    "title": state_cn if dcoi is None else "必要数据不完整，完整DCOI暂不可用",
+    "body": "缺失公司、年度营收或价格区间不按安全/中性分处理；其余分项继续展示，旧有效记录可在相应历史资料中查阅，不冒充本次结果。",
+}
 alert = alert_map.get(state, alert_map["WATCH"])
 st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
 
@@ -439,91 +305,77 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 
 def _render_detection_logic():
     st.markdown(logic_panel([
-        {"text": "<b>AOF 资产淘汰系数（×0.25）</b>：当前主流GPU机柜功率 ÷ 老机房设计上限，倍数越高代表存量机房技术性报废越严重", "thresholds": [
+        {"text": "<b>AOF 机柜适配压力（×0.25）</b>：已复核的GB200 NVL72整柜功率参考120kW ÷ 项目旧机房容量情景25kW＝4.8倍。不是主流部署占比或减值比例；参数切换与旧版2.4倍存在口径断点。沿用原分数映射，未重校准，本期100分、贡献25分", "thresholds": [
             ("#22c55e", "AOF < 1.5x", "SAFE", "green"),
-            ("#fbbf24", "AOF 1.5–2.5x", "WATCH", "yellow"),
-            ("#f97316", "AOF 2.5–3.5x", "WARNING", "orange"),
-            ("#ef4444", "AOF > 3.5x", "CRITICAL", "red"),
+            ("#fbbf24", "1.5 ≤ AOF < 2.5x", "WATCH", "yellow"),
+            ("#f97316", "2.5 ≤ AOF < 3.5x", "WARNING", "orange"),
+            ("#ef4444", "AOF ≥ 3.5x", "CRITICAL", "red"),
         ]},
-        {"text": "<b>REIT 估值压力（×0.35）</b>：EQIX/DLR 距52周高点跌幅，市场对底层资产的直接重定价信号", "thresholds": [
-            ("#22c55e", "距高点 < 5%", "SAFE", "green"),
-            ("#fbbf24", "距高点 5–15%", "WATCH", "yellow"),
-            ("#f97316", "距高点 15–25%", "WARNING", "orange"),
-            ("#ef4444", "距高点 > 25%", "CRITICAL", "red"),
+        {"text": "<b>REIT 估值压力（×0.35）</b>：固定EQIX/DLR。回撤＝（一年调整后日内最高价－最新调整后日收盘价）÷最高价；跌幅&lt;5/15/25/40%及以上对应价格分10/35/60/80/95。最新两个年度营收同比&gt;12/&gt;6/&gt;0%及以下对应增长分10/30/55/80。每家公司＝价格分×65%＋增长分×35%；两家公司平均后按原规则取整，状态按取整前均分判断。两家必要数据必须完整，不填0或50分。总览共用本入口；以下是REIT分项状态，不是股价跌幅或整页状态。", "thresholds": [
+            ("#22c55e", "REIT均分 < 25", "SAFE", "green"),
+            ("#fbbf24", "25 ≤ REIT均分 < 50", "WATCH", "yellow"),
+            ("#f97316", "50 ≤ REIT均分 < 70", "WARNING", "orange"),
+            ("#ef4444", "REIT均分 ≥ 70", "CRITICAL", "red"),
         ]},
-        {"text": "<b>液冷加速信号（×0.25）</b>：Vertiv/SMCI 营收增速，液冷厂商爆发 = 风冷淘汰加速"},
-        {"text": "<b>电力压力（×0.15）</b>：NEE/SO 相对强弱，电力需求旺盛是功率密度危机的物理证据"},
+        {"text": "<b>液冷加速信号（相关企业代理，×0.25）</b>：固定VRT/SMCI。公司年度总营收同比&lt;10/30/60/100%及以上对应增长分10/30/55/75/90；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置&gt;80/&gt;60/&gt;40%及以下对应价格分80/60/40/20。每家公司＝增长分×65%＋价格分×35%；两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不补0/50。不是液冷分部收入、增速加速度或风冷淘汰证明；总览共用本入口。", "thresholds": [
+            ("#22c55e", "液冷分项均分 < 25", "SAFE", "green"),
+            ("#fbbf24", "25 ≤ 液冷分项均分 < 50", "WATCH", "yellow"),
+            ("#f97316", "50 ≤ 液冷分项均分 < 70", "WARNING", "orange"),
+            ("#ef4444", "液冷分项均分 ≥ 70", "CRITICAL", "red"),
+        ]},
+        {"text": "<b>电力基础设施（相关企业代理，×0.15）</b>：固定NEE/SO。年度公司总营收同比&lt;3/8/15%及以上对应增长分15/35/60/80；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置&gt;75/&gt;50/&gt;25%及以下对应价格分70/50/30/15。每家公司＝增长分×60%＋价格分×40%，两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不填0/50/整项30分。只是公司经营与股价代理，不是数据中心用电、电网容量或缺电程度；总览共用本入口。", "thresholds": [
+            ("#22c55e", "电力分项均分 < 25", "SAFE", "green"),
+            ("#fbbf24", "25 ≤ 电力分项均分 < 45", "WATCH", "yellow"),
+            ("#f97316", "45 ≤ 电力分项均分 < 65", "WARNING", "orange"),
+            ("#ef4444", "电力分项均分 ≥ 65", "CRITICAL", "red"),
+        ]},
     ]), unsafe_allow_html=True)
 
 with st.container(border=True):
-    st.markdown('<div class="panel-title">⚡ GPU 功率密度代际跃迁（单机柜 kW）</div>', unsafe_allow_html=True)
-
-    gens     = [g["gen"]          for g in GPU_GENERATIONS]
-    rack_mid = [(g["rack_kw_min"] + g["rack_kw_max"]) / 2 for g in GPU_GENERATIONS]
-    rack_min = [g["rack_kw_min"]  for g in GPU_GENERATIONS]
-    rack_max = [g["rack_kw_max"]  for g in GPU_GENERATIONS]
-    statuses = [g["status"]       for g in GPU_GENERATIONS]
-
-    bar_colors = []
-    for s in statuses:
-        if s == "legacy":   bar_colors.append("#334155")
-        elif s == "active": bar_colors.append("#f97316")
-        elif s == "current":bar_colors.append("#ef4444")
-        else:               bar_colors.append("#7c3aed")
-
+    st.markdown('<div class="panel-title">⚡ GPU 功率密度代际参考与本期 AOF 方案（单机柜 kW）</div>', unsafe_allow_html=True)
+    legacy_chart = next(r["reference"]["chart_reference"] for r in aof_history()
+                        if r["reference"]["id"] == "legacy-h100-60kw-25kw")
+    generations = legacy_chart["generations"]
+    mids = [(g["rack_kw_min"]+g["rack_kw_max"])/2 for g in generations]
+    labels = [g["gen"].replace(" (", "<br>(") for g in generations]
     fig = go.Figure()
-
-    fig.add_shape(type="line", x0=-0.5, x1=len(gens) - 0.5,
-                  y0=LEGACY_RACK_LIMIT_KW, y1=LEGACY_RACK_LIMIT_KW,
-                  line=dict(color="#22c55e", width=1.5, dash="dash"))
-    fig.add_annotation(x=len(gens) - 0.6, y=LEGACY_RACK_LIMIT_KW + 6,
-                       text=f"传统风冷上限 {LEGACY_RACK_LIMIT_KW}kW",
-                       showarrow=False, font=dict(color="#22c55e", size=11), xanchor="right")
-
-    fig.add_shape(type="line", x0=-0.5, x1=len(gens) - 0.5,
-                  y0=UPGRADED_RACK_LIMIT_KW, y1=UPGRADED_RACK_LIMIT_KW,
-                  line=dict(color="#fbbf24", width=1.5, dash="dot"))
-    fig.add_annotation(x=len(gens) - 0.6, y=UPGRADED_RACK_LIMIT_KW + 6,
-                       text=f"改造风冷上限 {UPGRADED_RACK_LIMIT_KW}kW",
-                       showarrow=False, font=dict(color="#fbbf24", size=11), xanchor="right")
-
     fig.add_trace(go.Bar(
-        x=gens, y=rack_mid,
-        marker_color=bar_colors, marker_line_width=0, width=0.6,
-        error_y=dict(
-            type="data", symmetric=False,
-            array=[mx - mid for mx, mid in zip(rack_max, rack_mid)],
-            arrayminus=[mid - mn for mn, mid in zip(rack_min, rack_mid)],
-            color="rgba(255,255,255,0.2)", thickness=2,
-        ),
-        text=[f"{int(mid)}kW" for mid in rack_mid],
-        textposition="outside",
-        textfont=dict(color="#94a3b8", size=13),
+        name="原六代示意参数（未核验，不参与本期评分）",
+        x=labels, y=mids, marker_color=["#334155", "#334155", "#f97316", "#f97316", "#ef4444", "#7c3aed"],
+        text=[f"{v:g}kW" for v in mids], textposition="outside",
+        textfont=dict(color="#cbd5e1", size=14),
+        error_y=dict(type="data", symmetric=False,
+                     array=[g["rack_kw_max"]-v for g,v in zip(generations,mids)],
+                     arrayminus=[v-g["rack_kw_min"] for g,v in zip(generations,mids)],
+                     color="#64748b", thickness=2),
+        customdata=[[g["rack_kw_min"],g["rack_kw_max"]] for g in generations],
+        hovertemplate="%{x}<br>旧版示意范围：%{customdata[0]}–%{customdata[1]}kW<br>柱高为范围中点，未核验配置、不参与本期评分<extra></extra>",
     ))
-
+    fig.add_trace(go.Bar(
+        name="GB200 NVL72（本期已复核参考方案）",
+        x=["GB200 NVL72<br>本期AOF参考"], y=[CURRENT_RACK_KW],
+        marker_color="#60a5fa", text=[f"{CURRENT_RACK_KW:g}kW"],
+        textposition="outside", textfont=dict(color="#e2e8f0", size=16),
+        hovertemplate="本期GB200 NVL72整柜参考<br>%{y}kW ÷ 25kW情景＝4.8倍<br>不是现场实时负载<extra></extra>",
+    ))
+    fig.add_hline(y=LEGACY_RACK_LIMIT_KW, line_color="#22c55e", line_dash="dash",
+                  annotation_text=f"{LEGACY_RACK_LIMIT_KW:g}kW容量参考情景（AOF分母）",
+                  annotation_font_color="#22c55e", annotation_position="top left")
+    fig.add_hline(y=legacy_chart["upgraded_rack_limit_kw"], line_color="#fbbf24", line_dash="dot",
+                  annotation_text="旧版50kW示意线（未核验，不参与评分）",
+                  annotation_font_color="#fbbf24", annotation_position="top left")
     fig.update_layout(
-        height=310,
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#94a3b8", size=12),
-        margin=dict(l=10, r=20, t=10, b=10),
-        xaxis=dict(showgrid=False, zeroline=False, tickfont=dict(color="#94a3b8", size=13)),
-        yaxis=dict(
-            title="机柜功率 (kW)", gridcolor="rgba(255,255,255,0.05)", zeroline=False,
-            tickfont=dict(color="#94a3b8", size=11), title_font=dict(color="#94a3b8", size=11),
-        ),
-        showlegend=False,
+        height=370, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#cbd5e1", size=14), margin=dict(l=10, r=20, t=25, b=10),
+        xaxis=dict(showgrid=False, zeroline=False, categoryorder="array",
+                   categoryarray=labels+["GB200 NVL72<br>本期AOF参考"]),
+        yaxis=dict(title="机柜功率（kW）", range=[0,max(max(g["rack_kw_max"] for g in generations),CURRENT_RACK_KW)*1.15],
+                   gridcolor="rgba(255,255,255,0.05)", zeroline=False),
+        legend=dict(orientation="h", y=-.25, x=0, font=dict(color="#cbd5e1",size=13)),
+        barmode="group",
     )
-
     st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("""
-<div class="legend-row">
-  <div class="legend-item"><div class="legend-dot legend-dot-legacy"></div>历史世代（已淘汰）</div>
-  <div class="legend-item"><div class="legend-dot legend-dot-active"></div>当前主力部署</div>
-  <div class="legend-item"><div class="legend-dot legend-dot-current"></div>最新一代（在售）</div>
-  <div class="legend-item"><div class="legend-dot legend-dot-roadmap"></div>下一代（路线图）</div>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown('<div class="text-dim">原六代范围和中点完整保留，属于旧版未核验示意，并非实际部署或淘汰证据；蓝柱是本期已复核的整柜参考。本期AOF只按120÷25＝4.8计算，不将七根柱子平均。历史资料保留原标签及原始参数。</div>', unsafe_allow_html=True)
 
 # =========================================================
 # 页脚
@@ -533,17 +385,33 @@ logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史�
 with logic_tab:
     _render_detection_logic()
 with evidence_tab:
-    status_labels = {"legacy": "历史世代（已淘汰）", "active": "当前主力部署",
-                     "current": "最新一代（在售）", "next": "下一代（路线图）"}
-    st.markdown(evidence_table(
-        "📋 GPU 单机柜功率基准",
-        ["GPU 世代", "功率下限（kW）", "功率上限（kW）", "状态"],
-        [(row["gen"].replace("\n", " "), row["rack_kw_min"], row["rack_kw_max"],
-          status_labels[row["status"]]) for row in GPU_GENERATIONS],
-    ), unsafe_allow_html=True)
+    with st.container(key="aof_evidence"):
+        aof_tab, reit_tab, liquid_tab, power_tab = st.tabs(["AOF", "REIT", "液冷", "电力"])
+        with aof_tab:
+            with st.expander("本期数据与计算说明", expanded=False):
+                render_aof_current(aof_snapshot)
+            with st.expander("历史记录与原始资料", expanded=False):
+                render_aof_history(aof_snapshot, aof_history())
+        with reit_tab:
+            with st.expander("本期数据与计算说明", expanded=False):
+                render_reit_current(reit_snapshot)
+            with st.expander("历史记录与原始资料", expanded=False):
+                render_reit_history(reit_snapshot, reit_history())
+        with liquid_tab:
+            with st.expander("本期数据与计算说明", expanded=False):
+                render_liquid_current(liquid_snapshot)
+            with st.expander("历史记录与原始资料", expanded=False):
+                render_liquid_history(liquid_snapshot, liquid_history())
+        with power_tab:
+            with st.expander("本期数据与计算说明", expanded=False):
+                render_power_current(power_snapshot)
+            with st.expander("历史记录与原始资料", expanded=False):
+                render_power_history(power_snapshot, power_history())
 with source_tab:
     render_data_freshness([
-        {"name": "资产价格代理", "source": "Yahoo Finance · EQIX / DLR / VRT / SMCI / NEE / SO", "updated_at": "每小时缓存", "mode": "live"},
-        {"name": "GPU适配系数", "source": "NVIDIA规格与机架功率基准", "updated_at": "2026-09", "mode": "static"},
+        {"name": "电力相关企业价格与年度总营收", "source": f"Yahoo Finance · 固定NEE / SO · 覆盖{power_snapshot['coverage']}/2", "updated_at": "；".join(f"{r['ticker']}价格{r.get('price_date','未取得')}/财年{r['annual_revenue'][0]['period_end'] if r['annual_revenue'] else '未取得'}" for r in power_snapshot["rows"]), "mode": "live"},
+        {"name": "液冷相关企业价格与年度总营收", "source": f"Yahoo Finance · 固定VRT / SMCI · 覆盖{liquid_snapshot['coverage']}/2", "updated_at": "；".join(f"{r['ticker']}价格{r.get('price_date','未取得')}/财年{r['annual_revenue'][0]['period_end'] if r['annual_revenue'] else '未取得'}" for r in liquid_snapshot["rows"]), "mode": "live"},
+        {"name": "REIT价格与年度营收", "source": f"Yahoo Finance · 固定EQIX / DLR · 覆盖{reit_snapshot['coverage']}/2", "updated_at": "；".join(f"{r['ticker']}价格{r.get('price_date','未取得')}/财年{r['annual_revenue'][0]['period_end'] if r['annual_revenue'] else '未取得'}" for r in reit_snapshot["rows"]), "mode": "live"},
+        {"name": "AOF参考情景（非实时负载）", "source": "NVIDIA MGX官方资料（2025-05-16） · 项目25kW情景", "updated_at": aof_snapshot["reference"]["reviewed_date"] + " 参数复核，非实测日期", "mode": "static"},
     ])
-render_footer("Yahoo Finance · 每小时缓存 · AOF 基准参数人工校准")
+render_footer("Yahoo Finance · 每小时缓存 · AOF 经确认的固定参考情景（非自动追新型号）")

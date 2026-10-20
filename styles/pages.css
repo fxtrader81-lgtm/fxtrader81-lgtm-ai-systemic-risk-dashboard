@@ -703,6 +703,45 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
   opacity: 1 !important;
 }
 
+/* Factor 03 AOF evidence reuses factor 02's dark interaction contract. */
+.st-key-aof_evidence [data-testid="stExpander"] summary {
+  color: var(--text-soft) !important;
+  background: var(--bg-panel) !important;
+}
+.st-key-aof_evidence [data-testid="stExpander"] summary :is(p, span, svg) {
+  color: var(--text-soft) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  opacity: 1 !important;
+}
+.st-key-aof_evidence [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4) {
+  color: var(--text-soft) !important;
+}
+.st-key-aof_evidence [data-testid="stCaptionContainer"] :is(p, strong, em) {
+  color: var(--text-dim) !important;
+  overflow-wrap: anywhere;
+}
+.st-key-aof_evidence [data-testid="stMarkdownContainer"] a {
+  color: var(--blue) !important;
+}
+.st-key-aof_evidence [data-testid="stDownloadButton"] button {
+  background: var(--bg-input) !important;
+  color: var(--text-soft) !important;
+  border: 1px solid var(--text-dim) !important;
+}
+.st-key-aof_evidence [data-testid="stDownloadButton"] button:is(:hover, :focus, :active),
+.st-key-aof_evidence [data-testid="stExpander"] summary:is(:hover, :focus, :active),
+.st-key-aof_evidence [data-testid="stExpander"] details[open] > summary {
+  background: var(--bg-panel-2) !important;
+  color: var(--text-soft) !important;
+  border-color: var(--blue) !important;
+}
+.st-key-aof_evidence :is(button, summary):focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 2px;
+}
+
 /* Native Streamlit prose has its own light-theme foreground. Expander-title
    styling alone does not cover formulas, summaries or nested history text. */
 :is(.st-key-capability_evidence, .st-key-capability_history)

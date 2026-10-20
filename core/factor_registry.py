@@ -27,6 +27,10 @@ from core.capability_gap import ensure_full_baseline as current_capability_snaps
 from core.model_prices import load_prices
 from core.deployment_interest import load_deployment
 from core.ecology_downloads import load_ecology
+from core.aof import load_aof
+from core.reit_pressure import load_reit
+from core.liquid_signal import load_liquid
+from core.power_infrastructure import load_power
 
 
 @dataclass
@@ -182,27 +186,25 @@ def _price_position(series: pd.Series) -> float | None:
 
 
 def _straw3() -> dict:
-    close = _history(["EQIX", "DLR", "VRT", "SMCI", "NEE", "SO"])
-    if close.empty:
-        return _unavailable("straw3", "资产价格序列不可用")
-    aof_score = round((2.4 - 1.5) / 1.0 * 33)
-    groups = {"reit": ["EQIX", "DLR"], "liquid": ["VRT", "SMCI"], "power": ["NEE", "SO"]}
-    weights = {"reit": 0.35, "liquid": 0.25, "power": 0.15}
+    reit = load_reit()
+    liquid = load_liquid()
+    power = load_power()
+    aof = load_aof()
+    aof_score = aof["metrics"]["score"]
     components = [(0.25, aof_score)]
-    for group, tickers in groups.items():
-        values = [_price_position(close[t]) for t in tickers if t in close]
-        values = [v for v in values if v is not None]
-        if not values:
-            continue
-        pos = float(np.mean(values))
-        # High REIT/power prices reduce impairment stress; high cooling prices raise retrofit signal.
-        score = (100 - pos) if group == "reit" else pos if group == "liquid" else max(0, pos - 15)
-        components.append((weights[group], score))
+    if reit["available"]:
+        components.append((0.35, reit["metrics"]["score"]))
+    if liquid["available"]:
+        components.append((0.25, liquid["metrics"]["score"]))
+    if power["available"]:
+        components.append((0.15, power["metrics"]["score"]))
     weight = sum(w for w, _ in components)
     if weight < 0.6:
         return _unavailable("straw3", "资产组覆盖不足 60%")
     score = sum(w * value for w, value in components) / weight
-    return _result("straw3", score, weight, "GPU适配系数与三类资产价格信号联动", "NVIDIA公开规格 · Yahoo Finance")
+    return _result("straw3", score, weight,
+                   f"AOF参考情景{aof['metrics']['aof']:g}倍/{aof_score}分（非已确认减值）；REIT{'共用详情原公式' if reit['available'] else '数据不完整，不计分'}；液冷{'共用详情原公式（相关企业代理）' if liquid['available'] else '数据不完整，不计分'}；电力{'共用详情原公式（相关企业代理）' if power['available'] else '数据不完整，不计分'}",
+                   "NVIDIA GB200 NVL72参考规格 / 项目25kW情景 · Yahoo Finance")
 
 
 def _straw4() -> dict:

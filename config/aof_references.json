@@ -1,0 +1,45 @@
+{
+  "active_id": "gb200-nvl72-25kw-2026-10-19",
+  "records": [
+    {
+      "id": "legacy-h100-60kw-25kw",
+      "kind": "legacy",
+      "model": "H100（旧版未注明整柜配置）",
+      "rack_kw": 60,
+      "baseline_kw": 25,
+      "baseline_note": "旧版项目参数，非全市场统一容量，原始来源未核验。",
+      "effective_date": null,
+      "reviewed_date": "2026-10-19",
+      "source_url": null,
+      "source_published_date": null,
+      "source_excerpt": null,
+      "source_note": "改造前pages/straw3.py：CURRENT_DEPLOY_GPU=H100，CURRENT_RACK_KW=60，LEGACY_RACK_LIMIT_KW=25。原始硬件配置/启用日期未记录。",
+      "chart_reference": {
+        "upgraded_rack_limit_kw": 50,
+        "note": "以下为旧版示意参数和原状态标签，并非核验过的机柜配置、市场部署份额或实际报废记录；保留供追溯，不再用于当前图表或评分。",
+        "generations": [
+          {"gen": "V100 (2017)", "rack_kw_min": 10, "rack_kw_max": 20, "original_status": "历史世代（已淘汰）"},
+          {"gen": "A100 (2020)", "rack_kw_min": 20, "rack_kw_max": 30, "original_status": "历史世代（已淘汰）"},
+          {"gen": "H100 (2022)", "rack_kw_min": 40, "rack_kw_max": 80, "original_status": "当前主力部署"},
+          {"gen": "H200 (2024)", "rack_kw_min": 60, "rack_kw_max": 100, "original_status": "当前主力部署"},
+          {"gen": "B200 (2025)", "rack_kw_min": 100, "rack_kw_max": 140, "original_status": "最新一代（在售）"},
+          {"gen": "Rubin (2026e)", "rack_kw_min": 180, "rack_kw_max": 220, "original_status": "下一代（路线图）"}
+        ]
+      }
+    },
+    {
+      "id": "gb200-nvl72-25kw-2026-10-19",
+      "kind": "reviewed_reference",
+      "model": "NVIDIA GB200 NVL72（整柜参考方案）",
+      "rack_kw": 120,
+      "baseline_kw": 25,
+      "baseline_note": "项目固定旧机房容量参考情景，不是已核验的全市场平均值，也不是所有风冷机房的技术上限。",
+      "effective_date": "2026-10-19",
+      "reviewed_date": "2026-10-19",
+      "source_url": "https://developer.nvidia.com/blog/building-the-modular-foundation-for-ai-factories-with-nvidia-mgx/",
+      "source_published_date": "2025-05-16",
+      "source_excerpt": "120 kW per rack energy demands of the GB200 NVL72",
+      "source_note": "NVIDIA MGX技术说明中的整柜功率需求参考，不是实时平均负载、单GPU功率或冗余配电容量；不宣称是当前全市场主流/最新型号。"
+    }
+  ]
+}
