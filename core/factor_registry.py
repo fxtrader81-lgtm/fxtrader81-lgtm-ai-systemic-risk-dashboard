@@ -16,6 +16,8 @@ import requests
 import streamlit as st
 import yfinance as yf
 from core.market_freshness import download_yahoo
+from core.infra_current import load_infra
+from core.energy_cost import load_cost
 
 from config.thresholds import STRAW_WEIGHTS
 from core.credit_risk import compute_credit_metrics
@@ -31,6 +33,8 @@ from core.aof import load_aof
 from core.reit_pressure import load_reit
 from core.liquid_signal import load_liquid
 from core.power_infrastructure import load_power
+from core.gpu_efficiency import load_gpu_efficiency
+from core import energy_market
 
 
 @dataclass
@@ -208,28 +212,37 @@ def _straw3() -> dict:
 
 
 def _straw4() -> dict:
-    queue_s = clamp((43 - 12) / 36 * 100)
-    transformer_s = clamp((36 - 12) / 36 * 100)
-    reserve_s = clamp((20 - np.mean([16.5, 12.8])) / 12 * 100)
-    infra = queue_s * 0.45 + transformer_s * 0.30 + reserve_s * 0.25
-    ppp_s = clamp((0.6 - 0.028 / 0.079) / 0.4 * 100)
-    cost = ppp_s * 0.55 + clamp((15 - 10) / 25 * 100) * 0.45
-    efficiency = clamp((2.0 - 1.75) / 0.9 * 100)
-    components = [(0.40, infra), (0.25, cost), (0.20, efficiency)]
-    sources = "FERC/NERC/EIA 静态基准 · NVIDIA规格"
-    try:
-        close = _history(["CEG", "VST", "NEE", "XLU", "ICLN"])
-        positions = [_price_position(close[t]) for t in close.columns]
-        positions = [p for p in positions if p is not None]
-        if positions:
-            market = float(np.mean([75 if p > 80 else 55 if p > 60 else 35 if p > 40 else 20 for p in positions]))
-            components.append((0.15, market))
-            sources += " · Yahoo Finance"
-    except Exception:
-        pass
+    infra_snapshot = load_infra()
+    if not infra_snapshot["available"]:
+        return _unavailable("straw4", "基础设施必要输入/48月压力情景证据不完整；与详情一致暂不可用")
+    cost_snapshot = load_cost()
+    if not cost_snapshot["available"]:
+        return _unavailable("straw4", cost_snapshot["missing_reason"])
+    efficiency_snapshot = load_gpu_efficiency(check_remote=True)
+    if not efficiency_snapshot["available"]:
+        return _unavailable("straw4", "MLPerf整机能效必要实测缺失；与详情一致暂不可用")
+    market_snapshot = energy_market.load_energy_market()
+    if not market_snapshot["available"]:
+        return _unavailable("straw4", market_snapshot["missing_reason"])
+    cost = cost_snapshot["score"]
+    efficiency = efficiency_snapshot["metrics"]["score"]
+    market = market_snapshot["score"]
+    components = [(0.40, infra_snapshot["score"]), (0.25, cost),
+                  (0.20, efficiency), (0.15, market)]
+    sources = ("LBNL / NERC / DOE＋48月上限情景 · 中美固定地区参考电价中位数"
+               "（中国公开价/美国EIA工业代理，非同口径全国均价） · MLCommons MLPerf整机实测"
+               " · Yahoo Finance CEG/VST")
     weight = sum(w for w, _ in components)
-    score = sum(w * value for w, value in components) / weight
-    return _result("straw4", score, weight, "电网、成本、GPU效率与能源市场信号", sources)
+    score = sum(w * value for w, value in components)
+    gain = efficiency_snapshot["metrics"]["generation_gain"]
+    return _result(
+        "straw4", score, weight,
+        f"基础设施共用75分压力情景（48月上限，非平均）；成本共用地区电价比四档/{cost:g}分；"
+        f"系统能效共用MLPerf整机实测{efficiency_snapshot['baseline_generation']}→{efficiency_snapshot['target_generation']} "
+        f"{gain:.2f}倍/残余能源强度{efficiency:g}分；CEG/VST 52周位置均值"
+        f"{market_snapshot['mean_position_pct']:.1f}%/{market:g}分；整页权重不变，新旧有口径断点",
+        sources,
+    )
 
 
 def _single_close(ticker: str, period: str = "2y", interval: str = "1mo") -> pd.Series:
@@ -294,7 +307,10 @@ PROVIDERS: dict[str, Callable[[], dict]] = {
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def load_factor_results() -> dict[str, dict]:
-    """Load providers; capability refresh explicitly invalidates this result cache."""
+    """Load providers; factor-04 needs paired cluster electricity inputs, not IEA background.
+
+    Capability and infrastructure refreshes explicitly invalidate this cache.
+    """
     results: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=len(PROVIDERS)) as pool:
         future_map = {pool.submit(provider): straw_id for straw_id, provider in PROVIDERS.items()}

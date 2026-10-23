@@ -433,8 +433,58 @@
   margin-bottom: 10px;
 }
 
+.counter-review-banner {
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  margin:8px 0 16px;
+  padding:13px 16px;
+  border:1px solid rgba(96,165,250,.28);
+  border-radius:10px;
+  background:rgba(30,64,175,.10);
+}
+.counter-review-dot {
+  flex:0 0 auto;
+  width:10px;
+  height:10px;
+  margin-top:6px;
+  border-radius:50%;
+  background:var(--blue);
+  box-shadow:0 0 0 4px rgba(96,165,250,.10);
+}
+.counter-review-banner b {
+  display:block;
+  color:#bfdbfe;
+  font-size:15px;
+  line-height:1.45;
+}
+.counter-review-banner span:not(.counter-review-dot) {
+  display:block;
+  margin-top:3px;
+  color:var(--text-muted);
+  font-size:14px;
+  line-height:1.65;
+}
+.counter-review-banner-due {
+  border-color:rgba(251,191,36,.36);
+  background:rgba(120,53,15,.13);
+}
+.counter-review-banner-due .counter-review-dot {
+  background:var(--yellow);
+  box-shadow:0 0 0 4px rgba(251,191,36,.12);
+  animation:counter-review-pulse 2.4s ease-in-out infinite;
+}
+.counter-review-banner-due b { color:#fde68a; }
+@keyframes counter-review-pulse {
+  0%,100% { opacity:.45; transform:scale(.86); }
+  50% { opacity:1; transform:scale(1.12); box-shadow:0 0 0 7px rgba(251,191,36,.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .counter-review-banner-due .counter-review-dot { animation:none; }
+}
+
 .counter-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--green);
   letter-spacing: 0.5px;
@@ -450,6 +500,26 @@
 .counter-meta { margin-top:18px; display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; }
 .counter-meta span { color:var(--yellow); font-size:13px; }
 .counter-meta b { color:var(--text-main); }
+.counter-source-links { margin:10px 0 20px; color:var(--text-dim); font-size:14px; line-height:1.75; }
+.counter-source-links b { color:var(--text-muted); }
+.counter-source-links a { color:var(--blue); text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; }
+.st-key-energy_counter_evidence [data-testid="stExpander"] [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4),
+.st-key-energy_counter_evidence [data-testid="stExpander"] [data-testid="stCaptionContainer"] :is(p, strong, em) {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  opacity: 1 !important;
+  line-height: 1.65 !important;
+}
+.st-key-energy_counter_evidence [data-testid="stExpander"] [data-testid="stCaptionContainer"] :is(p, strong, em) {
+  color: #9fb0c8 !important;
+  -webkit-text-fill-color: #9fb0c8 !important;
+}
+.st-key-energy_counter_evidence .counter-source-links,
+.st-key-energy_counter_evidence .counter-source-links b {
+  color: #cbd5e1 !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
+  opacity: 1 !important;
+}
 
 .source-tag-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
 
@@ -703,6 +773,171 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
   opacity: 1 !important;
 }
 
+/* Factor 04 source management: paired foreground/background in every state. */
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary {
+  color: var(--text-soft) !important;
+  background: var(--bg-panel) !important;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary :is(p, span, svg) {
+  color: var(--text-soft) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  opacity: 1 !important;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stMarkdownContainer"] :is(p, li, strong, em) {
+  color: var(--text-soft) !important;
+  line-height: 1.65 !important;
+  overflow-wrap: anywhere;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stCaptionContainer"] p {
+  color: var(--text-dim) !important;
+  line-height: 1.65 !important;
+  overflow-wrap: anywhere;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stMarkdownContainer"] a { color: var(--blue) !important; }
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button {
+  background: var(--bg-input) !important;
+  color: var(--text-soft) !important;
+  border: 1px solid var(--text-dim) !important;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) button:is(:hover, :focus, :active),
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary:is(:hover, :focus, :active),
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] details[open] > summary {
+  background: var(--bg-panel-2) !important;
+  color: var(--text-soft) !important;
+  border-color: var(--blue) !important;
+}
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) :is(button, summary):focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 2px;
+}
+
+/* Factor 04 logic titles must never inherit Streamlit's low-contrast form text. */
+.st-key-energy_detection_logic [data-testid="stExpander"] summary,
+.st-key-energy_detection_logic [data-testid="stExpander"] summary * {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  opacity: 1 !important;
+}
+.st-key-energy_detection_logic [data-testid="stExpander"] details[open] > summary {
+  background: #111c2f !important;
+}
+
+/* Factor 04 quarterly current/history: never inherit light-theme text on dark panels. */
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary {
+  background: var(--bg-panel) !important;
+  color: #f8fafc !important;
+  font-size: 20px !important;
+  font-weight: 750 !important;
+  line-height: 1.5 !important;
+}
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary :is(p, span, svg) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  font-size: 20px !important;
+  font-weight: 750 !important;
+  line-height: 1.5 !important;
+  opacity: 1 !important;
+}
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary *,
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4),
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stCaptionContainer"] p {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  opacity: 1 !important;
+  line-height: 1.65 !important;
+}
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] details[open] > summary {
+  background: #111c2f !important;
+  border-color: var(--blue) !important;
+}
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stDownloadButton"] button {
+  background: var(--bg-input) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border: 1px solid var(--text-dim) !important;
+}
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) :is(button, summary):focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 2px;
+}
+.energy-quarter-score-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 6px 0 18px;
+}
+.energy-quarter-score-strip > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 78px;
+  padding: 13px 16px;
+  border: 1px solid #31415b;
+  border-radius: 10px;
+  background: #0f192b;
+}
+.energy-quarter-score-strip span {
+  color: #9fb0c8 !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+}
+.energy-quarter-score-strip strong {
+  color: #f8fafc !important;
+  font-size: 21px !important;
+  line-height: 1.35 !important;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .energy-quarter-score-strip { grid-template-columns: 1fr; }
+}
+
+/* Factor 04 protected downloads: authenticate only when a download is clicked. */
+:is([class*="st-key-request_download_"], [class*="st-key-download_"])
+  :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button,
+[data-testid="stDialog"]
+  :is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stLinkButton"], [data-testid="stDownloadButton"])
+  :is(button, a) {
+  background: var(--bg-input) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border: 1px solid var(--text-dim) !important;
+  box-shadow: none !important;
+}
+:is([class*="st-key-request_download_"], [class*="st-key-download_"])
+  :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button:is(:hover, :focus, :active),
+[data-testid="stDialog"]
+  :is([data-testid="stButton"], [data-testid="stFormSubmitButton"], [data-testid="stLinkButton"], [data-testid="stDownloadButton"])
+  :is(button, a):is(:hover, :focus, :active) {
+  background: var(--bg-panel-2) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border-color: var(--blue) !important;
+}
+:is([class*="st-key-request_download_"], [class*="st-key-download_"])
+  :is(button, a):focus-visible,
+[data-testid="stDialog"] :is(button, a):focus-visible {
+  outline: 2px solid var(--blue) !important;
+  outline-offset: 2px;
+}
+[data-testid="stDialog"] [role="dialog"] {
+  background: #0b1323 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #31415b !important;
+}
+[data-testid="stDialog"] :is([data-testid="stMarkdownContainer"], [data-testid="stCaptionContainer"]) :is(p, li, strong, em, h1, h2, h3, h4) {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  opacity: 1 !important;
+  line-height: 1.6 !important;
+}
+[data-testid="stDialog"] input {
+  background: #111c2f !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
 /* Factor 03 AOF evidence reuses factor 02's dark interaction contract. */
 .st-key-aof_evidence [data-testid="stExpander"] summary {
   color: var(--text-soft) !important;
@@ -799,4 +1034,39 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
   :is(button, summary):focus-visible {
   outline: 2px solid var(--blue) !important;
   outline-offset: 2px;
+}
+/* Energy-cost data maintenance, separate from risk-state colours. */
+.cost-maintenance {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    padding: 4px 9px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: #111827;
+    color: #cbd5e1;
+    font-size: 14px;
+    line-height: 1.5;
+    vertical-align: middle;
+}
+.cost-maintenance__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    flex-shrink: 0;
+}
+.cost-maintenance--attention { color: #fde68a; border-color: #a16207; }
+.cost-maintenance--attention .cost-maintenance__dot {
+    background: #fbbf24;
+    animation: energy-cost-breathe 2.4s ease-in-out infinite;
+}
+@keyframes energy-cost-breathe {
+    0%, 100% { opacity: .55; box-shadow: 0 0 0 0 #fbbf2400; }
+    50% { opacity: 1; box-shadow: 0 0 0 4px #fbbf2426; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cost-maintenance--attention .cost-maintenance__dot { animation: none; }
 }

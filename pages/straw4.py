@@ -1,12 +1,22 @@
 import streamlit as st
-import requests
 import plotly.graph_objects as go
-from config.api_keys import EIA_API_KEY
-from components.ui import (counter_card, evidence_table, freshness_badge, load_css, logic_panel,
+from components.ui import (counter_card, evidence_table, load_css,
                            metric_card, render_data_freshness, render_footer,
                            render_header, section_intro, source_tag_row)
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
+from components.infra_update_panel import render_infra_updates
+from core.infra_current import load_infra, score_infra
+from core.energy_cost import load_cost, history as cost_history
+from components.energy_cost_panel import render_cost_evidence
+from components.energy_cost_status import maintenance_badge
+from core.gpu_efficiency import load_gpu_efficiency
+from components.gpu_efficiency_panel import automatic_badge, render_gpu_efficiency_evidence
+from core import energy_market, infra_updates
+from core.energy_quarterly import load_history as load_quarterly_history, make_current_snapshot
+from components.energy_quarterly_panel import render_current_quarter, render_quarterly_history
+from core.energy_counter_signals import load_counter_signals
+from components.energy_counter_panel import render_counter_evidence, review_banner
 
 # =========================================================
 # 页面配置
@@ -42,201 +52,16 @@ INFRA_DATA = {
     "updated": "2025-01",
 }
 
-GPU_EFFICIENCY_DATA = {
-    "A100":  {"tflops_per_watt": 0.58, "year": 2020},
-    "H100":  {"tflops_per_watt": 1.00, "year": 2022},
-    "H200":  {"tflops_per_watt": 1.32, "year": 2024},
-    "B200":  {"tflops_per_watt": 1.75, "year": 2024},
-    "Rubin": {"tflops_per_watt": 2.40, "year": 2026},  # 预估
-    "updated": "2025-01",
-}
-
-ENERGY_COST_DATA = {
-    # 美国数据中心PPA电价 — 改为 EIA 实时获取，此处作为后备默认值
-    "us_datacenter_ppa_usd":    0.079,
-    "us_datacenter_ppa_source": "静态默认值",
-    # 中国西部大工业谷电价（静态）
-    "cn_west_industrial_usd":   0.028,
-    # 推理电力成本占OpEx比例（%）
-    "inference_energy_opex_pct": 15,
-    # 海外AI专用电力容量（GW）
-    "offshore_ai_capacity_gw":  18,
-    # 美国本土AI专用电力容量（GW）
-    "us_ai_capacity_gw":        52,
-    "updated": "2025-01",
-}
-
 # =========================================================
-# EIA API — 实时美国商业电价
+# 能源成本采用实际集群口径；IEA工业成对年度快照仅供背景参考
 # =========================================================
 
-@st.cache_data(ttl=86400)   # 每 24 小时刷新一次（EIA 数据月度更新）
-def fetch_eia_electricity_price() -> dict:
-    """
-    从 EIA Open Data API v2 获取美国最新商业电价（cents/kWh）。
-    端点：electricity/retail-sales
-    sector: COM（商业用电，涵盖数据中心 PPA 参考价格）
-    frequency: monthly，取最新一期全国均值
-
-    返回字典：
-      price_usd     — USD/kWh（已换算）
-      period        — 数据期间，如 "2024-11"
-      source        — "EIA API (实时)"
-      error         — 若获取失败，包含错误说明
-    """
-    url = "https://api.eia.gov/v2/electricity/retail-sales/data/"
-    params = {
-        "api_key":       EIA_API_KEY,
-        "frequency":     "monthly",
-        "data[0]":       "price",
-        "facets[sectorid][]": "COM",    # 商业用电
-        "sort[0][column]": "period",
-        "sort[0][direction]": "desc",
-        "length":        1,             # 只取最新一条
-        "offset":        0,
-    }
-    try:
-        r = requests.get(url, params=params, timeout=12)
-        if r.status_code != 200:
-            return {
-                "price_usd": None,
-                "period":    None,
-                "source":    "EIA API 请求失败",
-                "error":     f"HTTP {r.status_code}",
-            }
-        data = r.json()
-        rows = data.get("response", {}).get("data", [])
-        if not rows:
-            return {
-                "price_usd": None,
-                "period":    None,
-                "source":    "EIA API 返回空数据",
-                "error":     "No rows returned",
-            }
-        row = rows[0]
-        # EIA 价格单位是 cents/kWh，需除以 100 转为 USD/kWh
-        price_cents = float(row.get("price", 0))
-        price_usd   = round(price_cents / 100, 4)
-        period      = row.get("period", "未知")
-        return {
-            "price_usd": price_usd,
-            "period":    period,
-            "source":    "EIA API (实时)",
-            "error":     None,
-        }
-    except Exception as e:
-        return {
-            "price_usd": None,
-            "period":    None,
-            "source":    "EIA API 异常",
-            "error":     str(e),
-        }
-
-
-# =========================================================
-# 数据获取函数 — Yahoo Finance（实时市场信号）
-# =========================================================
-
-YF_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "application/json",
-}
-
-def fetch_yf_chart(ticker):
-    url = (
-        f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}"
-        f"?interval=1mo&range=1y"
-    )
-    try:
-        r = requests.get(url, headers=YF_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return None
-        data = r.json()
-        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
-        return {
-            "current_price": meta.get("regularMarketPrice", 0),
-            "week52_high":   meta.get("fiftyTwoWeekHigh", 0),
-            "week52_low":    meta.get("fiftyTwoWeekLow", 0),
-        }
-    except Exception:
-        return None
-
-
-def fetch_yf_summary(ticker):
-    url = (
-        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-        f"?modules=financialData,defaultKeyStatistics,summaryDetail"
-    )
-    try:
-        r = requests.get(url, headers=YF_HEADERS, timeout=10)
-        if r.status_code != 200:
-            return None
-        data = r.json()
-        result = data.get("quoteSummary", {}).get("result", [])
-        if not result:
-            return None
-        merged = {}
-        for module in result[0].values():
-            if isinstance(module, dict):
-                merged.update(module)
-        return merged
-    except Exception:
-        return None
-
-
-def safe_raw(d, key, default=0):
-    try:
-        v = (d or {}).get(key, {})
-        if isinstance(v, dict):
-            return float(v.get("raw", default))
-        return float(v) if v is not None else default
-    except Exception:
-        return default
-
-
-@st.cache_data(ttl=3600)
-def get_energy_stocks():
-    results = {}
-    for ticker in ["CEG", "VST", "NEE"]:
-        chart   = fetch_yf_chart(ticker)
-        summary = fetch_yf_summary(ticker)
-        if not chart and not summary:
-            continue
-        current_p   = (chart or {}).get("current_price", 0)
-        week52_high = (chart or {}).get("week52_high", 0)
-        week52_low  = (chart or {}).get("week52_low", 0)
-        rev_growth  = safe_raw(summary, "revenueGrowth") * 100
-        price_pos   = ((current_p - week52_low) / (week52_high - week52_low) * 100
-                       if week52_high > week52_low else 50)
-        results[ticker] = {
-            "current_price": current_p,
-            "week52_high":   week52_high,
-            "week52_low":    week52_low,
-            "price_pos_pct": price_pos,
-            "rev_growth":    rev_growth,
-        }
-    return results if results else None
-
-
-@st.cache_data(ttl=3600)
-def get_utility_etf():
-    results = {}
-    for ticker in ["XLU", "ICLN"]:
-        chart = fetch_yf_chart(ticker)
-        if not chart:
-            continue
-        current_p   = chart.get("current_price", 0)
-        week52_high = chart.get("week52_high", 0)
-        week52_low  = chart.get("week52_low", 0)
-        price_pos   = ((current_p - week52_low) / (week52_high - week52_low) * 100
-                       if week52_high > week52_low else 50)
-        results[ticker] = {
-            "current_price": current_p,
-            "week52_high":   week52_high,
-            "week52_low":    week52_low,
-            "price_pos_pct": price_pos,
-        }
-    return results if results else None
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_gpu_efficiency_snapshot(policy_version):
+    """Use one reviewed provider for the detail page and overview."""
+    if policy_version != "quarterly-v1":
+        raise ValueError("未知的系统能效复核策略版本")
+    return load_gpu_efficiency(check_remote=True)
 
 
 # =========================================================
@@ -244,54 +69,20 @@ def get_utility_etf():
 # =========================================================
 
 def compute_infra_score():
-    queue       = INFRA_DATA["interconnection_queue_months"]
-    queue_s     = max(0, min(100, (queue - 12) / 36 * 100))
-    transformer = INFRA_DATA["transformer_lead_time_months"]
-    transformer_s = max(0, min(100, (transformer - 12) / 36 * 100))
-    avg_reserve = (INFRA_DATA["pjm_reserve_margin_pct"] +
-                   INFRA_DATA["ercot_reserve_margin_pct"]) / 2
-    reserve_s   = max(0, min(100, (20 - avg_reserve) / 12 * 100))
-    return round(queue_s * 0.45 + transformer_s * 0.30 + reserve_s * 0.25, 1)
+    return score_infra(INFRA_DATA)
 
 
 def compute_cost_score(us_price_usd: float):
-    """
-    us_price_usd: 从 EIA API 获取的实时价格，或静态后备值
-    """
-    cn_price  = ENERGY_COST_DATA["cn_west_industrial_usd"]
-    ppp_ratio = cn_price / us_price_usd if us_price_usd > 0 else 0.5
-    ppp_s     = max(0, min(100, (0.6 - ppp_ratio) / 0.4 * 100))
-    opex_pct  = ENERGY_COST_DATA["inference_energy_opex_pct"]
-    opex_s    = max(0, min(100, (opex_pct - 10) / 25 * 100))
-    return round(ppp_s * 0.55 + opex_s * 0.45, 1)
+    return cost_snapshot["score"] if cost_snapshot["available"] else None
 
 
 def compute_efficiency_score():
-    latest_perf    = GPU_EFFICIENCY_DATA["B200"]["tflops_per_watt"]
-    baseline       = GPU_EFFICIENCY_DATA["H100"]["tflops_per_watt"]
-    efficiency_gain = latest_perf / baseline
-    return round(max(0, min(100, (2.0 - efficiency_gain) / 0.9 * 100)), 1)
-
-
-def compute_market_score(energy_stocks, utility_etf):
-    if not energy_stocks:
-        return 40
-    scores = []
-    for ticker, d in energy_stocks.items():
-        pos = d.get("price_pos_pct", 50)
-        if pos > 80:   s = 75
-        elif pos > 60: s = 55
-        elif pos > 40: s = 35
-        else:          s = 20
-        scores.append(s)
-    if utility_etf:
-        for ticker, d in utility_etf.items():
-            pos = d.get("price_pos_pct", 50)
-            scores.append(pos * 0.6)
-    return round(sum(scores) / len(scores)) if scores else 40
+    return gpu_snapshot["metrics"]["score"] if gpu_snapshot["available"] else None
 
 
 def compute_esri(infra_s, cost_s, efficiency_s, market_s):
+    if any(s is None for s in (infra_s,cost_s,efficiency_s,market_s)):
+        return None
     return round(
         0.40 * infra_s +
         0.25 * cost_s  +
@@ -302,6 +93,8 @@ def compute_esri(infra_s, cost_s, efficiency_s, market_s):
 
 
 def get_state(esri):
+    if esri is None:
+        return "N/A", "gray", "Incomplete Input Data", "必要输入或情景证据不完整，暂不输出完整ESRI。其他有效分项继续展示。"
     if esri < 30:
         return "SAFE",    "green",  "Grid Optimal",               "电力系统承载AI扩张，能源约束尚未成型，美国借电体系运转正常。"
     elif esri < 50:
@@ -313,6 +106,8 @@ def get_state(esri):
 
 
 def score_to_color(s):
+    if s is None:
+        return "gray", "—"
     if s < 30:   return "green",  "↗"
     elif s < 50: return "yellow", "→"
     elif s < 70: return "orange", "↘"
@@ -325,26 +120,22 @@ def score_to_color(s):
 
 render_header("⚡ AI能源约束", "核心监测维度：AI需求增长速度是否超过可调度能源的扩张速度", symbol="ESRI · 能源系统风险指数")
 
+render_infra_updates(INFRA_DATA)
+infra_snapshot = load_infra()
+INFRA_DATA = infra_snapshot["inputs"]
+
 # =========================================================
 # 数据加载
 # =========================================================
 
-with st.spinner("正在从 Yahoo Finance 拉取核电 · 电力市场数据..."):
-    energy_stocks = get_energy_stocks()
-    utility_etf   = get_utility_etf()
+with st.spinner("正在从 Yahoo Finance 读取 CEG / VST 电力资产行情..."):
+    market_snapshot = energy_market.load_energy_market()
 
-with st.spinner("正在从 EIA Open Data API 获取最新美国商业电价..."):
-    eia_result = fetch_eia_electricity_price()
-
-# 确定实际使用的美国电价
-if eia_result["price_usd"] is not None:
-    us_price_live = eia_result["price_usd"]
-    us_price_source = f"EIA API 实时 · 数据期：{eia_result['period']}"
-    us_price_tag_html = f'<span class="source-tag">EIA 实时 ✓ ({eia_result["period"]})</span>'
-else:
-    us_price_live = ENERGY_COST_DATA["us_datacenter_ppa_usd"]
-    us_price_source = f"EIA API 不可用，使用静态后备值 ({eia_result['error']})"
-    us_price_tag_html = '<span class="source-tag-warn">⚠ EIA API 失败，使用静态后备</span>'
+cost_snapshot = load_cost()
+us_price_live = cost_snapshot["us_price"]
+us_price_tag_html = maintenance_badge(cost_snapshot)
+gpu_snapshot = get_gpu_efficiency_snapshot("quarterly-v1")
+counter_snapshot = load_counter_signals()
 
 # =========================================================
 # 各分项评分
@@ -353,9 +144,12 @@ else:
 infra_s      = compute_infra_score()
 cost_s       = compute_cost_score(us_price_live)
 efficiency_s = compute_efficiency_score()
-market_s     = compute_market_score(energy_stocks, utility_etf)
+market_s     = market_snapshot["score"] if market_snapshot["available"] else None
 esri         = compute_esri(infra_s, cost_s, efficiency_s, market_s)
-register_score("straw4", esri)
+if esri is not None:
+    register_score("straw4", esri)
+else:
+    st.session_state.setdefault("straw_scores",{}).pop("straw4",None)
 
 state, state_color, state_eng, state_cn = get_state(esri)
 
@@ -375,10 +169,10 @@ mkt_color,    mkt_arrow    = score_to_color(market_s)
 # =========================================================
 
 st.markdown(render_osci_card(
-    "ENERGY SYSTEM RISK INDEX", esri, state, f"综合评分：{state_cn}",
+    "ENERGY SYSTEM RISK INDEX", esri, state, f"情景综合评分：{state_cn}<br>变压器采用48个月交付压力上限情景，不是平均交期。",
     bar_color=bar_color, state_detail=state_eng,
-    components_html="基础设施 ×0.40 · 成本压力 ×0.25<br>效率对冲 ×0.20 · 市场信号 ×0.15",
-    score_display=f"{esri:.0f}",
+    components_html="基础设施 ×0.40 · 成本压力 ×0.25<br>系统能效对冲 ×0.20 · 电力市场信号 ×0.15",
+    score_display=f"{esri:.0f}" if esri is not None else "N/A",
 ), unsafe_allow_html=True)
 
 # =========================================================
@@ -393,129 +187,121 @@ with c1:
     xfmr    = INFRA_DATA["transformer_lead_time_months"]
     pjm_r   = INFRA_DATA["pjm_reserve_margin_pct"]
     ercot_r = INFRA_DATA["ercot_reserve_margin_pct"]
-    fresh1  = freshness_badge(INFRA_DATA["updated"])
-    st.markdown(metric_card(f"基础设施约束 {fresh1}", f"{queue}mo", infra_color, infra_arrow,
-                            f"并网排队 {queue}月 · 变压器交期 {xfmr}月<br>"
-                            f"PJM储备率 {pjm_r}% · ERCOT {ercot_r}%"), unsafe_allow_html=True)
+    fresh1 = '<span class="source-tag">官方资料＋交付压力情景</span>'
+    queue_display=f"{queue:g}mo" if queue is not None else "N/A"
+    pjm_text=f"{pjm_r:g}%" if pjm_r is not None else "N/A"
+    ercot_text=f"{ercot_r:g}%" if ercot_r is not None else "N/A"
+    st.markdown(metric_card(f"基础设施约束 {fresh1}", queue_display, infra_color, infra_arrow,
+                            "发电项目申请→投运中位时长 · 2025年建成项目<br>"
+                            f"夏季预期备用裕度（2026）：PJM {pjm_text} · ERCOT {ercot_text}<br>"
+                            + (f"变压器交付压力：{xfmr:g}个月近似上限情景（非平均值）<br>基础设施情景分：{infra_s:g}/100" if xfmr is not None and infra_s is not None else "变压器情景证据待核验 · 本分项N/A")), unsafe_allow_html=True)
 
-# 卡片2：能源成本压力（EIA 实时）
+# 卡片2：能源成本压力（实际集群资料，尚缺可比成对价格）
 with c2:
-    us_p  = us_price_live
-    cn_p  = ENERGY_COST_DATA["cn_west_industrial_usd"]
-    ppp   = round(cn_p / us_p, 3) if us_p > 0 else 0
-    opex  = ENERGY_COST_DATA["inference_energy_opex_pct"]
-    fresh2_cn  = freshness_badge(ENERGY_COST_DATA["updated"])   # 中国价格静态
-    eia_period = eia_result.get("period", "")
+    bounds = cost_snapshot.get("ratio_range")
+    ratio_text = f"{bounds[0]:.2f}—{bounds[1]:.2f}" if bounds else "N/A"
     st.markdown(metric_card(
-        f"能源成本压力 {us_price_tag_html}", f"{ppp:.3f}", cost_color, cost_arrow,
-        f"中美电价PPP比值（越低美国越贵）<br>美国 ${us_p:.4f}/kWh（{us_price_source[:20]}…） · "
-        f"中国西部 ${cn_p}/kWh{fresh2_cn}<br>推理电力占OpEx {opex}%",
+        f"能源成本压力 {us_price_tag_html}", ratio_text, cost_color, cost_arrow,
+        "中美算力地区参考电价比（中国÷美国）<br>"
+        "中国2地区公开参考价 · 美国4州工业代理<br>"
+        "地区等权中位数；非全国均价、非同口径实测<br>"
+        + (f"区间两端均为{cost_snapshot['state']} · {cost_s:g}分；费用占比不再计分" if cost_s is not None else cost_snapshot["missing_reason"]),
     ), unsafe_allow_html=True)
 
-# 卡片3：GPU效率对冲（静态）
+# 卡片3：AI推理系统能效对冲（MLPerf整机实测）
 with c3:
-    b200_eff  = GPU_EFFICIENCY_DATA["B200"]["tflops_per_watt"]
-    h100_eff  = GPU_EFFICIENCY_DATA["H100"]["tflops_per_watt"]
-    gain      = round(b200_eff / h100_eff, 2)
-    rubin_eff = GPU_EFFICIENCY_DATA["Rubin"]["tflops_per_watt"]
-    fresh3    = freshness_badge(GPU_EFFICIENCY_DATA["updated"])
-    st.markdown(metric_card(f"GPU效率对冲 {fresh3}", f"{gain}x", eff_color, eff_arrow,
-                            f"B200 vs H100 每瓦性能倍数<br>B200={b200_eff}x · "
-                            f"Rubin预估={rubin_eff}x（H100基准=1.0）"), unsafe_allow_html=True)
+    gpu_metrics = gpu_snapshot["metrics"]
+    gain = gpu_metrics["generation_gain"]
+    fresh3 = automatic_badge(gpu_snapshot)
+    st.markdown(metric_card(
+        f"AI推理系统能效对冲 {fresh3}", f"{gain:.2f}x", eff_color, eff_arrow,
+        f"MLPerf整机实测 · {gpu_metrics['pair_count']}组同口径配对<br>"
+        f"{gpu_snapshot['baseline_generation']} {gpu_snapshot['baseline_release']} → "
+        f"{gpu_snapshot['target_generation']} {gpu_snapshot['target_release']}<br>"
+        f"同等基准工作残余能源强度：{gpu_metrics['score']:.1f}%",
+    ), unsafe_allow_html=True)
 
-# 卡片4：市场信号
+# 卡片4：电力市场信号
 with c4:
-    if energy_stocks:
-        ceg = energy_stocks.get("CEG", {})
-        vst = energy_stocks.get("VST", {})
-        ceg_pos = ceg.get("price_pos_pct", 0)
-        vst_pos = vst.get("price_pos_pct", 0)
-        ceg_p   = ceg.get("current_price", 0)
-        vst_p   = vst.get("current_price", 0)
-        desc4   = f"CEG ${ceg_p:.1f}（52周位置 {ceg_pos:.0f}%）<br>VST ${vst_p:.1f}（52周位置 {vst_pos:.0f}%）"
-        display4 = f"{(ceg_pos+vst_pos)/2:.0f}%"
+    if market_snapshot["available"]:
+        ceg = market_snapshot["rows"]["CEG"]
+        vst = market_snapshot["rows"]["VST"]
+        desc4 = (f"CEG ${ceg['current_price']:.1f}（52周位置 {ceg['position_pct']:.0f}%）<br>"
+                 f"VST ${vst['current_price']:.1f}（52周位置 {vst['position_pct']:.0f}%）<br>"
+                 f"行情日期 {market_snapshot['observed_on']} · 分项{market_s:g}分")
+        display4 = f"{market_snapshot['mean_position_pct']:.0f}%"
     else:
-        desc4    = "Yahoo Finance 数据暂时无法获取<br>请稍后刷新重试"
+        desc4 = market_snapshot["missing_reason"]
         display4 = "N/A"
-    st.markdown(metric_card('核电市场信号 <span class="source-tag">Yahoo 实时</span>', display4,
+    st.markdown(metric_card('电力市场信号 <span class="source-tag">Yahoo 行情 · CEG/VST · 1小时缓存</span>', display4,
                             mkt_color, mkt_arrow, desc4), unsafe_allow_html=True)
 
 # =========================================================
 # Alert 结论框
 # =========================================================
 
-us_cap     = ENERGY_COST_DATA["us_ai_capacity_gw"]
-offshore   = ENERGY_COST_DATA["offshore_ai_capacity_gw"]
-total_ctrl = us_cap + offshore
-global_ai_demand_gw = 85
-aecr = round(total_ctrl / global_ai_demand_gw * 100, 1)
-
-alert_map = {
-    "SAFE": {
-        "box_class":   "alert-box-green",
-        "icon":        "✅",
-        "title_color": "#22c55e",
-        "title":       "结论：美国能源控制体系稳固，AI扩张未受物理约束",
-        "body":        f'当前 ESRI = <span class="green"><b>{esri}</b></span>，处于安全区间。AECR（AI能源覆盖率）= <b>{aecr}%</b>，美国控制体系下可调用能源容量覆盖当前全球AI需求。并网排队和变压器交期尚在可控范围，推理成本结构健康。'
-    },
-    "WATCH": {
-        "box_class":   "alert-box",
-        "icon":        "👁",
-        "title_color": "#fbbf24",
-        "title":       "结论：基建时滞出现，AI能源扩张速度开始落后于算力需求",
-        "body":        f'当前 ESRI = <span class="yellow"><b>{esri}</b></span>，进入观察区间。AECR = <b>{aecr}%</b>。并网排队周期延长开始压缩数据中心交付节奏，局部电网储备率下降。能源约束尚未推高推理成本，但交付滞后将在6-12个月后显现。建议关注Constellation Energy（CEG）和Vistra（VST）的PPA签约量。'
-    },
-    "WARNING": {
-        "box_class":   "alert-box",
-        "icon":        "⚠️",
-        "title_color": "#f97316",
-        "title":       "结论：热力学瓶颈形成，能源成本开始侵蚀AI推理利润率",
-        "body":        f'当前 ESRI = <span class="orange"><b>{esri}</b></span>，进入高危区间。AECR = <b>{aecr}%</b>。中美电价剪刀差扩大，美国数据中心电力成本在全球竞争中处于劣势。能源成本占推理OpEx比例上升，Inference Margin开始承压。注意：这是成本端信号，尚未构成系统崩塌，需联动资本开支偏离共同确认传导。'
-    },
-    "CRITICAL": {
-        "box_class":   "alert-box-red",
-        "icon":        "🔴",
-        "title_color": "#ef4444",
-        "title":       "结论：算力扩张触及能源瓶颈，需与资本开支偏离联动确认CASCADE",
-        "body":        f'当前 ESRI = <span class="red"><b>{esri}</b></span>，进入危机区间。AECR = <b>{aecr}%</b>，可调用能源容量已无法覆盖全球AI需求。并网排队彻底失控，数据中心可能因无电可用成为闲置资产。本因子单独不触发CASCADE；只有当能源约束为 CRITICAL 且资本开支偏离达到 WARNING 以上时才升级。'
-    }
-}
-
-alert = alert_map.get(state, alert_map["WATCH"])
-st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_html=True)
+if esri is None:
+    st.markdown(section_intro("必要资料不完整，完整ESRI暂不可用",
+        cost_snapshot["missing_reason"] if not cost_snapshot["available"] else
+        "基础设施必要输入或48月情景证据不完整；不补旧值、不改权重。"),unsafe_allow_html=True)
+else:
+    st.markdown(render_alert(state,"结论：能源约束情景评分，不是已确认缺电",
+        f"当前情景ESRI={esri:.1f}，状态{state}。基础设施情景分{infra_s:.1f}，按原40%权重贡献{infra_s*.4:.1f}分。"
+        "变压器48月为已确认采用的交付压力上限情景，不是平均值；并网耗时及备用裕度分别使用各自期间。"
+        "成本采用固定地区中位数代理比较，按0.80/0.60/0.40分档，双方费用与期间不完全一致；15%费用占比不再计分。"
+        f"系统能效采用MLPerf整机实测，{gpu_snapshot['baseline_generation']}→{gpu_snapshot['target_generation']}的"
+        f"{gpu_metrics['pair_count']}组可比结果中位提升{gain:.2f}倍，按100÷提升倍数计{efficiency_s:.1f}分。"
+        "新旧有口径断点，不能把分差当作市场突然恶化；本页不单独确认CASCADE。"),unsafe_allow_html=True)
 
 # =========================================================
 # 评分构成图直接展示；检测方法和分项值留在底部标签页。
 # =========================================================
 
 def _render_detection_logic():
-    st.markdown(logic_panel([
-        {"text": "<b>基础设施约束（×0.40）</b>：并网排队周期（45%权重）+ 变压器交期（30%）+ 电网储备率（25%）。物理瓶颈是最难用钱解决的约束。", "thresholds": [
-            ("#22c55e", "排队 <12月 · 储备率 >20%", "SAFE", "green"),
-            ("#fbbf24", "排队 12-24月 · 储备率 15-20%", "WATCH", "yellow"),
-            ("#f97316", "排队 24-36月 · 储备率 10-15%", "WARNING", "orange"),
-            ("#ef4444", "排队 >36月 · 储备率 <10%", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>能源成本压力（×0.25）</b>：中美电价PPP比值 + 推理电力占OpEx比例。美国电价接入 EIA API，每24小时自动刷新。", "thresholds": [
-            ("#22c55e", "PPP > 0.45 · OpEx电力 <10%", "SAFE", "green"),
-            ("#ef4444", "PPP < 0.25 · OpEx电力 >30%", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>GPU效率对冲（×0.20）</b>：B200 vs H100每瓦性能倍数。效率革命是真实的反制力量，倍数越高说明热力学压力越小。"},
-        {"text": "<b>市场信号（×0.15）</b>：核电（CEG/VST）股价在52周区间的位置。市场对电力稀缺性的实时定价。"},
-    ]), unsafe_allow_html=True)
+    sections = [
+        ("1", "基础设施约束（×0.40）",
+         "发电项目申请至投运中位时长（45%）+ 大型变压器48月交付压力上限情景（30%，不是平均值）+ PJM/ERCOT夏季预期备用裕度ARM（25%）。时长不是数据中心接电等待，ARM不是晚间风险裕度。沿用原公式：q=clamp((月数−12)/36×100)，t同式；r=clamp((20−两地裕度均值)/12×100)；分项=round(0.45q+0.30t+0.25r,1)。本期q=100、t=100、r=0，分项75分，×40%贡献30分。必要值或情景证据缺失则N/A，不重分配权重。以下旧研究分档未重新校准；新旧有口径断点。",
+         ["🟢 排队 <12月 · 储备率 >20% · SAFE",
+          "🟡 排队 12–24月 · 储备率 15–20% · WATCH",
+          "🟠 排队 24–36月 · 储备率 10–15% · WARNING",
+          "🔴 排队 >36月 · 储备率 <10% · CRITICAL"]),
+        ("2", "能源成本压力（×0.25）",
+         "R=中国地区中位数÷美国地区中位数。固定两国地区名单，分别计算报价上下限，不取中点。分项按档位映射15/40/60/85分，整页25%权重不变；不是行业标准、实测风险概率或全国同口径比较。15%费用占比仅作旧假设参考，不再计分。区间两端同档才计入整页；跨档则展示状态范围，单点N/A。旧55/45加权公式及旧9分保留在历史。",
+         ["🟢 R ≥ 0.80 · 15分 · SAFE",
+          "🟡 0.60 ≤ R < 0.80 · 40分 · WATCH",
+          "🟠 0.40 ≤ R < 0.60 · 60分 · WARNING",
+          "🔴 0 < R < 0.40 · 85分 · CRITICAL"]),
+        ("3", "AI推理系统能效对冲（×0.20）",
+         f"使用MLPerf官方整机实测功耗。先在{gpu_snapshot['baseline_release']}与{gpu_snapshot['target_release']}之间筛选同任务、同场景、同单位、同卡数记录，再取各配对性能/瓦提升倍数的中位数G。本期{gpu_snapshot['baseline_generation']}→{gpu_snapshot['target_generation']}共有{gpu_snapshot['metrics']['pair_count']}组，G={gpu_snapshot['metrics']['generation_gain']:.3f}×；分项=clamp(100÷G,0,100)={gpu_snapshot['metrics']['score']:.1f}分，×20%贡献{gpu_snapshot['metrics']['contribution']:.1f}分。只采纳实测整机功耗；TDP、路线图预测与单卡理论规格不计分。新版本没有足够合格配对时保留上次有效结果。",
+         None),
+        ("4", "电力市场信号（×0.15）",
+         "固定使用CEG与VST。先计算两者各自在52周高低区间的位置P，再取平均；P≤40%计20分，40%<P≤60%计35分，60%<P≤80%计55分，P>80%计75分。它只是美国电力资产市场定价代理，不证明物理缺电。两者任一缺失或行情日期不一致时分项N/A，不使用后备分。详情页与总览共用同一入口。",
+         ["🟢 P ≤ 40% · 20分 · SAFE",
+          "🟡 40% < P ≤ 60% · 35分 · WATCH",
+          "🟠 60% < P ≤ 80% · 55分 · WARNING",
+          "🔴 P > 80% · 75分 · CRITICAL"]),
+    ]
+    for number, title, explanation, thresholds in sections:
+        with st.expander(f"{number}　{title}", expanded=False):
+            st.write(explanation)
+            if thresholds:
+                st.markdown("**评分规则**")
+                for line in thresholds:
+                    st.markdown(line)
 
 with st.container(border=True):
     st.markdown('<div class="panel-title">📊 ESRI分项评分构成 · 能源风险传导链</div>', unsafe_allow_html=True)
 
-    categories = ["基础设施约束", "能源成本压力", "GPU效率对冲", "市场信号"]
+    categories = ["基础设施约束", "能源成本压力", "系统能效对冲", "电力市场信号"]
     scores     = [infra_s, cost_s, efficiency_s, market_s]
     weights    = [0.40, 0.25, 0.20, 0.15]
-    bar_labels = [f"{c}  ×{w:.2f}  →  {s:.0f}分"
+    bar_labels = [f"{c}  ×{w:.2f}  →  {f'{s:.0f}分' if s is not None else 'N/A（待核验）'}"
                   for c, w, s in zip(categories, weights, scores)]
 
     bar_colors_list = []
     for s in scores:
-        if s < 30:   bar_colors_list.append("#22c55e")
+        if s is None: bar_colors_list.append("#94a3b8")
+        elif s < 30:   bar_colors_list.append("#22c55e")
         elif s < 50: bar_colors_list.append("#fbbf24")
         elif s < 70: bar_colors_list.append("#f97316")
         else:        bar_colors_list.append("#ef4444")
@@ -528,14 +314,15 @@ with st.container(border=True):
         marker_color=bar_colors_list,
         marker_line_width=0,
         width=0.55,
-        text=[f"{s:.0f}" for s in scores],
+        text=[f"{s:.0f}" if s is not None else "N/A" for s in scores],
         textposition="outside",
         textfont=dict(color="#94a3b8", size=15),
     ))
-    fig.add_shape(type="line", x0=esri, x1=esri, y0=-0.5, y1=3.5,
-                  line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dash"))
-    fig.add_annotation(x=esri, y=3.7, text=f"ESRI={esri}",
-                       showarrow=False, font=dict(color="#94a3b8", size=13), xanchor="center")
+    if esri is not None:
+        fig.add_shape(type="line", x0=esri, x1=esri, y0=-0.5, y1=3.5,
+                      line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dash"))
+        fig.add_annotation(x=esri, y=3.7, text=f"ESRI={esri}",
+                           showarrow=False, font=dict(color="#94a3b8", size=13), xanchor="center")
     fig.update_layout(
         height=280,
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -549,14 +336,16 @@ with st.container(border=True):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    ceg_pos_str = f"CEG: {energy_stocks['CEG']['price_pos_pct']:.0f}% 52w位" if energy_stocks and 'CEG' in energy_stocks else "CEG: N/A"
-    vst_pos_str = f"VST: {energy_stocks['VST']['price_pos_pct']:.0f}% 52w位" if energy_stocks and 'VST' in energy_stocks else "VST: N/A"
-    eia_tag = f'<span class="source-tag">EIA ✓ {eia_result.get("period","")}</span>' if eia_result["price_usd"] else '<span class="source-tag-warn">EIA 不可用</span>'
+    ceg_pos_str = (f"CEG: {market_snapshot['rows']['CEG']['position_pct']:.0f}% 52w位"
+                   if market_snapshot["available"] else "CEG: N/A")
+    vst_pos_str = (f"VST: {market_snapshot['rows']['VST']['position_pct']:.0f}% 52w位"
+                   if market_snapshot["available"] else "VST: N/A")
+    eia_tag = ('<span class="source-tag">地区中位数代理 · 区间同分</span>' if cost_snapshot["available"]
+               else '<span class="source-tag-warn">地区参考电价：单点评分待核验</span>')
     st.markdown(source_tag_row([
         '<span class="source-tag">Yahoo Finance ✓</span>', eia_tag,
-        '<span class="source-tag-warn static-data-badge">基础设施数据 静态维护</span>',
-        '<span class="source-tag-warn static-data-badge">效率数据 静态维护</span>',
-        f'<span class="source-tag-gray">AECR={aecr}%</span>',
+        '<span class="source-tag-warn">基础设施：2025投运 / 2026夏季 · 48月压力情景</span>',
+        f'<span class="source-tag">MLPerf整机实测 {gpu_snapshot["metrics"]["pair_count"]}/3 · 自动季度检查</span>',
         f'<span class="source-tag-gray">{ceg_pos_str}</span>',
         f'<span class="source-tag-gray">{vst_pos_str}</span>',
     ]), unsafe_allow_html=True)
@@ -566,50 +355,64 @@ with st.container(border=True):
 # =========================================================
 
 st.markdown(section_intro("🛡️ 反证模块（Counter Signals）— 能源风险对冲因素",
-                          "以下信号若持续增强，将系统性降低能源约束因子的风险等级"), unsafe_allow_html=True)
+                          "以下是降低能源约束的反证观察，不计入ESRI，不自动改分"), unsafe_allow_html=True)
+st.markdown(review_banner(counter_snapshot), unsafe_allow_html=True)
 
 cc1, cc2, cc3 = st.columns(3)
 
 with cc1:
-    st.markdown(counter_card("Counter A · 全球借电体系扩张",
-                             "中东AI园区（阿联酋 1.5GW · 沙特 2GW）、加拿大水电数据中心、北欧地热数据中心持续扩张。"
-                             "若海外AI专用电力容量占比超过40%，说明美国成功绕过本土瓶颈，能源约束缓解。",
-                             label="当前海外占比：", value=f"{round(offshore/(us_cap+offshore)*100,1)}%"), unsafe_allow_html=True)
+    signal_a = counter_snapshot["signals"]["overseas_ai_expansion"]
+    st.markdown(counter_card(signal_a["title"], signal_a["summary"],
+                             label=signal_a["status_label"], value=signal_a["display_value"]), unsafe_allow_html=True)
 
 with cc2:
-    rubin_gain = round(GPU_EFFICIENCY_DATA["Rubin"]["tflops_per_watt"] /
-                       GPU_EFFICIENCY_DATA["H100"]["tflops_per_watt"], 1)
-    st.markdown(counter_card("Counter B · GPU效率革命",
-                             f"Blackwell→Rubin路线图显示每瓦性能持续翻倍。若Rubin量产后每瓦性能达到H100的{rubin_gain}x，"
-                             "相同算力需求下电力消耗大幅下降，热力学压力系统性缓解。",
-                             label="路线图效率增益：", value=f"H100→Rubin={rubin_gain}x"), unsafe_allow_html=True)
+    st.markdown(counter_card(
+        "Counter B · AI推理系统能效提升",
+        f"MLPerf官方整机实测显示，{gpu_snapshot['target_generation']}相对{gpu_snapshot['baseline_generation']}的"
+        f"三组同口径配对中位能效提升为{gain:.2f}倍。同等基准工作对应残余能源强度为"
+        f"{gpu_metrics['score']:.1f}%；它可对冲单位工作量耗电，但不代表总需求反弹或数据中心总功耗已经下降。",
+        label="整机实测效率增益：", value=f"{gpu_snapshot['baseline_generation']}→{gpu_snapshot['target_generation']}={gain:.2f}x",
+    ), unsafe_allow_html=True)
 
 with cc3:
-    st.markdown(counter_card("Counter C · 独立能源系统（Behind-the-Meter）",
-                             "微软重启三里岛核电站（835MW）、谷歌签署SMR协议、Meta自建天然气电站。"
-                             "科技巨头脱离公共电网建立私有能源系统，若此趋势加速，公共电网压力下降，并网排队瓶颈对AI扩张的约束力减弱。",
-                             label="观察信号：", value="SMR商业化进程 · 核电PPA签约量"), unsafe_allow_html=True)
+    signal_c = counter_snapshot["signals"]["dedicated_power_progress"]
+    st.markdown(counter_card(signal_c["title"], signal_c["summary"],
+                             label=signal_c["status_label"], value=signal_c["display_value"]), unsafe_allow_html=True)
 
 # =========================================================
-# 底部注释：数据说明（含EIA实时状态）
+# 底部注释：数据说明（IEA年度核验快照，不再请求EIA）
 # =========================================================
 
 logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 with logic_tab:
-    _render_detection_logic()
+    with st.container(key="energy_detection_logic"):
+        _render_detection_logic()
 with evidence_tab:
-    st.markdown(evidence_table(
-        "📋 ESRI 分项原始评分",
-        ["指标", "权重", "分项评分", "加权贡献"],
-        [(category, f"{weight:.0%}", f"{score:.1f}", f"{score * weight:.1f}")
-         for category, weight, score in zip(categories, weights, scores)],
-    ), unsafe_allow_html=True)
+    current_quarter = make_current_snapshot(infra_snapshot, cost_snapshot, gpu_snapshot, market_snapshot)
+    quarterly_history = load_quarterly_history()
+    render_current_quarter(current_quarter)
+    render_counter_evidence(counter_snapshot)
+    render_cost_evidence(cost_snapshot, include_history=False)
+    render_gpu_efficiency_evidence(gpu_snapshot, include_history=False)
+    infra_history = infra_updates.history()
+    legacy_evidence = {
+        "infrastructure": {
+            "baselines": infra_history["baselines"],
+            "input_versions": infra_history["input_versions"],
+        },
+        "energy_cost": cost_history(),
+        "system_efficiency": gpu_snapshot["history"],
+        "market_signal": "旧五标的混合口径不再计分；2026Q3页面基准已统一归档。",
+        "counter_signals": counter_snapshot,
+    }
+    render_quarterly_history(quarterly_history, current_quarter, legacy_evidence)
 with source_tab:
     render_data_freshness([
-        {"name": "美国商业电价", "source": f"EIA Open Data · ${us_price_live:.4f}/kWh", "updated_at": eia_result.get("period") or "备用值", "mode": "live" if eia_result["price_usd"] else "fallback"},
-        {"name": "核电市场信号", "source": "Yahoo Finance · CEG / VST / NEE / XLU / ICLN", "updated_at": "每小时缓存", "mode": "live"},
-        {"name": "基础设施约束", "source": "FERC · NERC · LPT采购调研", "updated_at": INFRA_DATA["updated"], "mode": "static"},
-        {"name": "GPU效率", "source": "NVIDIA官方规格", "updated_at": GPU_EFFICIENCY_DATA["updated"], "mode": "static"},
-        {"name": "中国西部电价", "source": "国家能源局 · 行业均值", "updated_at": ENERGY_COST_DATA["updated"], "mode": "static"},
+        {"name": "算力地区参考电价", "source": "中国2地区公开参考价 / 美国EIA 4州工业代理；人工季度复核", "updated_at": cost_snapshot["period"], "mode": "static"},
+        {"name": "电力市场信号", "source": "Yahoo Finance · CEG / VST；两者52周位置均值", "updated_at": market_snapshot.get("observed_on", "N/A") + "；每小时缓存", "mode": "live"},
+        {"name": "基础设施约束", "source": "LBNL 2026版 · NERC 2026夏季 · DOE描述＋用户确认48月上限情景（非平均）", "updated_at": INFRA_DATA["updated"], "mode": "fallback"},
+        {"name": "AI推理系统能效", "source": "MLCommons MLPerf官方整机性能与实测功耗；季度自动检查，未通过门槛则保留上期", "updated_at": gpu_snapshot["checked_at"], "mode": "live"},
+        {"name": "反证模块A/C", "source": "官方公告与监管页面；跨季度后人工复核，不自动累加容量", "updated_at": counter_snapshot["reviewed_on"], "mode": "static"},
+        {"name": "电力占运营费用", "source": "15%沿用研究假设，出处待核验；非本期实测", "updated_at": "原录入2025-01，观察期未知", "mode": "static"},
     ])
-render_footer(f'Yahoo Finance · EIA Open Data · FERC · NERC · NVIDIA规格 · BloombergNEF（{INFRA_DATA["updated"]}）')
+render_footer(f'Yahoo Finance（CEG/VST）· 中国地区参考价 / 美国EIA工业代理（非同口径全国均价）· IEA旧工业背景 · LBNL · NERC · DOE · MLCommons MLPerf官方整机实测（{INFRA_DATA["updated"]}）')

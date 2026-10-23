@@ -4,3 +4,4 @@ plotly
 yfinance
 pandas
 numpy
+pypdf>=6.0,<7

@@ -1,0 +1,19 @@
+{
+  "id": "regional-median-v1-2026-10-21",
+  "reviewed_on": "2026-10-21",
+  "method": "中美算力地区参考电价比：固定地区、地区等权中位数、区间端点敏感性。中国数据中心公开参考价对美国EIA工业代理，不是同口径全国均价。",
+  "selection_policy": "初始固定篮子：中国内蒙古、新疆伊吾；美国弗吉尼亚、得州、华盛顿、北达科他，涵盖成熟集群与低成本算力布局。属于目的抽样而非随机抽样；中国仅2个地区，不能代表全国。以后不因价格高低换地区，增删名单需另行记录。",
+  "period": "美国2026-07月；中国2026-06/10公开描述，实际结算期间未明确；不是同季度实测",
+  "aggregation_policy": "各组对地区下限与上限分别求中位数，不将区间中点冒充实测；固定篮子必须完整。发布/观察期分别保留，旧于12个月或未知版本先复核，不用2024旧价填充。名义美元比较，非PPP。",
+  "fx": {"cny_per_usd": 6.7894, "date": "2026-07-31", "source_url": "https://fec.mofcom.gov.cn/article/zyfw/jrfw/jrfwywzn/jrfwwh/hlfxglzy/202607/7208.html", "basis": "美国价格月份末CFETS中间价，人民币/美元；非季度平均汇率；跨期中国资料仅作参考"},
+  "expected": {"CN": ["cn-inner-mongolia", "cn-xinjiang-yiwu"], "US": ["us-virginia", "us-texas", "us-washington", "us-north-dakota"]},
+  "caveat": "来源层级、费用边界与统计期间不完全相同。区间仅反映公开报价范围，不是置信区间，状态稳定也不代表消除了口径偏差。15%OpEx仍为旧假设。",
+  "rows": [
+    {"id":"cn-inner-mongolia","country":"CN","region":"内蒙古","low":0.35,"high":0.38,"currency":"CNY","price":"0.35—0.38元/kWh","period":"2026-10-12报道，统计期未知","classification":"数据中心绿电到户参考区间","source_url":"https://gxt.hunan.gov.cn/gxt/xxgk_71033/gzdt/xintszs/202610/t20261012_34079347.html"},
+    {"id":"cn-xinjiang-yiwu","country":"CN","region":"新疆伊吾相关基地","low":0.35,"high":0.35,"currency":"CNY","price":"约0.35元/kWh","period":"2026-06-09答复，结算月未知","classification":"特定项目参考价；不采用未来0.30目标","source_url":"https://dsjj.cq.gov.cn/zwgk_533/jyta/202606/t20260609_15739070_wap.html"},
+    {"id":"us-virginia","country":"US","region":"弗吉尼亚","low":0.1007,"high":0.1007,"currency":"USD","price":"0.1007美元/kWh","period":"2026-07，2026-09-24发布","classification":"EIA工业用户平均销售电价，初步值","source_url":"https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"},
+    {"id":"us-texas","country":"US","region":"得州","low":0.0707,"high":0.0707,"currency":"USD","price":"0.0707美元/kWh","period":"2026-07，2026-09-24发布","classification":"EIA工业用户平均销售电价，初步值","source_url":"https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"},
+    {"id":"us-washington","country":"US","region":"华盛顿","low":0.0751,"high":0.0751,"currency":"USD","price":"0.0751美元/kWh","period":"2026-07，2026-09-24发布","classification":"EIA工业用户平均销售电价，初步值","source_url":"https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"},
+    {"id":"us-north-dakota","country":"US","region":"北达科他","low":0.0821,"high":0.0821,"currency":"USD","price":"0.0821美元/kWh","period":"2026-07，2026-09-24发布","classification":"EIA工业用户平均销售电价，初步值","source_url":"https://www.eia.gov/electricity/monthly/epm_table_grapher.php?t=epmt_5_6_a"}
+  ]
+}

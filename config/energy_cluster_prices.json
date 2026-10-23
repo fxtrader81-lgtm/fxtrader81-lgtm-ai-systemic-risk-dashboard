@@ -1,0 +1,17 @@
+{
+  "id": "datacenter-cluster-prices-review-2026-10-21",
+  "reviewed_on": "2026-10-21",
+  "method": "中美实际算力集群数据中心到户电价参考；不是全国均价。",
+  "missing_reason": "美国侧尚缺同口径数据中心到户价格；中国样本年份、费用及补贴范围未全部对齐，暂不计算两组均价/价格比。IEA工业比值仅作背景，不用于本期评分。",
+  "aggregation_policy": "仅在样本期间、费用范围、货币换算及补贴处理可比后计算所选集群样本均价；无用电量权重时不得称全国均价。范围不取中点、目标价不当现价，旧资料单独保留。",
+  "rows": [
+    {"id":"cn-inner-mongolia","country":"CN","region":"内蒙古数据中心集群","price":"0.35—0.38元/度","period":"2026-10-12报道；统计期间未明确","classification":"绿电到户均价报道","adoption":"本期地区参考；区间不取中点","source_url":"https://gxt.hunan.gov.cn/gxt/xxgk_71033/gzdt/xintszs/202610/t20261012_34079347.html","evidence":"报道引述自治区工信厅数据：内蒙古数据中心绿电到户均价0.35—0.38元/千瓦时。","access":"正文已读取；非逐项目电费账单"},
+    {"id":"cn-xinjiang-yiwu","country":"CN","region":"新疆哈密伊吾相关算力基地","price":"约0.35元/度","period":"2026-06公开答复；结算月份未明确","classification":"特定项目价格描述","adoption":"本期地区参考；不代表全疆","source_url":"https://dsjj.cq.gov.cn/zwgk_533/jyta/202606/t20260609_15739070_wap.html","evidence":"答复称拟通过绿电直连进一步将电价从0.35元/度降低至约0.3元/度。","access":"搜索索引可读，直接正文读取超时"},
+    {"id":"cn-xinjiang-target","country":"CN","region":"同一伊吾基地绿电直连目标","price":"约0.30元/度","period":"预计2026年底；尚未核验实现","classification":"未来目标","adoption":"不纳入现价或均价","source_url":"https://dsjj.cq.gov.cn/zwgk_533/jyta/202606/t20260609_15739070_wap.html","evidence":"预计2026年底形成20万千瓦绿电直供能力，电价降至约0.3元/度。","access":"搜索索引可读，正文超时"},
+    {"id":"cn-qinghai-hainan","country":"CN","region":"青海海南州大数据中心","price":"0.42—0.44元/度","period":"2024-07-08公开建议","classification":"历史地区价格描述","adoption":"历史参考；不能当2026年现价","source_url":"https://www.qhrd.gov.cn/qhsrd/yajy/202407/t20240708_219996.html","evidence":"省人大网站代表建议描述当时海南州大数据中心用电电价在0.42—0.44元/度。","access":"正文已读取；非现行电价文件"},
+    {"id":"cn-guangxi","country":"CN","region":"广西数据中心","price":"约0.78元/度","period":"2024-03-26研究","classification":"历史研究平均水平","adoption":"历史参考；未核验当前价格","source_url":"https://gxxxzx.gxzf.gov.cn/zybg/dsjjcyyj/2024n/P020240705560860697217.pdf","evidence":"广西信息中心研究第1页描述数据中心电价平均水平约0.78元/千瓦时。","access":"搜索索引读取；直接PDF读取SSL失败"},
+    {"id":"cn-guangxi-policy","country":"CN","region":"广西旧补贴政策","price":"补贴后不低于0.349元/度","period":"2018-08-29政策","classification":"附条件历史政策","adoption":"不作为当前实际价","source_url":"https://news.gxnews.com.cn/staticpages/20180917/newgx5b9fa63d-17653432.shtml","evidence":"桂政办发〔2018〕104号：符合条件最高补贴0.2元/度，连补3年，每户每年最高500万元；补贴后不低于0.349元/度。","access":"政策原文转载已读取；当前有效性未确认"},
+    {"id":"us-virginia","country":"US","region":"弗吉尼亚州数据中心供电区","price":"待核验","period":"本轮检查2026-10-21；费率生效期须逐项核对","classification":"供电公司费率入口，不是实际均价","adoption":"缺可比到户单值","source_url":"https://www.dominionenergy.com/virginia/rates-and-tariffs/business-rates","evidence":"Dominion公开GS-3/GS-4大用户费率、Riders及用电消费税说明；不能只取电量费当完整到户价。","access":"正文已读取；尚未完成统一负荷下全费用测算"},
+    {"id":"us-texas","country":"US","region":"得州数据中心集群","price":"待核验","period":"数据中心实际价期间未知","classification":"尚缺数据中心成对证据","adoption":"不能用IEA工业0.050美元替代","source_url":"https://www.iea.org/data-and-statistics/charts/estimated-final-electricity-price-for-large-industrial-customers-in-energy-intensive-industries-2019-2025","evidence":"IEA 2025年50美元/MWh为得州工业代理，并非数据中心实际到户价。","access":"IEA背景资料已核验；实际数据中心价格尚缺"}
+  ]
+}

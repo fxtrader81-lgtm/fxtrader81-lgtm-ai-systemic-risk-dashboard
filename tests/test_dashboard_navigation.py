@@ -113,6 +113,23 @@ class DashboardNavigationTests(unittest.TestCase):
             r'\.step-text,\s*\.logic-step p\s*\{[^}]*font-size:\s*16px',
         )
 
+    def test_all_new_expander_menus_have_readable_default_style(self):
+        with open("styles/components.css", encoding="utf-8") as source:
+            css = source.read()
+
+        shared = '[data-testid="stExpander"] > details > summary'
+        self.assertIn(shared, css)
+        self.assertRegex(
+            css,
+            r'\[data-testid="stExpander"\] > details > summary\s*\{'
+            r'[^}]*min-height:\s*58px;'
+            r'[^}]*color:\s*#f8fafc\s*!important;'
+            r'[^}]*font-size:\s*20px\s*!important;'
+            r'[^}]*font-weight:\s*700\s*!important;',
+        )
+        self.assertIn('-webkit-text-fill-color: #f8fafc !important;', css)
+        self.assertIn('summary:focus-visible', css)
+
 
 if __name__ == "__main__":
     unittest.main()

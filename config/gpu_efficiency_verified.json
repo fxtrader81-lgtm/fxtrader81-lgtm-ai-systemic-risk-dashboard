@@ -1,0 +1,158 @@
+{
+  "active_id": "mlperf-h100-b200-bridge-v1-2026-10-22",
+  "review_interval_days": 90,
+  "records": [
+    {
+      "id": "legacy-static-gpu-efficiency-2025-01",
+      "kind": "legacy_method",
+      "recorded_at": "2025-01",
+      "status": "historical_only",
+      "inputs": {
+        "A100": 0.58,
+        "H100": 1.0,
+        "H200": 1.32,
+        "B200": 1.75,
+        "Rubin": 2.4
+      },
+      "input_label": "原tflops_per_watt字段实际为未给出可复核测试条件的归一化倍数",
+      "formula": "score=clamp((2.0-B200/H100)/0.9*100)",
+      "score": 27.8,
+      "limitation": "原值未绑定同一任务、场景、准确率、整机实测功耗或原始结果行；Rubin为预测值。仅保留历史，不再用于当前评分。"
+    },
+    {
+      "id": "mlperf-h100-b200-bridge-v1-2026-10-22",
+      "kind": "measured_generation_link",
+      "method_version": "mlperf-system-efficiency-chain-v1",
+      "checked_at": "2026-10-22",
+      "baseline_generation": "H100",
+      "target_generation": "B200",
+      "baseline_release": "v5.0",
+      "target_release": "v5.1",
+      "minimum_pairs": 2,
+      "weight": 0.2,
+      "formula": "pair_efficiency=performance_result/power_watts; pair_gain=target_efficiency/baseline_efficiency; generation_gain=median(pair_gain); score=clamp(100/generation_gain,0,100)",
+      "selection_policy": "仅使用MLPerf datacenter中has_power=true、Power_Units=Watts、相同模型、相同场景、相同性能单位和相同加速卡数量的整机结果；同一配对有多台系统时先取各代系统能效中位数，再计算代际倍数。至少两组配对才计分。",
+      "scope": "整机交流功耗下的AI推理系统能效代理，不是GPU芯片单体TFLOPS/W，也不代表AI总用电需求会同比下降。",
+      "confidence": "medium",
+      "confidence_reason": "三组公开实测可重复计算，但H100与B200来自相邻MLPerf版本及不同厂商整机；任务和场景严格配对，系统与软件代际因素无法与芯片因素完全拆分。",
+      "comparisons": [
+        {
+          "model": "llama2-70b-99",
+          "scenario": "Offline",
+          "performance_units": "Tokens/s",
+          "accelerators": 8,
+          "baseline": {
+            "release": "v5.0",
+            "commit": "50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92",
+            "id": "5.0-0023",
+            "submitter": "Fujitsu",
+            "system": "PRIMERGY CDI (8x H100NVL, TensorRT)",
+            "accelerator": "NVIDIA H100-NVL-94GB",
+            "performance_result": 18084.9,
+            "power_watts": 4952.0463662791,
+            "measured_power": true,
+            "accuracy": "ROUGE1: 44.6821; ROUGE2: 22.2379; ROUGEL: 28.8722; TOKENS_PER_SAMPLE: 289.4",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.0/blob/50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92/summary_results.json"
+          },
+          "target": {
+            "release": "v5.1",
+            "commit": "029742c79b1ec561e2f5a25d7daa585d2beebde1",
+            "id": "5.1-0061",
+            "submitter": "Lenovo",
+            "system": "ThinkSystem SR680a V3 (8x B200-SXM-180GB, TensorRT)",
+            "accelerator": "NVIDIA B200-SXM-180GB",
+            "performance_result": 102909.0,
+            "power_watts": 10400.9988793425,
+            "measured_power": true,
+            "accuracy": "ROUGE1: 44.7482; ROUGE2: 22.3577; ROUGEL: 29.1381; TOKENS_PER_SAMPLE: 273.3",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.1/blob/029742c79b1ec561e2f5a25d7daa585d2beebde1/summary_results.json"
+          }
+        },
+        {
+          "model": "llama2-70b-99",
+          "scenario": "Server",
+          "performance_units": "Tokens/s",
+          "accelerators": 8,
+          "baseline": {
+            "release": "v5.0",
+            "commit": "50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92",
+            "id": "5.0-0023",
+            "submitter": "Fujitsu",
+            "system": "PRIMERGY CDI (8x H100NVL, TensorRT)",
+            "accelerator": "NVIDIA H100-NVL-94GB",
+            "performance_result": 16848.6,
+            "power_watts": 4994.2610980392,
+            "measured_power": true,
+            "accuracy": "ROUGE1: 44.6735; ROUGE2: 22.2241; ROUGEL: 28.8629; TOKENS_PER_SAMPLE: 290.3",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.0/blob/50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92/summary_results.json"
+          },
+          "target": {
+            "release": "v5.1",
+            "commit": "029742c79b1ec561e2f5a25d7daa585d2beebde1",
+            "id": "5.1-0061",
+            "submitter": "Lenovo",
+            "system": "ThinkSystem SR680a V3 (8x B200-SXM-180GB, TensorRT)",
+            "accelerator": "NVIDIA B200-SXM-180GB",
+            "performance_result": 99159.3,
+            "power_watts": 10442.2597402597,
+            "measured_power": true,
+            "accuracy": "ROUGE1: 44.7510; ROUGE2: 22.3605; ROUGEL: 29.1380; TOKENS_PER_SAMPLE: 274.4",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.1/blob/029742c79b1ec561e2f5a25d7daa585d2beebde1/summary_results.json"
+          }
+        },
+        {
+          "model": "rgat",
+          "scenario": "Offline",
+          "performance_units": "Samples/s",
+          "accelerators": 8,
+          "baseline": {
+            "release": "v5.0",
+            "commit": "50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92",
+            "id": "5.0-0023",
+            "submitter": "Fujitsu",
+            "system": "PRIMERGY CDI (8x H100NVL, TensorRT)",
+            "accelerator": "NVIDIA H100-NVL-94GB",
+            "performance_result": 70313.0,
+            "power_watts": 2986.2257887517,
+            "measured_power": true,
+            "accuracy": "acc: 72.872",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.0/blob/50f1fbb1ce6a6d2e73f798ee772380ebcd9cea92/summary_results.json"
+          },
+          "target": {
+            "release": "v5.1",
+            "commit": "029742c79b1ec561e2f5a25d7daa585d2beebde1",
+            "id": "5.1-0062",
+            "submitter": "Lenovo",
+            "system": "ThinkSystem SR780a V3 (8x B200-SXM-180GB, TensorRT)",
+            "accelerator": "NVIDIA B200-SXM-180GB",
+            "performance_result": 618486.0,
+            "power_watts": 7467.0917985612,
+            "measured_power": true,
+            "accuracy": "acc: 72.869",
+            "source_url": "https://github.com/mlcommons/inference_results_v5.1/blob/029742c79b1ec561e2f5a25d7daa585d2beebde1/summary_results.json"
+          }
+        }
+      ],
+      "latest_source_checks": [
+        {
+          "release": "v6.0",
+          "commit": "ab33b2144a9f822f69d24f78569f993d195ee7e5",
+          "summary_file": "summary_results.json",
+          "total_rows": 520,
+          "datacenter_measured_power_rows": 0,
+          "source_url": "https://github.com/mlcommons/inference_results_v6.0/blob/ab33b2144a9f822f69d24f78569f993d195ee7e5/summary_results.json",
+          "result": "已检查，无可用于更新本指标的实测功耗记录"
+        },
+        {
+          "release": "v6.1",
+          "commit": "10ecdffda3bb94d71f0203a6ca8e20c17943f27c",
+          "summary_file": "summary.json",
+          "total_rows": 492,
+          "datacenter_measured_power_rows": 0,
+          "source_url": "https://github.com/mlcommons/inference_results_v6.1/blob/10ecdffda3bb94d71f0203a6ca8e20c17943f27c/summary.json",
+          "result": "已检查，无可用于更新本指标的实测功耗记录；design_power_watts不作为实测功耗"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": "energy-page-2026q3-legacy-baseline-v1",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_on": "2026-10-22",
+      "record_type": "backfilled_previous_page_state",
+      "method_version": "legacy-energy-page-v1",
+      "score": 47.2,
+      "display_score": 47,
+      "state": "WATCH",
+      "components": [
+        {
+          "id": "infrastructure",
+          "name": "基础设施约束",
+          "weight": 0.40,
+          "score": 69.9,
+          "contribution": 28.0,
+          "display_value": "43mo",
+          "raw": {
+            "interconnection_queue_months": 43,
+            "transformer_lead_time_months": 36,
+            "pjm_reserve_margin_pct": 16.5,
+            "ercot_reserve_margin_pct": 12.8
+          },
+          "observation_period": "旧录入标记2025-01；原始统计期间及字段未核验"
+        },
+        {
+          "id": "energy_cost",
+          "name": "能源成本压力",
+          "weight": 0.25,
+          "score": 42.8,
+          "contribution": 10.7,
+          "display_value": "中国÷美国=0.354",
+          "raw": {
+            "us_price_usd_kwh": 0.079,
+            "cn_price_usd_kwh": 0.028,
+            "electricity_opex_pct_assumption": 15
+          },
+          "observation_period": "旧录入标记2025-01；价格来源与费用边界未统一核验"
+        },
+        {
+          "id": "system_efficiency",
+          "name": "AI推理系统能效对冲",
+          "weight": 0.20,
+          "score": 27.8,
+          "contribution": 5.6,
+          "display_value": "B200/H100=1.75×",
+          "raw": {
+            "h100_normalized": 1.0,
+            "b200_normalized": 1.75,
+            "rubin_forecast_normalized": 2.4
+          },
+          "observation_period": "旧录入标记2025-01；未绑定同任务、场景或整机实测功耗"
+        },
+        {
+          "id": "market_signal",
+          "name": "电力市场信号",
+          "weight": 0.15,
+          "score": 20.0,
+          "contribution": 3.0,
+          "display_value": "低位档",
+          "raw": {
+            "ceg_2026_09_30_adjusted_close": 254.0200,
+            "vst_2026_09_30_adjusted_close": 138.3500,
+            "ceg_52w_position_pct_reconstructed": 10.8010,
+            "vst_52w_position_pct_reconstructed": 5.3741
+          },
+          "observation_period": "Yahoo Finance截至2026-09-30；收盘价与52周位置于2026-10-22补算"
+        }
+      ],
+      "summary": "上一版页面状态统一归档为2026Q3：基础设施约束贡献最大，旧能源成本与GPU效率仍使用2025-01静态输入；电力市场信号处于低位档。",
+      "caveat": "这是截至2026-09-30的上一版页面基准补录，不是四项数据都在9月30日发布或实测。各分项原始观察期分别保留；市场收盘数据为事后补算。旧值与2026Q4新口径之间存在方法断点，不能把分差解释为季度基本面变化。"
+    }
+  ]
+}

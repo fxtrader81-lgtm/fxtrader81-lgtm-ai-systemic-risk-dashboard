@@ -1,0 +1,30 @@
+MARKET_SNAPSHOT = {
+    "available": True,
+    "tickers": ["CEG", "VST"],
+    "rows": {
+        "CEG": {
+            "current_price": 30.0,
+            "week52_low": 10.0,
+            "week52_high": 110.0,
+            "position_pct": 20.0,
+            "observed_on": "2026-10-21",
+        },
+        "VST": {
+            "current_price": 50.0,
+            "week52_low": 10.0,
+            "week52_high": 110.0,
+            "position_pct": 40.0,
+            "observed_on": "2026-10-21",
+        },
+    },
+    "mean_position_pct": 30.0,
+    "score": 20,
+    "state": "SAFE",
+    "weight": 0.15,
+    "contribution": 3.0,
+    "checked_at": "2026-10-22T00:00:00+00:00",
+    "observed_on": "2026-10-21",
+    "cache_policy": "页面读取时检查；成功结果缓存1小时",
+    "method_version": "ceg-vst-52w-position-v1",
+    "missing_reason": "",
+}

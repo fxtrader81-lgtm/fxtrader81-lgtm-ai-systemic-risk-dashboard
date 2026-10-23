@@ -1,0 +1,17 @@
+{
+  "id": "iea-electricity-2026-industrial-2025",
+  "period": "2025",
+  "source_updated": "2026-03-04",
+  "reviewed_on": "2026-10-21",
+  "source_url": "https://www.iea.org/data-and-statistics/charts/estimated-final-electricity-price-for-large-industrial-customers-in-energy-intensive-industries-2019-2025",
+  "source_title": "IEA Electricity 2026：大型工业用户最终电价估计",
+  "capture_method": "浏览器逐一点击2025年美国、中国柱条，读取页面可见提示值；CSV不可下载。核验录入快照，不是自动抓取或实时价格。",
+  "rows": [
+    {"country": "US", "usd_mwh": 50, "scope": "得州工业电价代理，不是美国全国均价"},
+    {"country": "CN", "usd_mwh": 68, "scope": "IEA中国工业电价代理，本版注释未明确具体地区覆盖"}
+  ],
+  "opex_pct": 15,
+  "opex_classification": "沿用旧研究假设，来源待核验；不是本期实测值",
+  "caveat": "工业用户代理，不是数据中心PPA或实际合同价；中美样本并非同口径全国均价。新旧存在口径断点，不把分差当作市场变化。",
+  "refresh_policy": "按IEA后续版本复核后成对更新；当前不自动发现新版，不逐次请求EIA，不新增刷新按钮或后台任务。"
+}

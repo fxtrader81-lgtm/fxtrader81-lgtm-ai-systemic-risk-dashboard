@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "review_mode": "quarterly_manual_review",
+  "reviewed_quarter": "2026Q4",
+  "reviewed_on": "2026-10-23",
+  "score_effect": "反证观察项不计入ESRI，不自动下调风险等级。",
+  "review_policy": "进入新季度后页面提示人工复核。复核完成前保留上期已核验快照，不把新闻、规划上限或未核验项目自动累加。",
+  "scope_policy": {
+    "counter_a": "只跟踪美国以外AI数据中心的IT负载或明确算力容量；不与发电容量混加，不在没有统一分母时计算全球占比。",
+    "counter_c": "只跟踪有官方资料的专属、长期签约或共址供电项目；按公告、签约、许可、在建、投运分层，规划上限不冒充已投运。"
+  },
+  "signals": {
+    "overseas_ai_expansion": {
+      "title": "Counter A · 海外AI算力扩张",
+      "status_label": "本期观察",
+      "display_value": "2项官方项目组 · 分阶段",
+      "summary": "阿联酋Stargate UAE目标1GW，其中200MW预计2026年投运；沙特stc/HUMAIN宣布建设最高1GW的AI数据中心。两者都说明海外扩张正在加速，但项目阶段不同，不求和为已投运容量，也不再沿用旧占比与未校准阈值。",
+      "projects": [
+        {
+          "id": "stargate-uae",
+          "project": "Stargate UAE",
+          "country": "阿联酋",
+          "capacity_type": "AI集群目标IT容量",
+          "target_mw": 1000,
+          "near_term_mw": 200,
+          "stage": "已公告；200MW预计2026年投运",
+          "source_date": "2025-05-22",
+          "source_name": "OpenAI · Introducing Stargate UAE",
+          "source_url": "https://openai.com/index/introducing-stargate-uae/"
+        },
+        {
+          "id": "stc-humain-saudi",
+          "project": "stc / HUMAIN AI数据中心合资项目",
+          "country": "沙特阿拉伯",
+          "capacity_type": "AI工作负载规划上限",
+          "target_mw": 1000,
+          "near_term_mw": null,
+          "stage": "已宣布合资建设；上限不等于已投运",
+          "source_date": "2025-12-18",
+          "source_name": "Saudi Press Agency · stc and HUMAIN JV",
+          "source_url": "https://www.spa.gov.sa/en/N2471061"
+        }
+      ]
+    },
+    "dedicated_power_progress": {
+      "title": "Counter C · 专属与签约能源进展",
+      "status_label": "本期观察",
+      "display_value": "4组项目 · 分阶段跟踪",
+      "summary": "微软Crane 835MW长期PPA、Google/Kairos首期50MW与合作上限500MW、Google Duane Arnold超过600MW重启计划，以及Meta至2035年最高6.6GW的核电项目组合，表明科技公司正在锁定长期电源。这些是签约、重启或开发计划，不等于已全部供电；因此不再笼统解读为表后独立供电。",
+      "projects": [
+        {
+          "id": "microsoft-crane",
+          "project": "Crane Clean Energy Center",
+          "company": "Microsoft / Constellation",
+          "capacity_type": "长期PPA对应核电容量",
+          "target_mw": 835,
+          "stage": "20年PPA；重启许可流程推进中",
+          "source_date": "2024-09-20",
+          "source_name": "Microsoft · carbon-free energy progress",
+          "source_url": "https://www.microsoft.com/en-us/microsoft-cloud/blog/2024/09/20/accelerating-the-addition-of-carbon-free-energy-an-update-on-progress/",
+          "verification_url": "https://www.nrc.gov/facilities-safety/facility-finder/reactors/ccec"
+        },
+        {
+          "id": "google-kairos-tva",
+          "project": "Hermes 2 / Kairos Power合作",
+          "company": "Google / Kairos Power / TVA",
+          "capacity_type": "先进核电部署",
+          "target_mw": 500,
+          "near_term_mw": 50,
+          "stage": "首个50MW项目计划2030年上线；合作上限500MW",
+          "source_date": "2025-08-18",
+          "source_name": "Google · Kairos Power and TVA",
+          "source_url": "https://blog.google/company-news/outreach-and-initiatives/sustainability/google-first-advanced-nuclear-reactor-project-with-kairos-power-and-tennessee-valley-authority/"
+        },
+        {
+          "id": "google-duane-arnold",
+          "project": "Duane Arnold核电站重启",
+          "company": "Google / NextEra Energy",
+          "capacity_type": "重启核电容量",
+          "target_mw": 600,
+          "stage": "超过600MW；预计2029年恢复运行",
+          "source_date": "2025-10-27",
+          "source_name": "Google · Duane Arnold nuclear plant",
+          "source_url": "https://blog.google/feed/infrastructureduane-arnold-nuclear-plant-iowa/"
+        },
+        {
+          "id": "meta-nuclear-portfolio",
+          "project": "Meta核电项目组合",
+          "company": "Meta / Vistra / TerraPower / Oklo / Constellation",
+          "capacity_type": "2035年项目组合目标上限",
+          "target_mw": 6600,
+          "stage": "多项合作与开发目标；不等于当前投运",
+          "source_date": "2026-01",
+          "source_name": "Meta · nuclear energy projects",
+          "source_url": "https://about.fb.com/news/2026/01/meta-nuclear-energy-projects-power-american-ai-leadership/"
+        }
+      ]
+    }
+  },
+  "discovery_sources": [
+    "SEC EDGAR公司申报与RSS",
+    "EIA Form 860M电厂月度库存",
+    "NRC/FERC项目与许可页面",
+    "公司官方新闻稿与政府公告",
+    "Global Energy Monitor仅用于电厂状态交叉核验"
+  ]
+}
