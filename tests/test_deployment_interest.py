@@ -138,10 +138,9 @@ class DeploymentInterestTests(unittest.TestCase):
             self.assertEqual(len(at.exception),0)
             self.assertEqual(at.session_state["straw_scores"]["straw2"],71.3)
             labels=[e.label for e in at.expander]
-            self.assertIn("部署动能",[t.label for t in at.tabs])
-            for title in ("本期数据与计算说明","历史记录与原始资料"):
-                self.assertIn(title,labels)
-                self.assertFalse(next(e for e in at.expander if e.label==title).proto.expanded)
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in labels))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分75.0 · CRITICAL",labels)
             before=cap.current_snapshot()
             self.assertNotIn("refresh_deployment_only", [b.key for b in at.button])
             at.run()

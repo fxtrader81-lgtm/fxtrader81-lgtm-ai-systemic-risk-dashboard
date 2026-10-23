@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "policy": "每季度一条02页面级快照；页面刷新只更新当前季度。",
+  "records": [
+    {
+      "id": "open-source-page-2026q3-backfilled",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_at": "2026-10-23T00:00:00-07:00",
+      "record_type": "backfilled_previous_page_state",
+      "method_version": "open-source-page-pre-quarterly-v1",
+      "score": 75.0,
+      "display_score": 75,
+      "state": "CRITICAL",
+      "summary": "补录季度归档改造前的上一版02页面状态；四项沿用当时页面已采用的口径和最近有效输入。",
+      "caveat": "这是截止2026-09-30的上一版页面基准，不表示四项资料都在9月30日发布或实测。能力版本与10月读取的价格、仓库和下载资料保留各自观察期；不得解释为同口径季度涨跌。",
+      "components": [
+        {
+          "id": "capability_gap",
+          "name": "能力代差",
+          "weight": 0.2,
+          "score": 51.49370745006517,
+          "contribution": 10.3,
+          "display_value": "+3.54%",
+          "observation_period": "LiveBench 2026-06-25；快照读取2026-10-18",
+          "raw": {"signed_gap_pct": 3.544288562472843, "method": "全部测试等权求和；两组三平台"}
+        },
+        {
+          "id": "price_compression",
+          "name": "价格压缩",
+          "weight": 0.35,
+          "score": 100,
+          "contribution": 35.0,
+          "display_value": "10.70%",
+          "observation_period": "OpenRouter目录读取2026-10-20",
+          "raw": {"open_to_closed_ratio_pct": 10.702117647058824, "compression_pct": 89.29788235294117}
+        },
+        {
+          "id": "deployment_momentum",
+          "name": "部署动能",
+          "weight": 0.3,
+          "score": 66.66666666666666,
+          "contribution": 20.0,
+          "display_value": "409.8K stars",
+          "observation_period": "GitHub三仓库读取2026-10-20",
+          "raw": {"total_stars": 409823, "proxy_value": 140}
+        },
+        {
+          "id": "ecosystem_velocity",
+          "name": "生态速度",
+          "weight": 0.15,
+          "score": 65,
+          "contribution": 9.8,
+          "display_value": "2.41M downloads",
+          "observation_period": "Hugging Face近30天窗口；读取2026-10-20",
+          "raw": {"total_downloads": 2405606}
+        }
+      ]
+    }
+  ]
+}

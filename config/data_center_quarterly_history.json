@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "policy": "每季度一条03页面级快照；页面刷新只更新当前季度。",
+  "records": [
+    {
+      "id": "data-center-page-2026q3-backfilled",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_at": "2026-10-23T00:00:00-07:00",
+      "record_type": "backfilled_previous_page_state",
+      "method_version": "data-center-page-pre-quarterly-v1",
+      "score": 58.1,
+      "display_score": 58,
+      "state": "WARNING",
+      "summary": "补录季度归档改造前的上一版03页面状态；四项沿用首次完整接线后的页面结果。",
+      "caveat": "这是截止2026-09-30的上一版页面基准，不表示四项资料都在9月30日发布或实测。AOF参数和三组市场代理保留各自原始观察期；后续口径变化不得覆盖本记录。",
+      "components": [
+        {
+          "id": "aof",
+          "name": "AOF机柜适配压力",
+          "weight": 0.25,
+          "score": 100,
+          "contribution": 25.0,
+          "display_value": "4.8×",
+          "observation_period": "GB200 NVL72 120kW参考；参数复核2026-10-19",
+          "raw": {"rack_kw": 120, "baseline_kw": 25, "aof": 4.8}
+        },
+        {
+          "id": "reit_pressure",
+          "name": "REIT估值压力",
+          "weight": 0.35,
+          "score": 46,
+          "contribution": 16.1,
+          "display_value": "-14.41%",
+          "observation_period": "EQIX/DLR价格2026-10-19；相邻年度营收",
+          "raw": {"mean_drawdown_pct": 14.41048352707558}
+        },
+        {
+          "id": "liquid_cooling",
+          "name": "液冷加速信号",
+          "weight": 0.25,
+          "score": 41,
+          "contribution": 10.3,
+          "display_value": "+52.74%",
+          "observation_period": "VRT/SMCI价格2026-10-19；相邻年度总营收",
+          "raw": {"mean_growth_pct": 52.73538252635378}
+        },
+        {
+          "id": "power_infrastructure",
+          "name": "电力基础设施",
+          "weight": 0.15,
+          "score": 45,
+          "contribution": 6.8,
+          "display_value": "+10.66%",
+          "observation_period": "NEE/SO价格2026-10-19；相邻年度总营收",
+          "raw": {"mean_growth_pct": 10.664061194017638}
+        }
+      ]
+    }
+  ]
+}

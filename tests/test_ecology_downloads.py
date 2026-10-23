@@ -136,23 +136,18 @@ class EcologyDownloadsTests(unittest.TestCase):
         price={"coverage":6,"available":True,"checked_at":"test","basis":"test","rows":[],
                "metrics":{"closed_avg":10,"open_avg":1,"ratio":10,"compression":90,"score":100,"state":"CRITICAL","contribution":35}}
         with tempfile.TemporaryDirectory() as tmp,patch.object(cap,"STORE",Path(tmp)/"cap.sqlite3"),patch.object(ecology,"STORE",Path(tmp)/"eco.sqlite3"),patch("core.model_prices.load_prices",return_value=price),patch("core.model_prices.history",return_value=[]),patch("core.deployment_interest.load_deployment",return_value=deployment_snapshot()) as deployment_load,patch("core.deployment_interest.history",return_value=[]),patch("core.model_prices.get_selected_prices.clear") as clear_price,patch("core.ecology_downloads.load_ecology",return_value=snapshot()) as load,patch.object(ecology,"get_selected_downloads") as cached,patch.object(cohort,"fetch_latest_snapshot") as fetch:
-            at=AppTest.from_file("pages/straw2.py",default_timeout=30).run()
+            at=AppTest.from_file("pages/straw2.py",default_timeout=30)
+            at.session_state["download_owner_authenticated"] = True
+            at.run()
             self.assertEqual(len(at.exception),0)
             self.assertEqual(at.session_state["straw_scores"]["straw2"],75)
-            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","能力代差","价格压缩","部署动能","生态速度","数据覆盖与来源"])
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
             evidence_tab=next(t for t in at.tabs if t.label=="指标与历史证据")
-            self.assertEqual(len(evidence_tab.get("expander")),len(at.expander))
-            indicators=["能力代差","价格压缩","部署动能","生态速度"]
-            children=[t for t in evidence_tab.get("tab") if t.label in indicators]
-            self.assertEqual([t.label for t in children],indicators)
-            for child in children:
-                pair=[e.label for e in child.get("expander") if e.label in ("本期数据与计算说明","历史记录与原始资料")]
-                self.assertEqual(pair,["本期数据与计算说明","历史记录与原始资料"])
+            evidence_expanders=[e.label for e in evidence_tab.get("expander")]
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in evidence_expanders))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分75.0 · CRITICAL",evidence_expanders)
             downloads=[b.label for b in at.get("download_button")]
-            for label in ("下载能力历史原始资料","下载本期价格与历史原始资料","下载部署动能历史与原始资料","下载生态速度历史与原始资料"):
-                self.assertIn(label,downloads)
-            for title in ("本期数据与计算说明","历史记录与原始资料"):
-                self.assertFalse(next(e for e in at.expander if e.label==title).proto.expanded)
+            self.assertEqual(downloads,["下载可阅读版（HTML）","下载完整原始资料（JSON）"])
             before=cap.current_snapshot()
             self.assertNotIn("refresh_ecology_only", [b.key for b in at.button])
             at.run()

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "policy": "每季度一条总览页级快照；页面刷新只更新当前季度。",
+  "records": [
+    {
+      "id": "dashboard-2026q3-partial-backfill",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_at": "2026-10-23T00:00:00-07:00",
+      "record_type": "partial_backfill_from_verified_factor_archives",
+      "method_version": "dashboard-quarterly-v1",
+      "score": null,
+      "display_score": null,
+      "state": "N/A",
+      "coverage": 50,
+      "phase": "未归档",
+      "cascade": null,
+      "summary": "仅02、03、04有可核验的2026Q3页级快照；01、05、06、07当时未冻结，不用当前值倒填。",
+      "caveat": "01–05有效结构权重仅50%，低于70%总览出分门槛，因此总分和总状态保留N/A。第一条完整总览归档将从2026Q4季末开始。",
+      "factors": [
+        {"id":"straw1","number":"01","name":"资本开支偏离","role":"投入与收入匹配","layer":"structure","weight":0.25,"score":null,"state":"N/A","coverage":0,"contribution":null,"detail":"Q3未冻结页级快照","source":"未归档"},
+        {"id":"straw2","number":"02","name":"开源商业化压缩","role":"开源竞争与商业化压力","layer":"structure","weight":0.15,"score":75.0,"state":"CRITICAL","coverage":100,"contribution":11.3,"detail":"四项详情页Q3快照总分75.0","source":"config/open_source_quarterly_history.json"},
+        {"id":"straw3","number":"03","name":"数据中心资产减值","role":"数据中心资产减值代理","layer":"structure","weight":0.20,"score":58.1,"state":"WARNING","coverage":100,"contribution":11.6,"detail":"四项详情页Q3快照总分58.1","source":"config/data_center_quarterly_history.json"},
+        {"id":"straw4","number":"04","name":"AI能源约束","role":"能源、电网与交付约束","layer":"structure","weight":0.15,"score":47.2,"state":"WATCH","coverage":100,"contribution":7.1,"detail":"四项详情页Q3快照总分47.2","source":"config/energy_quarterly_history.json"},
+        {"id":"straw5","number":"05","name":"AI融资结构脆弱性","role":"融资结构脆弱性","layer":"structure","weight":0.25,"score":null,"state":"N/A","coverage":0,"contribution":null,"detail":"Q3未冻结页级快照","source":"未归档"},
+        {"id":"straw6","number":"06","name":"AI信贷与再融资压力","role":"信用与再融资外部确认","layer":"transmission","weight":null,"score":null,"state":"N/A","coverage":0,"contribution":null,"detail":"Q3未冻结页级快照","source":"未归档"},
+        {"id":"straw7","number":"07","name":"宏观与跨市场传导确认","role":"宏观与跨市场传导确认","layer":"transmission","weight":null,"score":null,"state":"N/A","coverage":0,"contribution":null,"detail":"Q3未冻结页级快照","source":"未归档"}
+      ]
+    }
+  ]
+}

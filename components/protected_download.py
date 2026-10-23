@@ -37,7 +37,7 @@ def _visitor_token() -> str:
 def _contact_request(resource_label: str) -> None:
     email = contact_email()
     st.info(f"验证未通过。如需索取「{resource_label}」，请联系 {email}。")
-    subject = quote(f"申请索取04页资料：{resource_label}")
+    subject = quote(f"申请索取看板资料：{resource_label}")
     st.link_button("发送邮件索取", f"mailto:{email}?subject={subject}", use_container_width=True)
     st.caption("失败验证仅记录资料名称、时间和匿名会话标识；不收集IP、姓名或邮箱。")
 

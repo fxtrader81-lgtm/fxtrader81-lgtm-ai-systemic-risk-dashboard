@@ -105,28 +105,23 @@ class PowerInfrastructureTests(unittest.TestCase):
         from streamlit.testing.v1 import AppTest
         from core.factor_registry import _straw3
         with patch("core.reit_pressure.load_reit",return_value=reit_snapshot()),patch("core.reit_pressure.history",return_value=[]),patch("core.liquid_signal.load_liquid",return_value=liquid_snapshot()),patch("core.liquid_signal.history",return_value=[]),patch("core.power_infrastructure.load_power",return_value=snapshot()) as load,patch("core.power_infrastructure.history",return_value=[snapshot()]):
-            at=AppTest.from_file("pages/straw3.py",default_timeout=30).run()
+            at=AppTest.from_file("pages/straw3.py",default_timeout=30)
+            at.session_state["download_owner_authenticated"] = True
+            at.run()
             self.assertEqual(len(at.exception),0)
             expected=round(25+.35*42+.25*34+.15*58,1)
             self.assertEqual(at.session_state["straw_scores"]["straw3"],expected)
             text="\n".join(m.value for m in at.markdown)
             self.assertIn("分项58分",text)
             self.assertIn("非实际用电量或电网容量",text)
-            self.assertIn("25/45/65切点",text)
-            section = next(t for t in at.tabs if t.label=="电力")
-            for label in ("本期数据与计算说明","历史记录与原始资料"):
-                self.assertFalse(next(e for e in section.get("expander") if e.label==label).proto.expanded)
+            self.assertIn("电力分项均分 < 25 · SAFE",text)
             evidence = next(t for t in at.tabs if t.label=="指标与历史证据")
-            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","AOF","REIT","液冷","电力","数据覆盖与来源"])
-            self.assertEqual(len(evidence.get("expander")),len(at.expander))
-            children = [t for t in evidence.get("tab") if t.label in ("AOF","REIT","液冷","电力")]
-            self.assertEqual([t.label for t in children],["AOF","REIT","液冷","电力"])
-            for child in children:
-                pair = [e.label for e in child.get("expander") if e.label in ("本期数据与计算说明","历史记录与原始资料")]
-                self.assertEqual(pair,["本期数据与计算说明","历史记录与原始资料"])
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
+            evidence_expanders=[e.label for e in evidence.get("expander")]
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in evidence_expanders))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分58.1 · WARNING",evidence_expanders)
             downloads=[d.label for d in at.get("download_button")]
-            for download in ("下载AOF历史与原始资料","下载REIT历史与原始资料","下载液冷历史与原始资料","下载电力历史与原始资料"):
-                self.assertIn(download,downloads)
+            self.assertEqual(downloads,["下载可阅读版（HTML）","下载完整原始资料（JSON）"])
             self.assertEqual(len(at.button),0)
             chart=json.loads(at.get("plotly_chart")[0].proto.spec)
             self.assertEqual(chart["data"][0]["y"],[15,25,60,80,120,200])

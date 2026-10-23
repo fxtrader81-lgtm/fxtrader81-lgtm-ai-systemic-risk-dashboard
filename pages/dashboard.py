@@ -4,10 +4,13 @@ from html import escape
 
 import streamlit as st
 
-from components.ui import (dashboard_conclusion, dashboard_header, evidence_table,
-                           load_css, logic_panel, model_evidence_panel,
+from components.dashboard_quarterly_panel import render_dashboard_quarterly
+from components.ui import (dashboard_conclusion, dashboard_header,
+                           load_css, logic_panel,
                            render_footer, source_strip)
 from config.thresholds import STATE_COLORS, STRAW_WEIGHTS
+from core.dashboard_quarterly import load_history as load_dashboard_history
+from core.dashboard_quarterly import make_current_snapshot as make_dashboard_snapshot
 from core.factor_registry import aggregate_factor_results, load_factor_results
 from core.macro_data import load_macro_stress_snapshot
 from core.score_engine import render_factor_navigation, render_system_card
@@ -119,33 +122,10 @@ with logic_tab:
     ], title="⚙️ 总览检测逻辑"), unsafe_allow_html=True)
 
 with evidence_tab:
-    factor_roles = {
-        "straw1": "投入与收入匹配",
-        "straw2": "开源竞争与商业化压力",
-        "straw3": "数据中心资产减值代理",
-        "straw4": "能源、电网与交付约束",
-        "straw5": "融资结构脆弱性",
-        "straw6": "信用与再融资外部确认",
-        "straw7": "宏观与跨市场传导确认",
-    }
-    evidence_rows = []
-    for key in ("straw1", "straw2", "straw3", "straw4", "straw5", "straw6", "straw7"):
-        item = results[key]
-        reading = f'{item["score"]:.1f}/100 · {item["state"]}' if item["available"] else "N/A · 数据不足"
-        evidence_rows.append((f'{key[-1].zfill(2)} · {item["name"]}', factor_roles[key], reading,
-                              f'{item["coverage"]:.0f}%', item["detail"]))
-    st.markdown(evidence_table(
-        "📋 七个风险因子的当前证据",
-        ["因子", "检测职责", "当前评分/状态", "覆盖率", "当前证据摘要"],
-        evidence_rows,
-        "当前证据摘要来自各因子本次计算；06与07是传导确认层，不进入01–05结构总分。",
-    ), unsafe_allow_html=True)
-    st.markdown(model_evidence_panel(
-        sample="历史审计包含19个领先压力信号起点；其5条正例归属2008、2020和2022三轮独立下跌，不是19次独立危机。",
-        validation="2017年后21个重叠联合信号月中7个月份随后出现回调，表观比例33.3%；不作为预测概率，也不能把重叠月份当成独立样本。",
-        boundary="07在三轮独立下跌中的月末确认均晚于标普500较近期高点下跌5%；外生冲击不在预测范围。06的早期历史事件使用BAA−10Y代理，与当前HY OAS口径不同。",
-        calibration="当前切点仍是探索性规则；STLFSI4历史回填、NFCI修订与HY OAS历史长度限制，意味着尚未完成按历史发布版本的独立样本外校准。",
-    ), unsafe_allow_html=True)
+    render_dashboard_quarterly(
+        make_dashboard_snapshot(results, system),
+        load_dashboard_history(),
+    )
 
 with source_tab:
     st.markdown(source_strip(source_items), unsafe_allow_html=True)

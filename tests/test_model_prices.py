@@ -137,15 +137,13 @@ class ModelPriceTests(unittest.TestCase):
             self.assertEqual(len(at.exception),0)
             self.assertTrue(any("10.0%" in m.value for m in at.markdown))
             labels = [e.label for e in at.expander]
-            self.assertIn("价格压缩", [t.label for t in at.tabs])
-            self.assertIn("本期数据与计算说明", labels)
-            self.assertIn("历史记录与原始资料", labels)
-            self.assertNotIn("价格压缩｜本期价格、计算说明与历史", labels)
-            self.assertNotIn("已保存的价格采集记录", labels)
-            for e in at.expander:
-                if e.label in ("本期数据与计算说明", "历史记录与原始资料"):
-                    self.assertFalse(e.proto.expanded)
-            self.assertTrue(any(b.label=="下载本期价格与历史原始资料" for b in at.get("download_button")))
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in labels))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分75.0 · CRITICAL",labels)
+            self.assertEqual(len(at.get("download_button")),0)
+            request_labels=[button.label for button in at.button]
+            self.assertIn("下载可阅读版（HTML）",request_labels)
+            self.assertIn("下载完整原始资料（JSON）",request_labels)
             before=cap.current_snapshot()
             self.assertNotIn("refresh_price_only", [b.key for b in at.button])
             at.run()

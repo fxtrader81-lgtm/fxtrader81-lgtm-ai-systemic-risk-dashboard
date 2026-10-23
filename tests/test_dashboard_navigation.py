@@ -64,9 +64,13 @@ class DashboardNavigationTests(unittest.TestCase):
     def test_dashboard_does_not_repeat_credit_transmission_panel(self):
         with open("pages/dashboard.py", encoding="utf-8") as source:
             dashboard = source.read()
+        with open("components/dashboard_quarterly_panel.py", encoding="utf-8") as source:
+            quarterly_panel = source.read()
         self.assertIn('st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])', dashboard)
         self.assertIn("总览检测逻辑", dashboard)
-        self.assertIn("七个风险因子的当前证据", dashboard)
+        self.assertIn("render_dashboard_quarterly", dashboard)
+        self.assertIn("七个风险因子的当前证据", quarterly_panel)
+        self.assertIn("季度历史快照", quarterly_panel)
         self.assertNotIn("AI信用传导｜结构暴露与市场确认", dashboard)
         self.assertNotIn('href="/factor-financing-structure"', dashboard)
         self.assertNotIn('href="/factor-credit-refinancing"', dashboard)

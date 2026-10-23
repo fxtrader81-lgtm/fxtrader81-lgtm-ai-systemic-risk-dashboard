@@ -91,16 +91,20 @@ class AofTests(unittest.TestCase):
             financials=income
             def history(self,**kwargs): return prices
         with tempfile.TemporaryDirectory() as tmp,patch.object(aof,"STORE",Path(tmp)/"aof.sqlite3"),patch("core.power_infrastructure.load_power",return_value=power_snapshot()),patch("core.power_infrastructure.history",return_value=[]),patch("core.liquid_signal.load_liquid",return_value=liquid_snapshot()),patch("core.liquid_signal.history",return_value=[]),patch("yfinance.Ticker",return_value=Ticker()):
-            at=AppTest.from_file("pages/straw3.py",default_timeout=30).run()
+            at=AppTest.from_file("pages/straw3.py",default_timeout=30)
+            at.session_state["download_owner_authenticated"] = True
+            at.run()
             self.assertEqual(len(at.exception),0)
             values="\n".join(m.value for m in at.markdown)
             self.assertIn("4.8x",values)
             self.assertIn("AOF 机柜适配压力",values)
             self.assertIn("不代表全市场资产已减值",values)
-            section = next(t for t in at.tabs if t.label=="AOF")
-            for title in ("本期数据与计算说明","历史记录与原始资料"):
-                self.assertFalse(next(e for e in section.get("expander") if e.label==title).proto.expanded)
-            self.assertIn("下载AOF历史与原始资料",[d.label for d in at.get("download_button")])
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
+            labels=[e.label for e in at.expander]
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in labels))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分58.1 · WARNING",labels)
+            self.assertEqual([d.label for d in at.get("download_button")],
+                             ["下载可阅读版（HTML）","下载完整原始资料（JSON）"])
             chart=json.loads(at.get("plotly_chart")[0].proto.spec)
             self.assertEqual(chart["data"][0]["y"],[15,25,60,80,120,200])
             self.assertEqual(chart["data"][1]["y"],[120])

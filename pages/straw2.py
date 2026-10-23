@@ -2,19 +2,17 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 from html import escape
-from components.capability_panel import (render_capability_controls, render_current_evidence,
-                                         render_capability_history)
-from components.ui import (evidence_table, load_css, logic_panel, metric_card, note_panel,
-                           render_data_freshness, render_footer, render_header,
-                           source_tag_row)
+from components.capability_panel import render_capability_controls
+from components.factor_quarterly_panel import render_current_quarter, render_quarterly_history
+from components.ui import (load_css, metric_card, render_data_freshness,
+                           render_footer, render_header, source_tag_row)
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
+from core import capability_gap as capability_store
 from core.model_prices import load_prices, history as price_history
-from components.price_panel import render_price_evidence, render_price_history
 from core.deployment_interest import load_deployment, history as deployment_history
-from components.deployment_panel import render_deployment_evidence, render_deployment_history
 from core.ecology_downloads import load_ecology, history as ecology_history
-from components.ecology_panel import render_ecology_evidence, render_ecology_history
+from core.open_source_quarterly import load_history as load_quarterly_history, make_current_snapshot
 
 # =========================================================
 # 页面配置
@@ -346,22 +344,30 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 # =========================================================
 
 def _render_detection_logic():
-    st.markdown(logic_panel([
-        {"text": "<b>能力代差（×0.20）</b>：读取同一Git提交的最新一期LiveBench全部测试列；单型号总分=全部测试成绩之和。各平台选最高完整型号/档位，美国闭源与中国开放权重各取不同平台前三家，分别平均得C与O。相对差距=(C－O)÷C×100%；保留正负值展示，风险输入取max(0,相对差距)。能力分=clamp[60×(25－输入)÷25,0,60]。缺项不补0、不足三家不采用；半年建议复核，未设定时。不是官方七类等权综合分。闭源优势越大风险贡献越低，不直接抵扣价格分；2/6/12/25参数仍是未校准研究规则。", "thresholds": [
-            ("#22c55e", "代差 > 12%", "SAFE", "green"),
-            ("#fbbf24", "6% < 相对代差 ≤ 12%", "WATCH", "yellow"),
-            ("#f97316", "2% < 相对代差 ≤ 6%", "WARNING", "orange"),
-            ("#ef4444", "相对代差 ≤ 2%", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>价格压缩（×0.35）</b>：使用能力代差本期选中的美国闭源、中国开放权重各三家确切型号。各组输入单价求和÷3，R=中国组均价÷美国组均价×100%，P=max(0,100－R)，价格分=clamp[(P－10)÷50×100,0,100]。单位USD/百万Token，输出价只展示；不使用缓存、batch及相似型号补价。保留旧阈值和35%权重，状态与分数映射仍是两套既有研究规则；缺价不计算完整OSCI。", "thresholds": [
-            ("#22c55e", "开源价格 > 70% 闭源", "SAFE", "green"),
-            ("#fbbf24", "开源价格 45–70% 闭源", "WATCH", "yellow"),
-            ("#f97316", "开源价格 25–45% 闭源", "WARNING", "orange"),
-            ("#ef4444", "开源价格 < 25% 闭源", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>部署动能（×0.30；自主部署工具关注度代理）</b>：固定Ollama、vLLM、llama.cpp三仓库累计stars求和S；按S&lt;150,000/300,000/500,000及其以上映射为30/80/140/220，再以clamp[(映射值－20)÷180×100,0,100]计算。映射值不是增长百分比；不等于企业部署量或迁移事实。保留原阈值、公式及30%权重，三项不完整不评分，不补预设数字。"},
-        {"text": "<b>生态速度（×0.15；本期入选模型下载热度代理）</b>：从本期能力代差选中的三家中国开放权重模型元数据中读取官方Hugging Face仓库，各取downloads字段（最近30天滚动窗口）后求和D。暂沿用D&lt;50万/200万/800万及以上对应15/40/65/85分和15%权重；三项必须完整，不填0或预设30分。不是整个平台生态、去重用户或真实增长率；新三模型替换旧四模型有方法断点，旧阈值未重校准，不直接解释新旧分差。"},
-    ]), unsafe_allow_html=True)
+    sections = [
+        ("1", "能力代差（×0.20）",
+         "读取同一Git提交的最新一期LiveBench全部测试列；单型号总分=全部测试成绩之和。各平台选最高完整型号/档位，美国闭源与中国开放权重各取不同平台前三家，分别平均得C与O。相对差距=(C－O)÷C×100%；保留正负值展示，风险输入取max(0,相对差距)。能力分=clamp[60×(25－输入)÷25,0,60]。缺项不补0、不足三家不采用；半年建议复核，未设定时。不是官方七类等权综合分。闭源优势越大风险贡献越低，不直接抵扣价格分；2/6/12/25参数仍是未校准研究规则。",
+         ["🟢 代差 > 12% · SAFE", "🟡 6% < 相对代差 ≤ 12% · WATCH",
+          "🟠 2% < 相对代差 ≤ 6% · WARNING", "🔴 相对代差 ≤ 2% · CRITICAL"]),
+        ("2", "价格压缩（×0.35）",
+         "使用能力代差本期选中的美国闭源、中国开放权重各三家确切型号。各组输入单价求和÷3，R=中国组均价÷美国组均价×100%，P=max(0,100－R)，价格分=clamp[(P－10)÷50×100,0,100]。单位USD/百万Token，输出价只展示；不使用缓存、batch及相似型号补价。保留旧阈值和35%权重，状态与分数映射仍是两套既有研究规则；缺价不计算完整OSCI。",
+         ["🟢 开源价格 > 70% 闭源 · SAFE", "🟡 开源价格 45–70% 闭源 · WATCH",
+          "🟠 开源价格 25–45% 闭源 · WARNING", "🔴 开源价格 < 25% 闭源 · CRITICAL"]),
+        ("3", "部署动能（×0.30；自主部署工具关注度代理）",
+         "固定Ollama、vLLM、llama.cpp三仓库累计stars求和S；按S<150,000/300,000/500,000及其以上映射为30/80/140/220，再以clamp[(映射值－20)÷180×100,0,100]计算。映射值不是增长百分比；不等于企业部署量或迁移事实。保留原阈值、公式及30%权重，三项不完整不评分，不补预设数字。",
+         ["🟢 S < 150,000 · 代理值30 · SAFE", "🟡 150,000 ≤ S < 300,000 · 代理值80 · WATCH",
+          "🟠 300,000 ≤ S < 500,000 · 代理值140 · WARNING", "🔴 S ≥ 500,000 · 代理值220 · CRITICAL"]),
+        ("4", "生态速度（×0.15；本期入选模型下载热度代理）",
+         "从本期能力代差选中的三家中国开放权重模型元数据中读取官方Hugging Face仓库，各取downloads字段（最近30天滚动窗口）后求和D。暂沿用D<50万/200万/800万及以上对应15/40/65/85分和15%权重；三项必须完整，不填0或预设30分。不是整个平台生态、去重用户或真实增长率；新三模型替换旧四模型有方法断点，旧阈值未重校准，不直接解释新旧分差。",
+         ["🟢 D < 50万 · 15分 · SAFE", "🟡 50万 ≤ D < 200万 · 40分 · WATCH",
+          "🟠 200万 ≤ D < 800万 · 65分 · WARNING", "🔴 D ≥ 800万 · 85分 · CRITICAL"]),
+    ]
+    for number, title, explanation, thresholds in sections:
+        with st.expander(f"{number}　{title}", expanded=False):
+            st.write(explanation)
+            st.markdown("**评分规则**")
+            for line in thresholds:
+                st.markdown(line)
 
 with st.container(border=True):
     st.markdown('<div class="panel-title">📊 指标分项评分（OSCI 构成）</div>', unsafe_allow_html=True)
@@ -455,38 +461,29 @@ with st.container(border=True):
 
 logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 with logic_tab:
-    st.info(f"当前能力相对差距 {cap_metrics['signed_gap']:+.2f}% → 能力分 {cap_s:.2f} → "
-            f"20%贡献 {cap_s*.20:.2f}。当前能力状态为{cap_status}；"
-            "能力状态按代差阈值判断，不等于整页OSCI状态。旧版考试与旧公式仅在历史资料中保留。")
-    _render_detection_logic()
+    with st.container(key="open_source_detection_logic"):
+        _render_detection_logic()
 with evidence_tab:
-    st.markdown(evidence_table(
-        "📋 OSCI 分项原始评分",
-        ["指标", "权重", "分项评分", "加权贡献"],
-        [(category, f"{weight:.0%}", f"{score:.1f}" if score is not None else "N/A", f"{score * weight:.1f}" if score is not None else "N/A")
-         for category, weight, score in zip(categories, weights, scores)],
-    ), unsafe_allow_html=True)
-    with st.container(key="capability_evidence"):
-        cap_tab, price_tab, deploy_tab, ecology_tab = st.tabs(["能力代差", "价格压缩", "部署动能", "生态速度"])
-        with cap_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_current_evidence(capability)
-            render_capability_history(label="历史记录与原始资料")
-        with price_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_price_evidence(price_data, capability)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_price_history(price_data, price_history())
-        with deploy_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_deployment_evidence(deployment_data)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_deployment_history(deployment_data, deployment_history())
-        with ecology_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_ecology_evidence(ecology_data)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_ecology_history(ecology_data, ecology_history())
+    current_quarter = make_current_snapshot(capability, price_data, deployment_data, ecology_data)
+    quarterly_history = load_quarterly_history()
+    render_current_quarter(current_quarter, container_key="open_source_quarterly_current")
+    legacy_evidence = {
+        "capability": {"legacy": capability_store.baseline()["legacy"], "records": capability_store.history()},
+        "price": price_history(),
+        "deployment": deployment_history(),
+        "ecology": ecology_history(),
+    }
+    render_quarterly_history(
+        quarterly_history, current_quarter, legacy_evidence,
+        container_key="open_source_quarterly_history", page_number="02",
+        page_title="开源商业化压缩", file_prefix="factor02-open-source",
+        method_summary=[
+            "能力代差使用同版LiveBench全部测试、两组三平台；独立检查更新。",
+            "价格压缩使用本期能力样本对应的OpenRouter输入基础价。",
+            "部署动能使用Ollama、vLLM、llama.cpp累计stars代理。",
+            "生态速度使用本期三家开放权重模型的Hugging Face近30天下载量。",
+        ],
+    )
 
 with source_tab:
     render_data_freshness([

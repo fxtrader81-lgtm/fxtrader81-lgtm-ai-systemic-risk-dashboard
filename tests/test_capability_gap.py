@@ -227,12 +227,17 @@ class CapabilityPageTests(unittest.TestCase):
             at = AppTest.from_file("pages/straw2.py", default_timeout=30).run()
             self.assertEqual(len(at.exception), 0)
             self.assertEqual(fetch.call_count, 0)
-            self.assertEqual([b.key for b in at.button], ["refresh_capability_only"])
+            self.assertEqual([b.key for b in at.button], [
+                "refresh_capability_only",
+                "request_download_factor02-open-source_quarterly_history_html",
+                "request_download_factor02-open-source_quarterly_history_json",
+            ])
             notes = [m.value for m in at.markdown if '<div class="capability-refresh-notes">' in m.value]
             self.assertEqual(len(notes), 1)
             self.assertGreaterEqual(notes[0].count('<p>'), 3)
-            self.assertEqual([e.label for e in at.expander].count("历史记录与原始资料"), 4)
-            self.assertEqual([e.label for e in at.expander].count("本期数据与计算说明"), 4)
+            labels = [e.label for e in at.expander]
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in labels))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分75.0 · CRITICAL", labels)
             self.assertEqual(len(cap.history()), 2)
             at.button(key="refresh_capability_only").click().run()
             self.assertEqual(len(at.exception), 0)

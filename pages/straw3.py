@@ -1,17 +1,15 @@
 import streamlit as st
 import yfinance as yf
 import plotly.graph_objects as go
-from components.ui import evidence_table, load_css, logic_panel, metric_card, render_data_freshness, render_footer, render_header
+from components.factor_quarterly_panel import render_current_quarter, render_quarterly_history
+from components.ui import load_css, metric_card, render_data_freshness, render_footer, render_header
 from core.alert_engine import render_alert, render_osci_card
 from core.score_engine import register_score
 from core.aof import load_aof, score_aof, history as aof_history
-from components.aof_panel import render_current as render_aof_current, render_history as render_aof_history
 from core.reit_pressure import load_reit, history as reit_history
-from components.reit_panel import render_current as render_reit_current, render_history as render_reit_history
 from core.liquid_signal import load_liquid, history as liquid_history
-from components.liquid_panel import render_current as render_liquid_current, render_history as render_liquid_history
 from core.power_infrastructure import load_power, history as power_history
-from components.power_panel import render_current as render_power_current, render_history as render_power_history
+from core.data_center_quarterly import load_history as load_quarterly_history, make_current_snapshot
 
 load_css()
 
@@ -304,32 +302,30 @@ st.markdown(render_alert(state, alert["title"], alert["body"]), unsafe_allow_htm
 # =========================================================
 
 def _render_detection_logic():
-    st.markdown(logic_panel([
-        {"text": "<b>AOF 机柜适配压力（×0.25）</b>：已复核的GB200 NVL72整柜功率参考120kW ÷ 项目旧机房容量情景25kW＝4.8倍。不是主流部署占比或减值比例；参数切换与旧版2.4倍存在口径断点。沿用原分数映射，未重校准，本期100分、贡献25分", "thresholds": [
-            ("#22c55e", "AOF < 1.5x", "SAFE", "green"),
-            ("#fbbf24", "1.5 ≤ AOF < 2.5x", "WATCH", "yellow"),
-            ("#f97316", "2.5 ≤ AOF < 3.5x", "WARNING", "orange"),
-            ("#ef4444", "AOF ≥ 3.5x", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>REIT 估值压力（×0.35）</b>：固定EQIX/DLR。回撤＝（一年调整后日内最高价－最新调整后日收盘价）÷最高价；跌幅&lt;5/15/25/40%及以上对应价格分10/35/60/80/95。最新两个年度营收同比&gt;12/&gt;6/&gt;0%及以下对应增长分10/30/55/80。每家公司＝价格分×65%＋增长分×35%；两家公司平均后按原规则取整，状态按取整前均分判断。两家必要数据必须完整，不填0或50分。总览共用本入口；以下是REIT分项状态，不是股价跌幅或整页状态。", "thresholds": [
-            ("#22c55e", "REIT均分 < 25", "SAFE", "green"),
-            ("#fbbf24", "25 ≤ REIT均分 < 50", "WATCH", "yellow"),
-            ("#f97316", "50 ≤ REIT均分 < 70", "WARNING", "orange"),
-            ("#ef4444", "REIT均分 ≥ 70", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>液冷加速信号（相关企业代理，×0.25）</b>：固定VRT/SMCI。公司年度总营收同比&lt;10/30/60/100%及以上对应增长分10/30/55/75/90；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置&gt;80/&gt;60/&gt;40%及以下对应价格分80/60/40/20。每家公司＝增长分×65%＋价格分×35%；两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不补0/50。不是液冷分部收入、增速加速度或风冷淘汰证明；总览共用本入口。", "thresholds": [
-            ("#22c55e", "液冷分项均分 < 25", "SAFE", "green"),
-            ("#fbbf24", "25 ≤ 液冷分项均分 < 50", "WATCH", "yellow"),
-            ("#f97316", "50 ≤ 液冷分项均分 < 70", "WARNING", "orange"),
-            ("#ef4444", "液冷分项均分 ≥ 70", "CRITICAL", "red"),
-        ]},
-        {"text": "<b>电力基础设施（相关企业代理，×0.15）</b>：固定NEE/SO。年度公司总营收同比&lt;3/8/15%及以上对应增长分15/35/60/80；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置&gt;75/&gt;50/&gt;25%及以下对应价格分70/50/30/15。每家公司＝增长分×60%＋价格分×40%，两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不填0/50/整项30分。只是公司经营与股价代理，不是数据中心用电、电网容量或缺电程度；总览共用本入口。", "thresholds": [
-            ("#22c55e", "电力分项均分 < 25", "SAFE", "green"),
-            ("#fbbf24", "25 ≤ 电力分项均分 < 45", "WATCH", "yellow"),
-            ("#f97316", "45 ≤ 电力分项均分 < 65", "WARNING", "orange"),
-            ("#ef4444", "电力分项均分 ≥ 65", "CRITICAL", "red"),
-        ]},
-    ]), unsafe_allow_html=True)
+    sections = [
+        ("1", "AOF机柜适配压力（×0.25）",
+         "已复核的GB200 NVL72整柜功率参考120kW ÷ 项目旧机房容量情景25kW＝4.8倍。不是主流部署占比或减值比例；参数切换与旧版2.4倍存在口径断点。沿用原分数映射，未重校准，本期100分、贡献25分。",
+         ["🟢 AOF < 1.5× · SAFE", "🟡 1.5 ≤ AOF < 2.5× · WATCH",
+          "🟠 2.5 ≤ AOF < 3.5× · WARNING", "🔴 AOF ≥ 3.5× · CRITICAL"]),
+        ("2", "REIT估值压力（×0.35）",
+         "固定EQIX/DLR。回撤＝（一年调整后日内最高价－最新调整后日收盘价）÷最高价；跌幅<5/15/25/40%及以上对应价格分10/35/60/80/95。最新两个年度营收同比>12/>6/>0%及以下对应增长分10/30/55/80。每家公司＝价格分×65%＋增长分×35%；两家公司平均后按原规则取整，状态按取整前均分判断。两家必要数据必须完整，不填0或50分。总览共用本入口；以下是REIT分项状态，不是股价跌幅或整页状态。",
+         ["🟢 REIT均分 < 25 · SAFE", "🟡 25 ≤ REIT均分 < 50 · WATCH",
+          "🟠 50 ≤ REIT均分 < 70 · WARNING", "🔴 REIT均分 ≥ 70 · CRITICAL"]),
+        ("3", "液冷加速信号（相关企业代理，×0.25）",
+         "固定VRT/SMCI。公司年度总营收同比<10/30/60/100%及以上对应增长分10/30/55/75/90；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置>80/>60/>40%及以下对应价格分80/60/40/20。每家公司＝增长分×65%＋价格分×35%；两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不补0/50。不是液冷分部收入、增速加速度或风冷淘汰证明；总览共用本入口。",
+         ["🟢 液冷分项均分 < 25 · SAFE", "🟡 25 ≤ 液冷分项均分 < 50 · WATCH",
+          "🟠 50 ≤ 液冷分项均分 < 70 · WARNING", "🔴 液冷分项均分 ≥ 70 · CRITICAL"]),
+        ("4", "电力基础设施（相关企业代理，×0.15）",
+         "固定NEE/SO。年度公司总营收同比<3/8/15%及以上对应增长分15/35/60/80；股价位置＝（最新调整后日收盘－一年调整后日内最低）÷（最高－最低），位置>75/>50/>25%及以下对应价格分70/50/30/15。每家公司＝增长分×60%＋价格分×40%，两家公司平均后取整，状态按取整前均分判断。两家必要资料完整才评分，不填0/50/整项30分。只是公司经营与股价代理，不是数据中心用电、电网容量或缺电程度；总览共用本入口。",
+         ["🟢 电力分项均分 < 25 · SAFE", "🟡 25 ≤ 电力分项均分 < 45 · WATCH",
+          "🟠 45 ≤ 电力分项均分 < 65 · WARNING", "🔴 电力分项均分 ≥ 65 · CRITICAL"]),
+    ]
+    for number, title, explanation, thresholds in sections:
+        with st.expander(f"{number}　{title}", expanded=False):
+            st.write(explanation)
+            st.markdown("**评分规则**")
+            for line in thresholds:
+                st.markdown(line)
 
 with st.container(border=True):
     st.markdown('<div class="panel-title">⚡ GPU 功率密度代际参考与本期 AOF 方案（单机柜 kW）</div>', unsafe_allow_html=True)
@@ -383,30 +379,29 @@ with st.container(border=True):
 
 logic_tab, evidence_tab, source_tab = st.tabs(["检测逻辑", "指标与历史证据", "数据覆盖与来源"])
 with logic_tab:
-    _render_detection_logic()
+    with st.container(key="data_center_detection_logic"):
+        _render_detection_logic()
 with evidence_tab:
-    with st.container(key="aof_evidence"):
-        aof_tab, reit_tab, liquid_tab, power_tab = st.tabs(["AOF", "REIT", "液冷", "电力"])
-        with aof_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_aof_current(aof_snapshot)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_aof_history(aof_snapshot, aof_history())
-        with reit_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_reit_current(reit_snapshot)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_reit_history(reit_snapshot, reit_history())
-        with liquid_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_liquid_current(liquid_snapshot)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_liquid_history(liquid_snapshot, liquid_history())
-        with power_tab:
-            with st.expander("本期数据与计算说明", expanded=False):
-                render_power_current(power_snapshot)
-            with st.expander("历史记录与原始资料", expanded=False):
-                render_power_history(power_snapshot, power_history())
+    current_quarter = make_current_snapshot(aof_snapshot, reit_snapshot, liquid_snapshot, power_snapshot)
+    quarterly_history = load_quarterly_history()
+    render_current_quarter(current_quarter, container_key="data_center_quarterly_current")
+    legacy_evidence = {
+        "aof": aof_history(),
+        "reit": reit_history(),
+        "liquid_cooling": liquid_history(),
+        "power_infrastructure": power_history(),
+    }
+    render_quarterly_history(
+        quarterly_history, current_quarter, legacy_evidence,
+        container_key="data_center_quarterly_history", page_number="03",
+        page_title="数据中心资产减值", file_prefix="factor03-data-center",
+        method_summary=[
+            "AOF使用已复核整柜功率与固定25kW旧机房容量情景。",
+            "REIT使用EQIX/DLR一年价格回撤与相邻年度总营收。",
+            "液冷使用VRT/SMCI总营收和股价位置代理，不是液冷分部收入。",
+            "电力使用NEE/SO总营收和股价位置代理，不是实际用电量或电网容量。",
+        ],
+    )
 with source_tab:
     render_data_freshness([
         {"name": "电力相关企业价格与年度总营收", "source": f"Yahoo Finance · 固定NEE / SO · 覆盖{power_snapshot['coverage']}/2", "updated_at": "；".join(f"{r['ticker']}价格{r.get('price_date','未取得')}/财年{r['annual_revenue'][0]['period_end'] if r['annual_revenue'] else '未取得'}" for r in power_snapshot["rows"]), "mode": "live"},

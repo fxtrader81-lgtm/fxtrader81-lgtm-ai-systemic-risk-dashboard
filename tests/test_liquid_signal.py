@@ -120,16 +120,20 @@ class LiquidSignalTests(unittest.TestCase):
             financials=income
             def history(self,**kwargs): return prices
         with patch("core.reit_pressure.load_reit",return_value=reit_snapshot()),patch("core.reit_pressure.history",return_value=[]),patch("core.power_infrastructure.load_power",return_value=power_snapshot()),patch("core.power_infrastructure.history",return_value=[]),patch("core.liquid_signal.load_liquid",return_value=snapshot()) as load,patch("core.liquid_signal.history",return_value=[snapshot()]),patch("yfinance.Ticker",return_value=Ticker()):
-            at=AppTest.from_file("pages/straw3.py",default_timeout=30).run()
+            at=AppTest.from_file("pages/straw3.py",default_timeout=30)
+            at.session_state["download_owner_authenticated"] = True
+            at.run()
             self.assertEqual(len(at.exception),0)
             self.assertIn("straw3",at.session_state["straw_scores"])
             text="\n".join(m.value for m in at.markdown)
             self.assertIn("分项34分",text)
             self.assertIn("非液冷业务收入",text)
-            section = next(t for t in at.tabs if t.label=="液冷")
-            for label in ("本期数据与计算说明","历史记录与原始资料"):
-                self.assertFalse(next(e for e in section.get("expander") if e.label==label).proto.expanded)
-            self.assertIn("下载液冷历史与原始资料",[d.label for d in at.get("download_button")])
+            self.assertEqual([t.label for t in at.tabs],["检测逻辑","指标与历史证据","数据覆盖与来源"])
+            labels=[e.label for e in at.expander]
+            self.assertTrue(any(label.startswith("2026Q4进行中｜") for label in labels))
+            self.assertIn("季度历史快照｜最近归档2026Q3 · 总分58.1 · WARNING",labels)
+            self.assertEqual([d.label for d in at.get("download_button")],
+                             ["下载可阅读版（HTML）","下载完整原始资料（JSON）"])
             self.assertEqual(len(at.button),0)
             chart=json.loads(at.get("plotly_chart")[0].proto.spec)
             self.assertEqual(chart["data"][0]["y"],[15,25,60,80,120,200])

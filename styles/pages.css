@@ -774,65 +774,65 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
 }
 
 /* Factor 04 source management: paired foreground/background in every state. */
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] summary {
   color: var(--text-soft) !important;
   background: var(--bg-panel) !important;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary :is(p, span, svg) {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] summary :is(p, span, svg) {
   color: var(--text-soft) !important;
   font-size: 20px !important;
   font-weight: 700 !important;
   line-height: 1.5 !important;
   opacity: 1 !important;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stMarkdownContainer"] :is(p, li, strong, em) {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stMarkdownContainer"] :is(p, li, strong, em) {
   color: var(--text-soft) !important;
   line-height: 1.65 !important;
   overflow-wrap: anywhere;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stCaptionContainer"] p {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stCaptionContainer"] p {
   color: var(--text-dim) !important;
   line-height: 1.65 !important;
   overflow-wrap: anywhere;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stMarkdownContainer"] a { color: var(--blue) !important; }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stMarkdownContainer"] a { color: var(--blue) !important; }
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) :is([data-testid="stButton"], [data-testid="stDownloadButton"]) button {
   background: var(--bg-input) !important;
   color: var(--text-soft) !important;
   border: 1px solid var(--text-dim) !important;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) button:is(:hover, :focus, :active),
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] summary:is(:hover, :focus, :active),
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) [data-testid="stExpander"] details[open] > summary {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) button:is(:hover, :focus, :active),
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] summary:is(:hover, :focus, :active),
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] details[open] > summary {
   background: var(--bg-panel-2) !important;
   color: var(--text-soft) !important;
   border-color: var(--blue) !important;
 }
-:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic) :is(button, summary):focus-visible {
+:is(.st-key-infra_updates, .st-key-infra_updates_cost, .st-key-infra_updates_gpu, .st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) :is(button, summary):focus-visible {
   outline: 2px solid var(--blue) !important;
   outline-offset: 2px;
 }
 
 /* Factor 04 logic titles must never inherit Streamlit's low-contrast form text. */
-.st-key-energy_detection_logic [data-testid="stExpander"] summary,
-.st-key-energy_detection_logic [data-testid="stExpander"] summary * {
+:is(.st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] summary,
+:is(.st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] summary * {
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
   opacity: 1 !important;
 }
-.st-key-energy_detection_logic [data-testid="stExpander"] details[open] > summary {
+:is(.st-key-energy_detection_logic, .st-key-open_source_detection_logic, .st-key-data_center_detection_logic) [data-testid="stExpander"] details[open] > summary {
   background: #111c2f !important;
 }
 
-/* Factor 04 quarterly current/history: never inherit light-theme text on dark panels. */
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary {
+/* Quarterly current/history: never inherit light-theme text on dark panels. */
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stExpander"] summary {
   background: var(--bg-panel) !important;
   color: #f8fafc !important;
   font-size: 20px !important;
   font-weight: 750 !important;
   line-height: 1.5 !important;
 }
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary :is(p, span, svg) {
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stExpander"] summary :is(p, span, svg) {
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
   font-size: 20px !important;
@@ -840,25 +840,25 @@ div[data-testid="stPlotlyChart"] .scatterlayer .trace:hover .js-line {
   line-height: 1.5 !important;
   opacity: 1 !important;
 }
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] summary *,
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4),
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stCaptionContainer"] p {
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stExpander"] summary *,
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stMarkdownContainer"] :is(p, li, strong, em, h1, h2, h3, h4),
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stCaptionContainer"] p {
   color: #e2e8f0 !important;
   -webkit-text-fill-color: #e2e8f0 !important;
   opacity: 1 !important;
   line-height: 1.65 !important;
 }
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stExpander"] details[open] > summary {
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stExpander"] details[open] > summary {
   background: #111c2f !important;
   border-color: var(--blue) !important;
 }
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) [data-testid="stDownloadButton"] button {
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) [data-testid="stDownloadButton"] button {
   background: var(--bg-input) !important;
   color: #f8fafc !important;
   -webkit-text-fill-color: #f8fafc !important;
   border: 1px solid var(--text-dim) !important;
 }
-:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history) :is(button, summary):focus-visible {
+:is(.st-key-energy_quarterly_current, .st-key-energy_quarterly_history, .st-key-open_source_quarterly_current, .st-key-open_source_quarterly_history, .st-key-data_center_quarterly_current, .st-key-data_center_quarterly_history, .st-key-dashboard_quarterly_current, .st-key-dashboard_quarterly_history) :is(button, summary):focus-visible {
   outline: 2px solid var(--blue) !important;
   outline-offset: 2px;
 }
