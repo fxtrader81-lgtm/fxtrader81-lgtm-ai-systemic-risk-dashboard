@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "policy": "每季度一条06页面级快照；页面刷新只更新当前季度。",
+  "method_notes": [
+    "信用利差使用HY OAS；旧事件回放在HY历史不可得时才使用BAA-10Y长期代理，季度快照不混合两种口径。",
+    "10Y实际利率与NFCI同时使用水平及变化；银行融资可得性使用美联储SLOOS大中型企业工商业贷款标准净收紧比例。",
+    "AI发行、贷款与担保事件保留为非评分证据，不因单笔票息或新闻标题人工改写CFRI。",
+    "2026Q3为当前数据版本按2026-09-30截点重建，不冒充当时自动保存的原始快照。"
+  ],
+  "legacy_method_evidence": {
+    "period": "2026Q3以前",
+    "method": "顶部第四项曾预留为AI融资交易温度，但缺少稳定可比数据而长期N/A；可用三项按90%权重归一。",
+    "replacement": "2026Q4起第四项改为SLOOS银行融资可得性；历史季度若按新方法复算必须明确标注方法断点。",
+    "comparison_policy": "Q3记录是版本化复算，只用于建立可审计基准；不得把Q3到Q4的分差全部解释为市场变化。"
+  },
+  "records": [
+    {
+      "id": "credit-page-2026q3-versioned-reconstruction",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_at": "2026-10-23T00:00:00-07:00",
+      "record_type": "reconstructed_from_current_vintage_fred_at_quarter_end",
+      "method_version": "cfri-quarterly-v2-sloos",
+      "score": 20.1,
+      "display_score": 20,
+      "state": "SAFE",
+      "summary": "按当前FRED数据版本截取截至2026-09-30可用观测，使用现行四项CFRI方法复算Q3。实际利率是唯一非零压力分项。",
+      "caveat": "这是2026-10-23完成的版本化复算，不是9月30日自动保存截图。FRED历史值可能修订；SLOOS是季度调查；新旧第四项存在方法断点，不能把分差全部解释为季度基本面变化。",
+      "components": [
+        {
+          "id": "credit_spread",
+          "name": "高收益信用利差",
+          "weight": 0.35,
+          "score": 0.0,
+          "contribution": 0.0,
+          "display_value": "312bp",
+          "observation_period": "FRED BAMLH0A0HYM2；截至2026-09-30",
+          "raw": {"value_bp": 312.0, "three_month_change_bp": 37.0, "proxy": "HY OAS"}
+        },
+        {
+          "id": "real_rate",
+          "name": "10Y实际利率",
+          "weight": 0.30,
+          "score": 67.0,
+          "contribution": 20.1,
+          "display_value": "2.93%",
+          "observation_period": "FRED DFII10；截至2026-09-30",
+          "raw": {"value_pct": 2.93, "three_month_change_bp": 73.0}
+        },
+        {
+          "id": "financial_conditions",
+          "name": "NFCI金融条件",
+          "weight": 0.25,
+          "score": 0.0,
+          "contribution": 0.0,
+          "display_value": "-0.518",
+          "observation_period": "FRED NFCI；截至2026-09-30",
+          "raw": {"value": -0.518, "three_month_change": -0.004}
+        },
+        {
+          "id": "lending_standards",
+          "name": "银行融资可得性",
+          "weight": 0.10,
+          "score": 0.0,
+          "contribution": 0.0,
+          "display_value": "+0.0%",
+          "observation_period": "美联储SLOOS 2026Q3；FRED DRTSCILM",
+          "raw": {"net_tightening_pct": 0.0, "quarter_change_points": -8.1}
+        }
+      ]
+    }
+  ]
+}

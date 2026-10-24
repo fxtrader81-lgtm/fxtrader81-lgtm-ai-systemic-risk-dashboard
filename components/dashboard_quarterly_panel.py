@@ -21,6 +21,17 @@ def _state(value):
     return f"{value}（{STATE_CN.get(value, value)}）"
 
 
+def _history_record_status(snapshot):
+    kind = snapshot.get("record_type", "")
+    if "factor05_and_factor06_versioned_reconstruction" in kind:
+        return "部分补录 · 含05/06版本化复算"
+    if "versioned_reconstruction" in kind:
+        return "部分补录 · 含05版本化复算"
+    if "partial_backfill" in kind:
+        return "部分补录"
+    return "季度归档"
+
+
 def _score_strip(snapshot, record_status):
     return (
         '<div class="energy-quarter-score-strip">'
@@ -59,7 +70,8 @@ def _factor_table_html(snapshot):
 
 def build_readable_report(current, records):
     sections = []
-    for snapshot, label in [(current, "当前季度"), *[(record, "已归档历史") for record in records]]:
+    for snapshot, label in [(current, "当前季度"),
+                            *[(record, _history_record_status(record)) for record in records]]:
         period = f"截止{snapshot['period_end']}" if snapshot.get("period_end") else "进行中"
         sections.append(
             f"<section><h2>{escape(snapshot['quarter'])} · {period} · {label}</h2>"
@@ -105,7 +117,7 @@ def render_dashboard_quarterly(current, records):
             st.write("每季度只保留一条总览快照；页面刷新、行情更新或单项检查不会生成零散历史。")
             for record in records:
                 st.markdown(f"### {record['quarter']} · 截止{record['period_end']} · 季度快照")
-                st.markdown(_score_strip(record, "部分补录" if record["score"] is None else "季度归档"), unsafe_allow_html=True)
+                st.markdown(_score_strip(record, _history_record_status(record)), unsafe_allow_html=True)
                 st.write(record["summary"])
                 st.markdown(evidence_table(
                     f"{record['quarter']}七因子状态",
@@ -114,6 +126,8 @@ def render_dashboard_quarterly(current, records):
                 ), unsafe_allow_html=True)
                 if record["score"] is None:
                     st.warning("该季度结构因子归档覆盖低于70%，不倒填当前数据，总分与总状态保留N/A。")
+                elif "versioned_reconstruction" in record.get("record_type", ""):
+                    st.info("该季度的05和06分数为版本化复算，不是季末自动保存的原始截图；原始观察期和方法限制均随记录保留。")
                 st.caption(record["caveat"])
 
             payload = {

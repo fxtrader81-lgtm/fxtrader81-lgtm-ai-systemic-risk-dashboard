@@ -10,9 +10,12 @@ import streamlit as st
 from components.ui import (coverage_panel, load_css, logic_panel, metric_card,
                            render_data_freshness, render_footer, render_header)
 from components.credit_transmission_views import render_structure_evidence
+from components.factor_quarterly_panel import render_current_quarter, render_quarterly_history
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
 from core.factor_registry import load_factor_results
+from core.financing_quarterly import (load_archive_metadata, load_history as load_quarterly_history,
+                                      make_current_snapshot)
 from core.score_engine import register_score
 from core.straw5_engine import SOURCES, STATIC_INPUTS, load_straw5_analysis, state_for
 
@@ -132,9 +135,9 @@ st.markdown(render_osci_card(
 components = analysis["components"]
 cols = st.columns(4)
 cards = [
-    _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限", "⚠ 静态披露"),
-    _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠", "⚠ 静态披露"),
-    _component_card("证券化与契约结构 ×0.20", components["securitization"], "偿还期限、契约与尾部再融资结构", "⚠ 静态披露"),
+    _component_card("期限错配 ×0.35", components["term_mismatch"], "合同、设备、租约与偿还期限", "季度复核·人工确认"),
+    _component_card("资本闭环依赖 ×0.25", components["capital_loop"], "投资、供应、担保与购买角色重叠", "季度复核·人工确认"),
+    _component_card("证券化与契约结构 ×0.20", components["securitization"], "偿还期限、契约与尾部再融资结构", "季度复核·人工确认"),
     _component_card("抵押品脆弱度 ×0.20", components["collateral"], "直接引用数据中心资产减值指数，不重复计算底层信号"),
 ]
 for column, card in zip(cols, cards):
@@ -192,6 +195,16 @@ with tab1:
     ], title="⚙️ AFSI 评分逻辑"), unsafe_allow_html=True)
 
 with tab2:
+    current_quarter = make_current_snapshot(analysis)
+    quarterly_history = load_quarterly_history()
+    archive_metadata = load_archive_metadata()
+    render_current_quarter(current_quarter, container_key="financing_quarterly_current")
+    render_quarterly_history(
+        quarterly_history, current_quarter, archive_metadata["legacy_method_evidence"],
+        container_key="financing_quarterly_history", page_number="05",
+        page_title="AI融资结构脆弱性", file_prefix="factor05-financing",
+        method_summary=archive_metadata["method_notes"],
+    )
     st.markdown(f"""
 <div class="panel"><div class="panel-title">📋 当前覆盖实体与证据链</div>
 <table class="gpu-table"><thead><tr><th>对象</th><th>可观察结构</th><th>本页用途</th><th>状态</th></tr></thead><tbody>

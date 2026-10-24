@@ -13,7 +13,7 @@ from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from core.market_freshness import download_yahoo
 
 
-def _fred(series_id: str) -> pd.Series:
+def _fred(series_id: str, *, frequency: str = "m") -> pd.Series:
     if not FRED_API_KEY:
         response = requests.get(
             "https://fred.stlouisfed.org/graph/fredgraph.csv",
@@ -30,7 +30,7 @@ def _fred(series_id: str) -> pd.Series:
         return series.resample("ME").last().dropna().sort_index()
     response = requests.get(
         "https://api.stlouisfed.org/fred/series/observations",
-        params={"series_id": series_id, "api_key": FRED_API_KEY, "file_type": "json", "observation_start": "1994-01-01", "frequency": "m", "aggregation_method": "eop"},
+        params={"series_id": series_id, "api_key": FRED_API_KEY, "file_type": "json", "observation_start": "1994-01-01", "frequency": frequency, "aggregation_method": "eop"},
         timeout=15,
     )
     response.raise_for_status()
@@ -147,7 +147,12 @@ def load_credit_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
         except Exception:
             series[key] = pd.Series(dtype=float)
             missing.append(fred_id)
-    source = "FRED（BAMLH0A0HYM2、BAA10Y、DFII10、NFCI）"
+    try:
+        series["sloos"] = _fred("DRTSCILM", frequency="q")
+    except Exception:
+        series["sloos"] = pd.Series(dtype=float)
+        missing.append("DRTSCILM")
+    source = "FRED（BAMLH0A0HYM2、BAA10Y、DFII10、NFCI、DRTSCILM）"
     if missing:
         source += f" · 缺失：{', '.join(missing)}"
     return series, source

@@ -180,8 +180,8 @@ def render_structure_evidence() -> None:
 def render_credit_market_evidence() -> None:
     """Factor 06: clarify the boundary between broad proxies and issuer quotes."""
     st.markdown(panel("逐发行人信用重新定价｜证据边界",
-        '<div class="metric-sub">本页上方 HY OAS、TIPS 与 NFCI 是广泛市场代理，不是 Microsoft、Amazon、Alphabet、Meta 或 Oracle 的实际债券报价。'
+        '<div class="metric-sub">本页上方 HY OAS、TIPS、NFCI 与 SLOOS 是广泛市场代理，不是 Microsoft、Amazon、Alphabet、Meta 或 Oracle 的实际债券报价。'
         '这五家的可比公司债利差、CDS、发行溢价、认购倍数及二级市场表现尚无稳定且可核验的数据序列，当前标为“不可得”，不填零、不模拟、不计入CFRI。'
         '数据中心ABS、相关私募信贷以及逐发行人评级与展望也待逐项核验，不以股票波动率替代信用指标。'
-        '下方“已核实的AI融资事件”按单笔发行文件展示条款与状态；票息变化不能直接解释为信用利差变化。'
+        '下方“AI融资事件观察”按单笔发行文件展示条款与状态；票息变化不能直接解释为信用利差变化。'
         '<a href="/factor-financing-structure">05 查看现金覆盖、RPO与融资结构证据 →</a></div>'), unsafe_allow_html=True)

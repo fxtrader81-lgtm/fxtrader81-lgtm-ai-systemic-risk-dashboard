@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "policy": "每季度一条05页面级快照；页面刷新只更新当前季度。",
+  "method_notes": [
+    "期限错配、资本闭环和证券化结构使用SEC披露与行业函件，属慢变证据，每季人工复核。",
+    "抵押品脆弱度直接引用03页DCOI，不在05页重复计算底层信号。",
+    "当前结构模型在2026-09-23已进入版本历史，因此2026Q3可按同版本公式复算，但不冒充当时自动保存的原始截图。",
+    "2026-09-16至2026-09-22的旧版方法使用35%/25%/25%/15%权重并混入HYG/HYXF市场代理；市场信号现已迁移至06页，旧方法不与新季度分数直接比较。"
+  ],
+  "legacy_method_evidence": {
+    "period": "2026-09-16至2026-09-22",
+    "weights": {"term_mismatch": 0.35, "capital_loop": 0.25, "securitization_and_credit_market": 0.25, "collateral": 0.15},
+    "market_proxy": "HYG/HYXF即时价格信号",
+    "comparison_policy": "仅作方法历史；因当时未保存季末市场与DCOI快照，不伪造可比总分。"
+  },
+  "records": [
+    {
+      "id": "financing-page-2026q3-versioned-reconstruction",
+      "quarter": "2026Q3",
+      "period_end": "2026-09-30",
+      "captured_at": "2026-10-23T00:00:00-07:00",
+      "record_type": "reconstructed_from_versioned_model_and_factor03_q3_archive",
+      "method_version": "afvi-structure-v2@6cbefbc",
+      "model_sha256": "eeed4801f479156383ec59b8ffa7d4c98cc0cf5e256357a5b844a114bb8868fe",
+      "score": 68.2,
+      "display_score": 68,
+      "state": "WARNING",
+      "summary": "按2026-09-23已存在的AFVI四项结构模型复算2026Q3；前三项沿用当时版本静态披露，抵押品引用03页Q3归档分。",
+      "caveat": "这是版本化复算，不是9月30日自动保存的原始截图。03页Q3本身也是按上一版页面状态补录，其底层观察期保留原日期；不应解读为所有证据均于9月30日新发布。",
+      "components": [
+        {
+          "id": "term_mismatch",
+          "name": "期限错配",
+          "weight": 0.35,
+          "score": 64.5,
+          "contribution": 22.6,
+          "display_value": "4y合同 / 6y GPU / 15y租约",
+          "observation_period": "FY2025/2026 filing；2026-07行业样本；模型入库2026-09-23",
+          "raw": {"customer_contract_wal_years": 4.0, "gpu_accounting_life_years": 6.0, "representative_lease_years": 15.0, "securitization_ard_years": 5.0, "securitization_final_maturity_years": 27.5}
+        },
+        {
+          "id": "capital_loop",
+          "name": "资本闭环依赖",
+          "weight": 0.25,
+          "score": 86.5,
+          "contribution": 21.6,
+          "display_value": "4/4依赖渠道已观察",
+          "observation_period": "NVIDIA 2026-Q2；Helios 2026-07；模型入库2026-09-23",
+          "raw": {"nvidia_stack_dependency": true, "equity_supplier_overlap": true, "capacity_backstop": true, "credit_support_or_extended_terms": true}
+        },
+        {
+          "id": "securitization",
+          "name": "证券化与契约结构",
+          "weight": 0.2,
+          "score": 62.0,
+          "contribution": 12.4,
+          "display_value": "5y预期偿还 / 27.5y法定到期",
+          "observation_period": "2026-07行业函件；模型入库2026-09-23",
+          "raw": {"structural_score": 62.0, "market_price_signal_included": false}
+        },
+        {
+          "id": "collateral",
+          "name": "抵押品脆弱度",
+          "weight": 0.2,
+          "score": 58.1,
+          "contribution": 11.6,
+          "display_value": "58.1/100",
+          "observation_period": "03页2026Q3补录快照；截止2026-09-30",
+          "raw": {"factor": "03", "source_record": "data-center-page-2026q3-backfilled", "dcoi_score": 58.1}
+        }
+      ]
+    }
+  ]
+}

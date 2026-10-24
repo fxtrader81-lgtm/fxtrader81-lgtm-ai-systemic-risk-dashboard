@@ -270,13 +270,14 @@ def _straw6() -> dict:
     metrics = compute_credit_metrics(
         series["hy_oas"], series["real_yield"], series["nfci"],
         baa_spread=series["baa10y"],
+        lending_standards=series["sloos"],
     )
     composite = metrics["composite"]
     if composite["score"] is None:
         return _unavailable("straw6", f"信贷压力序列覆盖不足（{composite['coverage']}%）")
     return _result(
         "straw6", composite["score"], composite["coverage"] / 100,
-        "HY信用利差、10Y实际利率与NFCI；AI交易定价待可比数据齐备后计分", source,
+        "HY信用利差、10Y实际利率、NFCI与SLOOS银行贷款标准；AI融资事件仅作非评分证据", source,
     )
 
 

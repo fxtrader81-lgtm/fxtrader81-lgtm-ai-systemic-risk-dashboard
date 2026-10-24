@@ -21,6 +21,7 @@ class CreditHistoryTests(unittest.TestCase):
             "baa10y": pd.Series([2.0] * 12, index=dates),
             "real_yield": pd.Series([1.0] * 12, index=dates),
             "nfci": pd.Series([-0.5] * 12, index=dates),
+            "sloos": pd.Series([0.0] * 4, index=pd.date_range("2019-01-31", periods=4, freq="3ME")),
         }
         row = build_credit_history_rows(series, [("2019-12", "测试", "说明")])[0]
         self.assertIn("BAA10Y长期代理", row["credit"])
@@ -29,7 +30,7 @@ class CreditHistoryTests(unittest.TestCase):
 
     def test_sparse_old_period_remains_unavailable(self):
         blank = pd.Series(dtype=float)
-        series = {key: blank for key in ("hy_oas", "baa10y", "real_yield", "nfci")}
+        series = {key: blank for key in ("hy_oas", "baa10y", "real_yield", "nfci", "sloos")}
         row = build_credit_history_rows(series, [("1998-08", "测试", "说明")])[0]
         self.assertEqual(row["state"], "N/A")
         self.assertIsNone(row["score"])

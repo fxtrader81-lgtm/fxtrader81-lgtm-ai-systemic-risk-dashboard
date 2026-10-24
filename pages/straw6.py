@@ -13,10 +13,13 @@ from components.ui import (load_css, logic_panel, metric_card, model_evidence_pa
                            render_data_freshness, render_footer, render_header,
                            spacer)
 from components.credit_transmission_views import render_credit_market_evidence
+from components.factor_quarterly_panel import render_current_quarter, render_quarterly_history
 from config.thresholds import STATE_COLORS
 from core.alert_engine import render_alert, render_osci_card
 from core.ai_financing_news import load_financing_news, load_softbank_financing_releases
 from core.credit_history import build_credit_history_rows
+from core.credit_quarterly import (load_archive_metadata, load_history as load_quarterly_history,
+                                   make_current_snapshot)
 from core.credit_risk import COMPONENTS, compute_credit_metrics
 from core.macro_data import load_credit_stress_snapshot
 from core.score_engine import register_score
@@ -79,6 +82,12 @@ def _latest_date(series: pd.Series) -> str | None:
     return stamp.strftime("%Y-%m-%d")
 
 
+def _latest_quarter(series: pd.Series) -> str | None:
+    if series is None or series.empty:
+        return None
+    return str(pd.Timestamp(series.dropna().index[-1]).to_period("Q"))
+
+
 def _stress_chart(series: dict[str, pd.Series]) -> go.Figure:
     fig = make_subplots(
         rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.08,
@@ -124,11 +133,12 @@ render_header(
     symbol="CFRI · CREDIT & REFINANCING",
 )
 
-with st.spinner("正在读取信用利差、实际利率与金融条件数据…"):
+with st.spinner("正在读取信用利差、实际利率、金融条件与银行贷款标准…"):
     series, source = load_credit_stress_snapshot()
 metrics = compute_credit_metrics(
     series["hy_oas"], series["real_yield"], series["nfci"],
     baa_spread=series["baa10y"],
+    lending_standards=series["sloos"],
 )
 composite = metrics["composite"]
 score, state = composite["score"], composite["grade"]
@@ -145,8 +155,8 @@ st.markdown(render_osci_card(
     "CFRI · 探索性信用压力指标",
     score, state, f"综合评分：{summary}",
     bar_color=STATE_COLORS.get(state, "#94a3b8"),
-    state_detail=f"有效权重覆盖率 {composite['coverage']}% · AI交易定价尚未纳入评分",
-    components_html="信用利差 ×0.35 · 10Y实际利率 ×0.30<br>NFCI金融条件 ×0.25 · AI融资交易温度 ×0.10",
+    state_detail=f"有效权重覆盖率 {composite['coverage']}% · 银行贷款标准按季度更新",
+    components_html="信用利差 ×0.35 · 10Y实际利率 ×0.30<br>NFCI金融条件 ×0.25 · 银行融资可得性 ×0.10",
     score_display="N/A" if score is None else f"{score:.1f}",
 ), unsafe_allow_html=True)
 
@@ -156,8 +166,8 @@ for column, key in zip(columns, COMPONENTS):
     item = metrics.get(key)
     with column:
         if item is None:
-            desc = "已有发行票息；待可比利差、认购及二级市场数据" if key == "ai_deal" else "数据缺失，不按SAFE处理"
-            st.markdown(metric_card(f"{definition['label']} ×{definition['weight']:.2f}", "N/A", "gray", desc=desc), unsafe_allow_html=True)
+            st.markdown(metric_card(f"{definition['label']} ×{definition['weight']:.2f}", "N/A", "gray",
+                                    desc="数据缺失，不按SAFE处理"), unsafe_allow_html=True)
             continue
         if key == "credit_spread":
             value = f"{item['value']:.0f}bp"
@@ -167,6 +177,11 @@ for column, key in zip(columns, COMPONENTS):
             value = f"{item['value']:.2f}%"
             change = "" if item["change"] is None else f"3M {item['change']:+.0f}bp"
             desc = f"当前 {item['grade']}<br>{change}"
+        elif key == "lending_standards":
+            value = f"{item['value']:+.1f}%"
+            change = "" if item["change"] is None else f"较上季 {item['change']:+.1f}个百分点"
+            period = _latest_quarter(series["sloos"]) or "季度不可得"
+            desc = f"当前 {item['grade']} · {period}<br>{change}"
         else:
             value = f"{item['value']:+.2f}"
             change = "" if item["change"] is None else f"13周 {item['change']:+.2f}"
@@ -265,14 +280,14 @@ def _deal_rows(items: list[dict[str, str]]) -> str:
 
 deal_rows = _deal_rows(sorted(AI_DEALS, key=lambda item: item["date"], reverse=True))
 st.markdown(
-    '<div class="panel"><div class="panel-title">🏦 已核实的AI融资事件</div>'
+    '<div class="panel"><div class="panel-title">🏦 AI融资事件观察｜非评分证据</div>'
     '<div class="metric-sub">条款及交易状态依据发行人原始公告；已公布、已定价、已完成及已提款各有不同，均不自动计入CFRI评分。</div>'
     '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>日期</th><th>发行人</th><th>用途／关联</th><th>规模</th><th>发行条款</th><th>核验状态</th></tr></thead>'
     f'<tbody>{deal_rows}</tbody></table></div><div class="metric-sub">'
     'SoftBank同一发行人4月美元债3.5年及5.5年票息分别为7.625%和8.250%，9月同期限均上移100bp；'
     '票息变化不等于信用利差变化，可能含基准利率、发行时点和融资需求影响。'
     '<a href="https://group.softbank/en/news/press/20260416" target="_blank">4月发行文件</a>。'
-    '目前缺少可比国债利差、认购倍数和二级市场表现，故交易温度仍不计分。</div></div>',
+    '目前缺少可比国债利差、认购倍数和二级市场表现，因此只作风险解释，不进入评分。</div></div>',
     unsafe_allow_html=True,
 )
 
@@ -321,7 +336,7 @@ for row in history_rows:
     interpretation = "未见广泛压力" if row["state"] == "SAFE" else "广泛压力抬升" if row["state"] != "N/A" else "数据不足"
     body.append(
         f'<tr><td>{row["month"]}</td><td><b>{escape(row["event"])}</b><br><small>{escape(row["description"])}</small></td>'
-        f'<td>{row["credit"]}</td><td>{row["real"]}</td><td>{row["nfci"]}</td>'
+        f'<td>{row["credit"]}</td><td>{row["real"]}</td><td>{row["nfci"]}</td><td>{row["sloos"]}</td>'
         f'<td style="color:{earlier_color};font-weight:800">{row["earlier_state"]}<br>{earlier_text}</td>'
         f'<td style="color:{color};font-weight:800">{row["state"]}<br>{score_text}<br><small>{interpretation}</small></td>'
         f'<td>{row["coverage"]}%</td></tr>'
@@ -337,12 +352,13 @@ history_summary = (
 st.markdown(
     '<div class="panel"><div class="panel-title">📋 历史信用事件复盘</div>'
     '<div class="history-help">分别观察事件前6个月和前3个月的月末值，按当前数据版本重建；这些是事前压力快照，不是事件预测。'
+    'SLOOS为季度调查，表示美国大中型企业工商业贷款标准净收紧比例，并非AI专项信贷报价。'
     'FRED的HY OAS从2026年4月起仅提供近三年，旧事件使用BAA−10Y代理；两者口径不同。'
     '1998和2002年事件因10Y TIPS实际利率序列尚未开始、有效权重只有60%，从评分表移除。'
     'NFCI历史值可能修订，这不是当时真实可见的评分，也不是经过验证的命中率。'
     f'{history_summary}SAFE只表示该时点尚未出现足以触发本模型的广泛信用压力；'
     '突发事件、局部信用风险及尚未扩散的脆弱性可能不反映在这些指标里。</div>'
-    '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差（前3个月）</th><th>实际利率（前3个月）</th><th>NFCI（前3个月）</th><th>前6个月代理</th><th>前3个月代理</th><th>覆盖率</th></tr></thead>'
+    '<div class="table-scroll"><table class="gpu-table"><thead><tr><th>事件时间</th><th>信用事件</th><th>信用利差（前3个月）</th><th>实际利率（前3个月）</th><th>NFCI（前3个月）</th><th>银行标准净收紧（前3个月）</th><th>前6个月代理</th><th>前3个月代理</th><th>覆盖率</th></tr></thead>'
     f'<tbody>{"".join(body)}</tbody></table></div></div>', unsafe_allow_html=True,
 )
 
@@ -352,11 +368,22 @@ with logic_tab:
     {"text": "<b>信用利差（35%）</b>：实时优先采用HY OAS；长历史仅用BAA−10Y代理并明确标注，不混合口径。"},
     {"text": "<b>实际利率（30%）</b>：10Y TIPS水平占70%，三个月变化占30%，用于衡量项目NPV和真实资金成本。"},
     {"text": "<b>NFCI（25%）</b>：水平占60%，13周变化占40%；正值表示金融条件较长期平均更紧。"},
-    {"text": "<b>AI融资交易温度（10%）</b>：只有可比较的最终定价与市场表现齐备时才计分。"},
+    {"text": "<b>银行融资可得性（10%）</b>：采用美联储SLOOS中大中型企业工商业贷款标准净收紧比例；≤5%为0分，>5–10%为33分，>10–20%为67分，>20%为100分。季度自动更新。"},
+    {"text": "<b>AI融资事件</b>：保留发行、贷款与担保结构作为解释证据；因条款口径不统一、缺少系统可比市场数据，不再占用评分权重。"},
     {"text": "<b>覆盖政策</b>：有效权重不足75%时输出N/A；缺失指标绝不按SAFE或零分处理。"},
     ], title="⚙️ CFRI评分逻辑"), unsafe_allow_html=True)
 
 with evidence_tab:
+    current_quarter = make_current_snapshot(metrics, series)
+    quarterly_history = load_quarterly_history()
+    archive_metadata = load_archive_metadata()
+    render_current_quarter(current_quarter, container_key="credit_quarterly_current")
+    render_quarterly_history(
+        quarterly_history, current_quarter, archive_metadata["legacy_method_evidence"],
+        container_key="credit_quarterly_history", page_number="06",
+        page_title="AI信贷与再融资压力", file_prefix="factor06-credit",
+        method_summary=archive_metadata["method_notes"],
+    )
     st.markdown(model_evidence_panel(
         sample="历史表为事后选择的信用事件；独立事件数、正常时期对照样本尚未核实。",
         validation=f"{history_summary}这些结果不支持把CFRI当作事件前三至六个月的预测器；无可可靠展示的独立样本外命中率与置信区间。",
@@ -370,7 +397,8 @@ with source_tab:
         {"name": "长期信用代理", "source": "FRED · BAA10Y", "updated_at": _latest_date(series["baa10y"]), "mode": "live"},
         {"name": "实际利率", "source": "FRED · DFII10", "updated_at": _latest_date(series["real_yield"]), "mode": "live"},
         {"name": "金融条件", "source": "FRED · NFCI", "updated_at": _latest_date(series["nfci"]), "mode": "live"},
-        {"name": "AI融资交易", "source": "SoftBank官方发行文件；待认购与二级市场数据", "updated_at": "2026-09-24", "mode": "static"},
+        {"name": "银行融资可得性", "source": "美联储SLOOS / FRED · DRTSCILM", "updated_at": _latest_date(series["sloos"]), "mode": "live"},
+        {"name": "AI融资事件（非评分）", "source": "发行人官方公告；不自动改变CFRI", "updated_at": "2026-10-01", "mode": "static"},
         {"name": "SoftBank官方披露线索", "source": "SoftBank新闻索引；访问时最多每周检索一次", "updated_at": checked_at, "mode": "live"},
     ])
 render_footer(f"{source} · 发行文件与事件驱动信息")

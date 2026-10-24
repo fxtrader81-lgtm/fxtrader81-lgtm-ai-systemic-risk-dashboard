@@ -1,4 +1,4 @@
-"""Reusable quarterly current/history presentation for Factors 02 and 03."""
+"""Reusable quarterly current/history presentation for factor detail pages."""
 from __future__ import annotations
 
 from html import escape
@@ -19,6 +19,15 @@ def _score(value):
 
 def _state(value):
     return f"{value}（{STATE_CN.get(value, value)}）"
+
+
+def _record_type_label(record):
+    kind = record.get("record_type", "")
+    if kind.startswith("reconstructed_"):
+        return "版本化复算"
+    if kind.startswith("backfilled"):
+        return "补录上一版页面状态"
+    return "季度归档"
 
 
 def _score_strip(score, state, record_status):
@@ -106,7 +115,7 @@ def render_quarterly_history(records, current, legacy_evidence, *, container_key
         with st.expander(label, expanded=False):
             st.write(f"每季度只保留一条{page_number}页面快照；页面刷新、行情更新或单项检查不会产生零散历史记录。")
             for record in records:
-                record_type = "补录上一版页面状态" if record["record_type"].startswith("backfilled") else "季度归档"
+                record_type = _record_type_label(record)
                 st.markdown(f"### {record['quarter']} · 截止{record['period_end']} · {record_type}")
                 st.markdown(_score_strip(record["score"], record["state"], record_type), unsafe_allow_html=True)
                 st.write(f"归档总得分{record['score']:.1f}/100，状态{_state(record['state'])}（页面整数显示{record['display_score']}）。{record['summary']}")
@@ -118,6 +127,7 @@ def render_quarterly_history(records, current, legacy_evidence, *, container_key
                 "history_policy": "每季度一条页面级快照；刷新只更新当前季度，不追加历史。",
                 "current": current,
                 "quarterly_history": records,
+                "method_summary": method_summary,
                 "legacy_method_evidence": legacy_evidence,
             }
             st.markdown("**下载说明**：HTML用于直接阅读；JSON保留完整原始输入、旧方法与既有采集记录。两种下载均需验证。")

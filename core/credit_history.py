@@ -30,6 +30,7 @@ def build_credit_history_rows(series: dict[str, pd.Series], events: list[tuple[s
                 as_of(series["real_yield"], month, lead_months),
                 as_of(series["nfci"], month, lead_months),
                 baa_spread=as_of(series["baa10y"], month, lead_months),
+                lending_standards=as_of(series.get("sloos", pd.Series(dtype=float)), month, lead_months),
             )
 
         metrics = reading(3)
@@ -48,5 +49,6 @@ def build_credit_history_rows(series: dict[str, pd.Series], events: list[tuple[s
             "credit": "N/A" if not credit else f"{credit['value']:.0f}bp · {credit.get('proxy', '')}",
             "real": "N/A" if "real_rate" not in metrics else f"{metrics['real_rate']['value']:.2f}%",
             "nfci": "N/A" if "financial_conditions" not in metrics else f"{metrics['financial_conditions']['value']:+.2f}",
+            "sloos": "N/A" if "lending_standards" not in metrics else f"{metrics['lending_standards']['value']:+.1f}%",
         })
     return rows

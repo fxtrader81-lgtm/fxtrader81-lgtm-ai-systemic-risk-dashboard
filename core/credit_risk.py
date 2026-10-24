@@ -1,8 +1,9 @@
 """Auditable AI credit and refinancing pressure scoring.
 
 The model separates broad credit pricing, real borrowing costs, system-wide
-financial conditions, and issuer-specific AI financing evidence. Missing
-components are excluded and never treated as SAFE.
+financial conditions, and bank lending standards. Issuer-specific AI financing
+events remain explanatory evidence outside the score. Missing components are
+excluded and never treated as SAFE.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ COMPONENTS = {
     "credit_spread": {"label": "高收益信用利差", "weight": 0.35, "unit": "bp"},
     "real_rate": {"label": "10Y实际利率", "weight": 0.30, "unit": "%"},
     "financial_conditions": {"label": "NFCI金融条件", "weight": 0.25, "unit": ""},
-    "ai_deal": {"label": "AI融资交易温度", "weight": 0.10, "unit": ""},
+    "lending_standards": {"label": "银行融资可得性", "weight": 0.10, "unit": "%"},
 }
 
 
@@ -51,6 +52,17 @@ def _ascending(value: float, safe: float, watch: float, warning: float) -> int:
     return 100
 
 
+def score_lending_standards(value: float) -> int:
+    """Map SLOOS net tightening to the Federal Reserve's qualitative bands."""
+    if value <= 5:
+        return 0
+    if value <= 10:
+        return 33
+    if value <= 20:
+        return 67
+    return 100
+
+
 def _component(value: float, change: float | None, level_score: int, change_score: int | None,
                *, level_weight: float, unit: str) -> dict:
     if change_score is None:
@@ -72,7 +84,7 @@ def compute_credit_metrics(
     nfci: pd.Series,
     *,
     baa_spread: pd.Series | None = None,
-    ai_deal_score: float | None = None,
+    lending_standards: pd.Series | None = None,
 ) -> dict:
     """Compute CFRI from source series available at the selected observation date.
 
@@ -83,6 +95,7 @@ def compute_credit_metrics(
     real_yield = normalize_monthly(real_yield)
     nfci = normalize_monthly(nfci)
     baa_spread = normalize_monthly(baa_spread)
+    lending_standards = normalize_monthly(lending_standards)
     result: dict[str, dict] = {}
 
     credit_series = hy_oas
@@ -124,14 +137,16 @@ def compute_credit_metrics(
             level_weight=0.60, unit="",
         )
 
-    if ai_deal_score is not None:
-        bounded = max(0.0, min(100.0, float(ai_deal_score)))
-        result["ai_deal"] = {
-            "value": bounded,
-            "change": None,
-            "score": round(bounded, 1),
-            "grade": state_for(bounded),
-            "unit": "",
+    if not lending_standards.empty:
+        value = float(lending_standards.iloc[-1])
+        change = float(value - lending_standards.iloc[-2]) if len(lending_standards) >= 2 else None
+        component_score = score_lending_standards(value)
+        result["lending_standards"] = {
+            "value": round(value, 3),
+            "change": None if change is None else round(change, 3),
+            "score": float(component_score),
+            "grade": state_for(component_score),
+            "unit": "%",
         }
 
     available_weight = sum(COMPONENTS[key]["weight"] for key in result)
@@ -143,9 +158,10 @@ def compute_credit_metrics(
         }
         return result
     score = sum(result[key]["score"] * COMPONENTS[key]["weight"] for key in result) / available_weight
+    displayed_score = round(score, 1)
     result["composite"] = {
-        "score": round(score, 1),
-        "grade": state_for(score),
+        "score": displayed_score,
+        "grade": state_for(displayed_score),
         "coverage": round(available_weight * 100),
     }
     return result
