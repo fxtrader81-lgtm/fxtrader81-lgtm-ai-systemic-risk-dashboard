@@ -13,6 +13,24 @@ from config.api_keys import FMP_API_KEY, FRED_API_KEY
 from core.market_freshness import download_yahoo
 
 
+CREDIT_SERIES_KEYS = ("hy_oas", "baa10y", "real_yield", "nfci", "sloos")
+
+
+def normalize_credit_stress_series(series: dict[str, pd.Series] | None) -> dict[str, pd.Series]:
+    """Return the complete Factor-06 schema without inventing missing values.
+
+    Streamlit can briefly retain a cached snapshot produced by an older app
+    version.  Consumers must therefore tolerate absent keys as well as failed
+    upstream requests.  Missing inputs remain empty series so the scoring
+    engine reduces coverage instead of treating them as zero or SAFE.
+    """
+    values = series or {}
+    return {
+        key: value if isinstance((value := values.get(key)), pd.Series) else pd.Series(dtype=float)
+        for key in CREDIT_SERIES_KEYS
+    }
+
+
 def _fred(series_id: str, *, frequency: str = "m") -> pd.Series:
     if not FRED_API_KEY:
         response = requests.get(
@@ -155,4 +173,4 @@ def load_credit_stress_snapshot() -> tuple[dict[str, pd.Series], str]:
     source = "FRED（BAMLH0A0HYM2、BAA10Y、DFII10、NFCI、DRTSCILM）"
     if missing:
         source += f" · 缺失：{', '.join(missing)}"
-    return series, source
+    return normalize_credit_stress_series(series), source

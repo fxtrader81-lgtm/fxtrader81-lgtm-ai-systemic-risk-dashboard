@@ -26,10 +26,10 @@ def build_credit_history_rows(series: dict[str, pd.Series], events: list[tuple[s
     for month, event, description in events:
         def reading(lead_months: int) -> dict:
             return compute_credit_metrics(
-                as_of(series["hy_oas"], month, lead_months),
-                as_of(series["real_yield"], month, lead_months),
-                as_of(series["nfci"], month, lead_months),
-                baa_spread=as_of(series["baa10y"], month, lead_months),
+                as_of(series.get("hy_oas", pd.Series(dtype=float)), month, lead_months),
+                as_of(series.get("real_yield", pd.Series(dtype=float)), month, lead_months),
+                as_of(series.get("nfci", pd.Series(dtype=float)), month, lead_months),
+                baa_spread=as_of(series.get("baa10y", pd.Series(dtype=float)), month, lead_months),
                 lending_standards=as_of(series.get("sloos", pd.Series(dtype=float)), month, lead_months),
             )
 

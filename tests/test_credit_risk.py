@@ -1,6 +1,7 @@
 """Factor-06 scoring must preserve published SLOOS bands and missingness."""
 
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -42,6 +43,24 @@ class CreditRiskTests(unittest.TestCase):
         metrics = compute_credit_metrics(hy_oas, real_yield, nfci)
         self.assertNotIn("lending_standards", metrics)
         self.assertEqual(metrics["composite"]["coverage"], 90)
+
+    def test_overview_accepts_cached_snapshot_without_sloos(self):
+        from core.factor_registry import _straw6
+
+        hy_oas, real_yield, nfci = self._market_series()
+        cached_old_schema = {
+            "hy_oas": hy_oas,
+            "baa10y": pd.Series(dtype=float),
+            "real_yield": real_yield,
+            "nfci": nfci,
+        }
+        with patch("core.factor_registry.load_credit_stress_snapshot",
+                   return_value=(cached_old_schema, "旧缓存测试源")):
+            result = _straw6()
+
+        self.assertTrue(result["available"])
+        self.assertEqual(result["coverage"], 90)
+        self.assertNotEqual(result["state"], "N/A")
 
 
 if __name__ == "__main__":

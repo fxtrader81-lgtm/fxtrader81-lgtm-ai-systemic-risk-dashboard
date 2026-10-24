@@ -1,11 +1,12 @@
 """Regression checks for factor 07's retrospective event-month semantics."""
 
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
 from core.market_event_replay import build_history_rows, event_validation_scope
-from core.macro_risk import compute_macro_metrics, daily_six_month_peak_gap
+from core.macro_risk import compute_current_macro_metrics, compute_macro_metrics, daily_six_month_peak_gap
 
 
 class MarketHistoryTests(unittest.TestCase):
@@ -59,6 +60,54 @@ class MarketHistoryTests(unittest.TestCase):
         metrics = compute_macro_metrics(**self.stress)
         self.assertNotIn("equity_drawdown", metrics)
         self.assertEqual(metrics["composite"]["coverage"], 80)
+
+    def test_current_score_uses_one_fresh_daily_series_for_both_equity_inputs(self):
+        daily = pd.Series(
+            [100.0, 105.0, 110.0, 115.0, 120.0, 90.0],
+            index=pd.to_datetime([
+                "2026-05-29", "2026-06-30", "2026-07-31",
+                "2026-08-31", "2026-09-30", "2026-10-23",
+            ]),
+        )
+        with patch("core.macro_risk.stale_sessions", return_value=0):
+            metrics = compute_current_macro_metrics(self.stress, daily)
+
+        self.assertIn("equity_momentum", metrics)
+        self.assertIn("equity_drawdown", metrics)
+        self.assertEqual(metrics["composite"]["coverage"], 100)
+
+    def test_overview_provider_matches_factor07_coverage_and_daily_source(self):
+        from core.factor_registry import _straw7
+
+        daily = pd.Series(
+            [100.0, 105.0, 110.0, 115.0, 120.0, 118.0],
+            index=pd.to_datetime([
+                "2026-05-29", "2026-06-30", "2026-07-31",
+                "2026-08-31", "2026-09-30", "2026-10-23",
+            ]),
+        )
+        with patch("core.factor_registry.load_macro_stress_snapshot", return_value=(self.stress, "宏观测试源")), \
+             patch("core.factor_registry.load_sp500_daily", return_value=(daily, "日线测试源")), \
+             patch("core.macro_risk.stale_sessions", return_value=0):
+            result = _straw7()
+
+        self.assertTrue(result["available"])
+        self.assertEqual(result["coverage"], 100)
+        self.assertIn("日线测试源", result["source"])
+
+    def test_overview_suspends_stale_equity_without_hiding_partial_coverage(self):
+        from core.factor_registry import _straw7
+
+        stale_daily = pd.Series([100.0], index=pd.to_datetime(["2026-09-01"]))
+        with patch("core.factor_registry.load_macro_stress_snapshot", return_value=(self.stress, "宏观测试源")), \
+             patch("core.factor_registry.load_sp500_daily", return_value=(stale_daily, "过期日线源")), \
+             patch("core.macro_risk.stale_sessions", return_value=2):
+            result = _straw7()
+
+        self.assertFalse(result["available"])
+        self.assertEqual(result["coverage"], 50)
+        self.assertEqual(result["state"], "N/A")
+        self.assertIn("核心股指日线缺失或过期", result["detail"])
 
     def test_six_month_outcome_excludes_seventh_month(self):
         dates = pd.date_range("2020-01-31", periods=13, freq="ME")

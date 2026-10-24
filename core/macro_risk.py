@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from core.market_freshness import stale_sessions
+
 
 COMPONENTS = {
     "equity_momentum": {"label": "标普500三个月收益", "weight": 0.30, "unit": "%"},
@@ -120,3 +122,39 @@ def compute_macro_metrics(
         "breadth": round(breadth, 1),
     }
     return result
+
+
+def compute_current_macro_metrics(
+    stress: dict[str, pd.Series],
+    sp500_daily: pd.Series,
+) -> dict:
+    """Score the live factor-07 view from one fresh S&P 500 daily series.
+
+    The daily series supplies both the monthly momentum input and the six-month
+    drawdown input.  If it is missing or stale, both equity confirmations are
+    excluded and the current composite is suspended instead of mixing two
+    different S&P 500 snapshots.
+    """
+    lag = stale_sessions(sp500_daily, "US")
+    equity_is_stale = lag is None or lag > 1
+    empty = pd.Series(dtype=float)
+    if equity_is_stale:
+        sp500_monthly = empty
+        daily_for_score = empty
+    else:
+        daily_for_score = pd.to_numeric(sp500_daily, errors="coerce").dropna().copy()
+        daily_for_score.index = pd.to_datetime(daily_for_score.index).tz_localize(None)
+        daily_for_score = daily_for_score.sort_index()
+        sp500_monthly = daily_for_score.resample("ME").last().dropna()
+
+    metrics = compute_macro_metrics(
+        stress["y10"], stress["y3m"], sp500_monthly,
+        stress["stlfsi"], stress["vix"], daily_for_score,
+    )
+    if equity_is_stale:
+        metrics["composite"] = {
+            **metrics["composite"],
+            "score": None,
+            "grade": "N/A",
+        }
+    return metrics

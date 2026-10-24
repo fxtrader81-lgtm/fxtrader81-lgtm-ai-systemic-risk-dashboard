@@ -21,8 +21,10 @@ from core.energy_cost import load_cost
 
 from config.thresholds import STRAW_WEIGHTS
 from core.credit_risk import compute_credit_metrics
-from core.macro_data import load_credit_stress_snapshot, load_macro_stress_snapshot
-from core.macro_risk import compute_macro_metrics
+from core.macro_data import (load_credit_stress_snapshot, load_macro_stress_snapshot,
+                             normalize_credit_stress_series)
+from core.macro_risk import compute_current_macro_metrics
+from core.market_outcome_data import load_sp500_daily
 from core.straw5_engine import load_straw5_analysis
 from core.transmission_phase import market_phase, system_phase
 from core.capability_gap import ensure_full_baseline as current_capability_snapshot
@@ -267,6 +269,7 @@ def _yield_series(ticker: str) -> pd.Series:
 
 def _straw6() -> dict:
     series, source = load_credit_stress_snapshot()
+    series = normalize_credit_stress_series(series)
     metrics = compute_credit_metrics(
         series["hy_oas"], series["real_yield"], series["nfci"],
         baa_spread=series["baa10y"],
@@ -282,14 +285,22 @@ def _straw6() -> dict:
 
 
 def _straw7() -> dict:
-    series, source = load_macro_stress_snapshot()
-    metrics = compute_macro_metrics(
-        series["y10"], series["y3m"], series["sp500"],
-        series["stlfsi"], series["vix"],
-    )
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        stress_job = pool.submit(load_macro_stress_snapshot)
+        daily_job = pool.submit(load_sp500_daily)
+        series, source = stress_job.result()
+        try:
+            sp500_daily, daily_source = daily_job.result()
+        except Exception:
+            sp500_daily, daily_source = pd.Series(dtype=float), "日线暂不可用"
+    metrics = compute_current_macro_metrics(series, sp500_daily)
+    source += f" · 标普500日线按月汇总：{daily_source}"
     composite = metrics["composite"]
     if composite["score"] is None:
-        return _unavailable("straw7", f"跨市场序列覆盖不足（{composite['coverage']}%）")
+        return _result(
+            "straw7", None, composite["coverage"] / 100,
+            f"跨市场序列覆盖不足（{composite['coverage']}%）；核心股指日线缺失或过期，暂停当前评级", source,
+        )
     return _result(
         "straw7", composite["score"], composite["coverage"] / 100,
         "市场传导确认强度：股票动量与回撤、VIX、利率冲击、市场压力与期限曲线；非下跌预测概率", source,

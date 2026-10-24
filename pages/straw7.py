@@ -32,7 +32,7 @@ from core.alert_engine import render_alert, render_osci_card
 from core.macro_data import load_macro_stress_snapshot
 from core.market_outcome_data import load_sp500_daily
 from core.market_freshness import download_yahoo, repair_china_if_stale, repair_if_stale, stale_sessions
-from core.macro_risk import COMPONENTS, compute_macro_metrics
+from core.macro_risk import COMPONENTS, compute_current_macro_metrics, compute_macro_metrics
 from core.transmission_phase import market_phase_from_series
 from core.market_event_replay import build_history_rows, event_validation_scope
 from core.score_engine import register_score
@@ -228,17 +228,7 @@ def fetch_fred_daily(series_id: str, start: str = "1994-01-01") -> pd.Series:
 # =========================================================
 
 def compute_alert_metrics(stress: dict[str, pd.Series], sp500_daily: pd.Series) -> dict:
-    lag = stale_sessions(sp500_daily, "US")
-    equity_is_stale = lag is None or lag > 1
-    empty = pd.Series(dtype=float)
-    metrics = compute_macro_metrics(
-        stress["y10"], stress["y3m"], empty if equity_is_stale else stress["sp500"],
-        stress["stlfsi"], stress["vix"], empty if equity_is_stale else sp500_daily,
-    )
-    if equity_is_stale:
-        # Missing a core confirmation series is not a market SAFE signal.
-        metrics["composite"] = {**metrics["composite"], "score": None, "grade": "N/A"}
-    return metrics
+    return compute_current_macro_metrics(stress, sp500_daily)
 
 
 def grade_to_color(grade: str) -> str:

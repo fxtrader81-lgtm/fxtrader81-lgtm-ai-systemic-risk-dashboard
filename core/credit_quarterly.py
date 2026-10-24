@@ -33,16 +33,16 @@ def _component_snapshot(key, item, series):
         return component(key, labels[key], None, "N/A", "数据缺失", {}, WEIGHTS)
     if key == "credit_spread":
         display = f"{item['value']:.0f}bp"
-        period = f"FRED HY OAS；截至{_latest_period(series['hy_oas'])}"
+        period = f"FRED HY OAS；截至{_latest_period(series.get('hy_oas'))}"
     elif key == "real_rate":
         display = f"{item['value']:.2f}%"
-        period = f"FRED 10Y TIPS；截至{_latest_period(series['real_yield'])}"
+        period = f"FRED 10Y TIPS；截至{_latest_period(series.get('real_yield'))}"
     elif key == "financial_conditions":
         display = f"{item['value']:+.3f}"
-        period = f"FRED NFCI；截至{_latest_period(series['nfci'])}"
+        period = f"FRED NFCI；截至{_latest_period(series.get('nfci'))}"
     else:
         display = f"{item['value']:+.1f}%"
-        period = f"美联储SLOOS；{_latest_period(series['sloos'], quarterly=True)}"
+        period = f"美联储SLOOS；{_latest_period(series.get('sloos'), quarterly=True)}"
     return component(key, labels[key], item.get("score"), display, period, dict(item), WEIGHTS)
 
 

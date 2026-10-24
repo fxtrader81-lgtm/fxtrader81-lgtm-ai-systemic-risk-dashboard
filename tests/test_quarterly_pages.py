@@ -188,6 +188,29 @@ class QuarterlyPageTests(unittest.TestCase):
         self.assertEqual([button.label for button in at.get("download_button")],
                          ["下载可阅读版（HTML）", "下载完整原始资料（JSON）"])
 
+    def test_factor06_page_tolerates_cached_snapshot_without_sloos(self):
+        from streamlit.testing.v1 import AppTest
+
+        months = pd.date_range("2026-04-30", periods=4, freq="ME")
+        cached_old_schema = {
+            "hy_oas": pd.Series([2.85, 2.85, 2.85, 3.40], index=months),
+            "baa10y": pd.Series([1.5, 1.5, 1.5, 1.5], index=months),
+            "real_yield": pd.Series([2.47, 2.47, 2.47, 2.76], index=months),
+            "nfci": pd.Series([-0.543, -0.543, -0.543, -0.496], index=months),
+        }
+        with patch("core.macro_data.load_credit_stress_snapshot",
+                   return_value=(cached_old_schema, "旧缓存测试源")), \
+             patch("core.ai_financing_news.load_financing_news", return_value=([], None)), \
+             patch("core.ai_financing_news.load_softbank_financing_releases", return_value=([], None)):
+            at = AppTest.from_file("pages/straw6.py", default_timeout=30)
+            at.run()
+
+        self.assertEqual(len(at.exception), 0)
+        labels = [expander.label for expander in at.expander]
+        self.assertTrue(any(label.startswith("2026Q4进行中｜总分27.7 · WATCH") for label in labels))
+        text = "\n".join(block.value for block in at.markdown)
+        self.assertIn("数据缺失，不按SAFE处理", text)
+
 
 if __name__ == "__main__":
     unittest.main()

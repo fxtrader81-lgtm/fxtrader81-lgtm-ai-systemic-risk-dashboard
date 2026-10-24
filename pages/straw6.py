@@ -21,7 +21,7 @@ from core.credit_history import build_credit_history_rows
 from core.credit_quarterly import (load_archive_metadata, load_history as load_quarterly_history,
                                    make_current_snapshot)
 from core.credit_risk import COMPONENTS, compute_credit_metrics
-from core.macro_data import load_credit_stress_snapshot
+from core.macro_data import load_credit_stress_snapshot, normalize_credit_stress_series
 from core.score_engine import register_score
 
 
@@ -135,6 +135,7 @@ render_header(
 
 with st.spinner("正在读取信用利差、实际利率、金融条件与银行贷款标准…"):
     series, source = load_credit_stress_snapshot()
+series = normalize_credit_stress_series(series)
 metrics = compute_credit_metrics(
     series["hy_oas"], series["real_yield"], series["nfci"],
     baa_spread=series["baa10y"],
